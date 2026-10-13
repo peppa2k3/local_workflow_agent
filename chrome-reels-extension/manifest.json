@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Local Workflow Agent Bridge",
+  "version": "3.4.0",
+  "description": "Runs local workflow steps in the current Chrome profile.",
+  "permissions": ["debugger"],
+  "host_permissions": ["http://127.0.0.1:34719/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [{
+    "matches": ["http://*/*", "https://*/*"],
+    "js": ["content.js"],
+    "run_at": "document_idle"
+  }]
+}
