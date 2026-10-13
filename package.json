@@ -1,4 +1,11 @@
 {
+  "name": "local-chrome-workflow-agent",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "node local-agent.js",
+    "test": "node tests/overlay-flow.js"
+  },
   "dependencies": {
     "playwright": "^1.64.0"
   }

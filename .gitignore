@@ -1,0 +1,7 @@
+node_modules/
+.facebook-chrome-profile/
+*.pem
+*.crx
+playwright-report/
+test-results/
+*.log
