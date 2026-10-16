@@ -3,89 +3,32 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 const { spawn } = require('child_process');
-const { port, scenariosDir, dashboardPath, chromePath, profile } = require('./config');
+const { port, scenariosDir, dashboardPath, chromePath, profile, userDataDir } = require('./config');
 const { createScenarioStore } = require('./scenario-store');
 const { chooseFile } = require('./file-picker');
+const { listProfiles } = require('./profiles');
+const { createWorkflows } = require('./workflows');
 
 const scenarios = createScenarioStore(scenariosDir);
-let workflow = null;
-let index = 0;
-let runId = 0;
-let running = false;
-let inFlight = false;
-let requiredUrl = null;
-let boundTabId = null;
-let lastContact = 0;
-let lastError = '';
-let picker = { id: 0, active: false, result: null };
-
-function stop() {
-  running = false;
-  inFlight = false;
-  runId++;
-}
-
-function status() {
-  return {
-    running, profile, index, total: workflow?.steps.length || 0,
-    action: workflow?.steps[index]?.action || null,
-    extensionConnected: Date.now() - lastContact < 5000,
-    requiredUrl, error: lastError
-  };
-}
-
-function startScenario(scenario, uploadPath = '') {
-  const prepared = scenarios.prepare(scenario, uploadPath);
-  stop();
-  picker.active = false;
-  workflow = prepared;
-  index = 0;
-  lastError = '';
-  requiredUrl = null;
-  boundTabId = null;
-  running = true;
-  console.log(`Started: ${workflow.name || 'Untitled scenario'}`);
-  advanceLocalSteps(runId).catch(error => { lastError = error.message; stop(); });
-}
-
-async function advanceLocalSteps(id) {
-  while (running && runId === id && index < workflow.steps.length) {
-    const step = workflow.steps[index];
-    if (step.action === 'wait') {
-      await new Promise(resolve => setTimeout(resolve, step.ms));
-      if (!running || runId !== id) return;
-    } else if (step.action === 'openFolder') {
-      const folder = path.resolve(step.path);
-      if (!fs.existsSync(folder) || !fs.statSync(folder).isDirectory()) {
-        lastError = `Folder does not exist: ${folder}`;
-        stop();
-        return;
-      }
-      const explorer = spawn('explorer.exe', [folder], { detached: true, stdio: 'ignore' });
-      explorer.on('error', error => console.error(error.message));
-      explorer.unref();
-    } else if (step.action === 'openUrl') {
-      const url = new URL(step.url);
-      if (!['http:', 'https:'].includes(url.protocol)) throw new Error('openUrl requires http or https');
-      const chrome = spawn(chromePath, [`--profile-directory=${profile}`, url.href], {
-        detached: true, stdio: 'ignore'
-      });
-      chrome.on('error', error => { lastError = error.message; stop(); });
-      chrome.unref();
-      requiredUrl = url.href;
-      boundTabId = null;
-    } else {
-      return; // A Chrome tab will execute this step.
-    }
-    console.log(`Done ${index + 1}/${workflow.steps.length}: ${step.action}`);
-    index++;
+let profileCache, profileCacheAt = 0;
+const profiles = () => {
+  if (!profileCache || Date.now() - profileCacheAt > 2000) {
+    profileCache = listProfiles(userDataDir, profile); profileCacheAt = Date.now();
   }
-  if (running && runId === id && index === workflow.steps.length) {
-    running = false;
-    console.log('Scenario completed.');
-  }
+  return profileCache;
+};
+const workflows = createWorkflows({ scenarios, defaultProfile: profile, profiles, openFolder(folderPath) {
+  const folder = path.resolve(folderPath);
+  if (!fs.existsSync(folder) || !fs.statSync(folder).isDirectory()) throw new Error(`Folder does not exist: ${folder}`);
+  return launch('explorer.exe', [folder]);
+} });
+function launch(command, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { detached: true, stdio: 'ignore' });
+    child.once('error', reject);
+    child.once('spawn', () => { child.unref(); resolve(); });
+  });
 }
-
 function readBody(request) {
   return new Promise((resolve, reject) => {
     let body = '';
@@ -96,11 +39,13 @@ function readBody(request) {
     request.on('end', () => {
       try { resolve(JSON.parse(body)); } catch (error) { reject(error); }
     });
+    request.on('error', reject);
   });
 }
 
 const server = http.createServer(async (request, response) => {
-  const route = new URL(request.url, `http://127.0.0.1:${port}`).pathname;
+  const url = new URL(request.url, `http://127.0.0.1:${port}`);
+  const route = url.pathname;
   const json = (code, data) => {
     response.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
     response.end(JSON.stringify(data));
@@ -110,141 +55,100 @@ const server = http.createServer(async (request, response) => {
     fs.createReadStream(dashboardPath).pipe(response);
     return;
   }
-  if (route.startsWith('/api/')) {
-    try {
+  try {
+    if (route.startsWith('/api/')) {
       const origin = request.headers.origin;
-      if (origin && origin !== `http://127.0.0.1:${port}`) throw new Error('Origin not allowed');
-      if (request.method === 'GET' && route === '/api/status') return json(200, status());
-      if (request.method === 'GET' && route === '/api/pick/status') return json(200, picker);
+      const extensionRead = request.method === 'GET' && route === '/api/profiles' && /^chrome-extension:\/\/[a-z]+$/.test(origin || '');
+      if (origin && origin !== `http://127.0.0.1:${port}` && !extensionRead) throw new Error('Origin not allowed');
+      const selected = url.searchParams.get('profile') || profile;
+      if (request.method === 'GET' && route === '/api/status') return json(200, workflows.status(selected));
+      if (request.method === 'GET' && route === '/api/profiles') {
+        return json(200, { defaultProfile: profile, profiles: profiles().map(item => ({ ...item, ...workflows.status(item.directory) })) });
+      }
+      if (request.method === 'POST' && route === '/api/profiles/open') {
+        const body = await readBody(request);
+        workflows.session(body.profile);
+        await launch(chromePath, [`--user-data-dir=${userDataDir}`, `--profile-directory=${body.profile}`, `http://127.0.0.1:${port}`]);
+        return json(200, { ok: true });
+      }
+      if (request.method === 'GET' && route === '/api/pick/status') return json(200, workflows.session(selected).picker);
       if (request.method === 'POST' && route === '/api/choose-file') {
         const body = await readBody(request);
-        const filePath = await chooseFile(body.initialDirectory || '');
-        return json(200, { filePath });
+        return json(200, { filePath: await chooseFile(body.initialDirectory || '') });
       }
       if (request.method === 'POST' && route === '/api/pick/start') {
-        if (running) throw new Error('Stop the scenario before picking an element');
-        picker = { id: picker.id + 1, active: true, result: null };
-        return json(200, picker);
+        const body = await readBody(request);
+        const s = workflows.session(body.profile);
+        if (s.running) throw new Error('Stop this profile before picking an element');
+        if (!workflows.status(s.profile).extensionConnected) throw new Error('Extension chưa kết nối profile này');
+        s.picker = { id: s.picker.id + 1, active: true, result: null };
+        return json(200, s.picker);
       }
-      if (request.method === 'GET' && route === '/api/scenarios') {
-        return json(200, { names: scenarios.list() });
-      }
+      if (request.method === 'GET' && route === '/api/scenarios') return json(200, { names: scenarios.list() });
       const match = route.match(/^\/api\/scenarios\/([^/]+)$/);
-      if (match && request.method === 'GET') {
-        return json(200, scenarios.load(match[1]));
-      }
+      if (match && request.method === 'GET') return json(200, scenarios.load(match[1]));
       if (match && request.method === 'PUT') {
-        const scenario = await readBody(request);
-        scenarios.save(match[1], scenario);
+        scenarios.save(match[1], await readBody(request));
         return json(200, { ok: true });
       }
       if (request.method === 'POST' && route === '/api/run') {
         const body = await readBody(request);
-        startScenario(scenarios.load(body.name), body.uploadPath || '');
+        workflows.start(body.profile || profile, scenarios.load(body.name), body.uploadPath || '');
         return json(200, { ok: true });
       }
       if (request.method === 'POST' && route === '/api/stop') {
-        stop();
+        const body = await readBody(request);
+        workflows.stop(body.profile || profile);
         return json(200, { ok: true });
       }
       return json(404, { error: 'Not found' });
-    } catch (error) {
-      return json(400, { error: String(error.message || error) });
     }
-  }
-  if (request.method !== 'POST' || !['/next', '/result', '/state', '/pick/next', '/pick/result'].includes(request.url)) {
-    response.writeHead(404).end();
-    return;
-  }
-  try {
+    if (request.method !== 'POST' || !['/next', '/result', '/state', '/pick/next', '/pick/result'].includes(route)) {
+      return json(404, { error: 'Not found' });
+    }
     const body = await readBody(request);
-    lastContact = Date.now();
-    let answer = { running, runId };
-    if (request.url === '/pick/next') {
-      answer = { active: picker.active, id: picker.id };
-    } else if (request.url === '/pick/result') {
-      if (picker.active && body.id === picker.id) {
-        picker.active = false;
-        picker.result = body.locator || null;
-      }
-      answer = { ok: true };
-    } else if (request.url === '/next') {
-      answer.step = null;
-      if (running && !inFlight && index < workflow.steps.length) {
-        if ((!requiredUrl || body.url?.startsWith(requiredUrl)) &&
-            (boundTabId === null || body.tabId === boundTabId)) {
-          boundTabId = body.tabId;
-          requiredUrl = null;
-          inFlight = true;
-          answer.step = { ...workflow.steps[index], id: index };
-          console.log(`Running ${index + 1}/${workflow.steps.length}: ${answer.step.action}`);
-        }
-      }
-    } else if (request.url === '/result') {
-      if (running && body.runId === runId && body.id === index && inFlight) {
-        inFlight = false;
-        if (!body.ok) {
-          lastError = `Step ${index + 1}: ${body.error}`;
-          console.error(lastError);
-          stop();
-        } else {
-          const step = workflow.steps[index];
-          console.log(`Done ${index + 1}/${workflow.steps.length}: ${step.action}`);
-          index++;
-          advanceLocalSteps(runId).catch(error => { lastError = error.message; stop(); });
-        }
-      }
+    const s = workflows.connect(body);
+    if (route === '/next') return json(200, workflows.next(s));
+    if (route === '/result') workflows.result(s, body);
+    if (route === '/pick/next') return json(200, s.picker);
+    if (route === '/pick/result' && s.picker.active && body.id === s.picker.id) {
+      s.picker.active = false; s.picker.result = body.locator || null;
     }
-    response.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-    response.end(JSON.stringify(answer));
+    return json(200, { running: s.running, runId: s.runId, ok: true });
   } catch (error) {
-    response.writeHead(400).end(String(error.message || error));
+    return json(400, { error: String(error.message || error) });
   }
 });
-
+const expiry = setInterval(workflows.expire, 1000);
+expiry.unref();
 server.listen(port, '127.0.0.1', () => {
-  console.log(`Local agent ready. Chrome profile: ${profile}. Load/reload the extension there.`);
+  console.log(`Local agent ready. Default Chrome profile: ${profile}.`);
   console.log(`Dashboard: http://127.0.0.1:${port}`);
-  console.log('Commands: run <scenario.json> | stop | status | exit');
+  console.log('Commands: run <scenario.json> [--profile "Profile 1"] [--upload "path"] | stop [profile] | status | exit');
   terminal.prompt();
 });
 server.on('error', error => {
-  if (error.code === 'EADDRINUSE') {
-    console.error(`Port ${port} is already in use. Exit the previous local agent, then run this version again.`);
-  } else {
-    console.error(error);
-  }
-  process.exitCode = 1;
-  terminal.close();
+  console.error(error.code === 'EADDRINUSE' ? `Port ${port} is already in use. Exit the previous local agent, then run this version again.` : error);
+  process.exitCode = 1; terminal.close();
 });
-
 const terminal = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: 'agent> ' });
 terminal.on('line', line => {
   const command = line.trim();
-  if (command.startsWith('run ')) {
-    try {
-      const raw = command.slice(4).trim();
-      const marker = ' --upload ';
-      const position = raw.indexOf(marker);
-      const file = path.resolve((position < 0 ? raw : raw.slice(0, position)).trim().replace(/^"|"$/g, ''));
-      const uploadPath = position < 0 ? '' : raw.slice(position + marker.length).trim().replace(/^"|"$/g, '');
-      const scenario = JSON.parse(fs.readFileSync(file, 'utf8'));
-      startScenario(scenario, uploadPath);
-    } catch (error) { console.error(error.message); }
-  } else if (command === 'stop') {
-    stop();
-    console.log('Stopped.');
-  } else if (command === 'status') {
-    console.log(`State: ${running ? 'running' : 'idle'}; step: ${workflow ? `${index + 1}/${workflow.steps.length}` : 'none'}; extension: ${Date.now() - lastContact < 5000 ? 'connected' : 'not connected'}`);
-    if (requiredUrl) console.log(`Waiting for URL: ${requiredUrl}`);
-    if (lastError) console.log(`Error: ${lastError}`);
-  } else if (command === 'exit') {
-    stop();
-    terminal.close();
-    return;
-  } else {
-    console.log('Commands: run <scenario.json> | stop | status | exit');
-  }
+  try {
+    if (command.startsWith('run ')) {
+      const tokens = command.slice(4).match(/"[^"]*"|\S+/g)?.map(value => value.replace(/^"|"$/g, '')) || [];
+      const [file, ...flags] = tokens;
+      let selected = profile, uploadPath = '';
+      for (let i = 0; i < flags.length; i += 2) {
+        if (!flags[i + 1] || !['--profile', '--upload'].includes(flags[i])) throw new Error('Use --profile "Profile 1" or --upload "path"');
+        if (flags[i] === '--profile') selected = flags[i + 1]; else uploadPath = flags[i + 1];
+      }
+      workflows.start(selected, JSON.parse(fs.readFileSync(path.resolve(file), 'utf8')), uploadPath);
+    } else if (command === 'stop' || command.startsWith('stop ')) workflows.stop(command.slice(5).trim().replace(/^"|"$/g, '') || profile);
+    else if (command === 'status') console.log(JSON.stringify(profiles().map(item => workflows.status(item.directory)), null, 2));
+    else if (command === 'exit') { terminal.close(); return; }
+    else console.log('Commands: run <scenario.json> [--profile "Profile 1"] [--upload "path"] | stop [profile] | status | exit');
+  } catch (error) { console.error(error.message); }
   terminal.prompt();
 });
-terminal.on('close', () => server.close());
+terminal.on('close', () => { profiles().forEach(item => workflows.stop(item.directory)); server.close(); });

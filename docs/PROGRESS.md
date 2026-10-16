@@ -1,8 +1,12 @@
 # Tiến độ phát triển
 
-Cập nhật: 2026-10-13 (Asia/Bangkok).
+Cập nhật: 2026-10-16 (Asia/Bangkok).
 
 ## Completed
+
+- Điều phối tuần tự theo xác nhận hoàn tất: chờ navigation/DOM ổn định sau openUrl/click; hỗ trợ điều kiện kết quả visible/hidden/enabled cho tác vụ bất đồng bộ, timeout và dừng riêng.
+- Dashboard chọn/mở nhiều Chrome profile và chạy đồng thời các workflow độc lập; extension cấu hình profile một lần trong Options, từ chối kết nối trùng và kết quả cũ.
+- Kiểm thử Chrome tách biệt cho redirect, tải tài nguyên chậm, click thay document, kết quả SPA; kiểm thử cách ly workflow/profile.
 
 - Local Agent chạy trong Node.js, điều phối các bước kịch bản JSON và cung cấp dashboard HTTP local.
 - Extension thao tác trên Chrome profile đang dùng: cuộn, click, nhập chữ, chọn phần tử trực tiếp, locator semantic/CSS/XPath.

@@ -2,6 +2,8 @@
 
 Công cụ tạo và chạy kịch bản tự động trên Chrome profile đang dùng. Agent Node.js nhận lệnh trên máy; Chrome Extension thực hiện click, nhập chữ, cuộn và chọn file trong tab. Dashboard local giúp chỉnh sửa kịch bản JSON bằng giao diện.
 
+Dashboard hỗ trợ chọn/mở nhiều Chrome profile và chạy kịch bản độc lập trên từng profile. Cài extension trong mỗi profile, vào **Extension options** để chọn đúng thư mục profile, rồi chọn profile trên dashboard. `openUrl`/`click` chờ trang tải xong; dùng điều kiện hoàn tất để chờ kết quả AJAX hoặc upload.
+
 **Bắt đầu:** [Hướng dẫn cài đặt và chạy từng bước](docs/SETUP.md).
 
 ## Cấu trúc

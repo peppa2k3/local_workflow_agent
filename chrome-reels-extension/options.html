@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="vi">
+<head><meta charset="utf-8"><title>Local Agent — Chrome profile</title>
+<style>body{font:16px system-ui;max-width:620px;margin:60px auto;padding:20px;background:#0b1020;color:#edf2ff}label{display:grid;gap:8px;margin:24px 0}select,button{font:inherit;padding:12px;border-radius:8px}button{cursor:pointer}p{line-height:1.6}#message{white-space:pre-wrap}</style></head>
+<body>
+<h1>Kết nối Chrome profile</h1>
+<p>Chọn đúng profile đang mở cửa sổ này. Xem <strong>Profile Path</strong> tại <code>chrome://version</code>: phần cuối là <code>Default</code> hoặc <code>Profile 1</code>, <code>Profile 2</code>… Mỗi profile cần cài extension và cấu hình một lần.</p>
+<label>Chrome profile<select id="profile"><option value="">Chọn profile…</option></select></label>
+<button id="save">Lưu kết nối</button>
+<p id="message" role="status"></p>
+<script src="options.js"></script>
+</body></html>

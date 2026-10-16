@@ -3,9 +3,9 @@
 ## 1. Chuẩn bị
 
 1. Cài Node.js và Google Chrome trên Windows.
-2. Mở PowerShell tại thư mục dự án `D:\CODE_DND\playwright_test`.
+2. Mở PowerShell tại thư mục dự án `D:\[you-path]\playwright_test`.
 3. Chạy `npm ci` để cài dependency theo `package-lock.json`.
-4. Chọn đúng Chrome profile đang có phiên đăng nhập Facebook. Mặc định agent dùng `Profile 2`. Để đổi sang `Profile 1`, chạy `$env:CHROME_PROFILE = 'Profile 1'` trong **cùng terminal** trước khi khởi động agent. Có thể đặt `$env:CHROME_PATH` nếu Chrome không ở `C:\Program Files\Google\Chrome\Application\chrome.exe`.
+4. Dashboard cho phép chọn nhiều Chrome profile. Mặc định CLI/API dùng `Profile 2`; đổi mặc định bằng `$env:CHROME_PROFILE = 'Profile 1'` trước khi khởi động agent. Có thể đặt `$env:CHROME_PATH` nếu Chrome không ở `C:\Program Files\Google\Chrome\Application\chrome.exe`, và `$env:CHROME_USER_DATA_DIR` nếu dùng thư mục dữ liệu Chrome riêng. Cần Chrome 120 trở lên.
 
 Không dùng `legacy/facebook-feed.js` cho quy trình này: nó là thử nghiệm Playwright cũ. Agent và extension thao tác trên profile Chrome hiện có.
 
@@ -14,9 +14,10 @@ Không dùng `legacy/facebook-feed.js` cho quy trình này: nó là thử nghi�
 1. Chuyển sang cửa sổ của Chrome profile đã chọn.
 2. Mở `chrome://extensions`.
 3. Bật **Developer mode**.
-4. Chọn **Load unpacked**, chọn thư mục `D:\CODE_DND\playwright_test\chrome-reels-extension` (chọn **thư mục**, không chọn `manifest.json`).
-5. Chấp nhận quyền Debugger nếu Chrome hỏi. Extension dùng quyền này để gửi click, cuộn và chọn file vào tab.
-6. Khi mã extension thay đổi, bấm **Reload** trên thẻ extension rồi tải lại tab website đang mở.
+4. Chọn **Load unpacked**, chọn thư mục `D:\[you-path]\playwright_test\chrome-reels-extension` (chọn **thư mục**, không chọn `manifest.json`).
+5. Chấp nhận quyền extension nếu Chrome hỏi. Extension dùng Debugger để gửi click/cuộn/chọn file; Tabs, Scripting, Storage và Alarms để quản lý tab, chờ tải trang và duy trì kết nối riêng theo profile.
+6. Sau khi agent chạy, mở **Details → Extension options**. Chọn đúng thư mục của profile này rồi **Lưu kết nối**. Xem **Profile Path** tại `chrome://version` để biết phần cuối là `Default`, `Profile 1`, `Profile 2`… Lặp lại việc cài và cấu hình cho từng profile muốn điều khiển.
+7. Khi mã extension thay đổi, bấm **Reload** trên thẻ extension trong từng profile rồi tải lại tab website đang mở. Bản cập nhật nhiều profile yêu cầu cấu hình Extension options một lần trước khi chạy.
 
 ## 3. Khởi động agent và dashboard
 
@@ -24,15 +25,16 @@ Không dùng `legacy/facebook-feed.js` cho quy trình này: nó là thử nghi�
 2. Giữ terminal đó mở. Dòng `Dashboard: http://127.0.0.1:34719` cho biết agent đã sẵn sàng.
 3. Mở `http://127.0.0.1:34719` trong Chrome. Địa chỉ này chỉ lắng nghe trên máy local.
 4. Nếu cổng `34719` đã được dùng, nhập `exit` trong terminal agent cũ rồi chạy lại. Extension đang kết nối cố định với cổng này.
+5. Chọn **Chrome profile** trên dashboard. **Mở profile** mở cửa sổ của profile đó; chỉ chạy khi trạng thái extension của profile là **đã kết nối**.
 
 ## 4. Tạo và chạy kịch bản
 
 1. Nhập **Tên file mới** bằng chữ thường, số, `-` hoặc `_`, rồi bấm **Tạo mới**. Hoặc chọn kịch bản đã lưu và bấm **Mở**.
 2. Bấm **＋ Thêm bước**, chọn action, điền trường của bước đó. Dùng nút ↑ ↓ để đổi thứ tự.
-3. Thường bắt đầu bằng `openUrl`, rồi `waitFor` nút cần xuất hiện, sau đó `click`, `type`, `scroll` hoặc `upload`.
+3. Thường bắt đầu bằng `openUrl`, rồi `waitFor` nút cần xuất hiện, sau đó `click`, `type`, `scroll` hoặc `upload`. `openUrl` và `click` tự chờ trang tải xong/DOM ổn định. Với AJAX, upload hoặc điều hướng trễ, điền **Chờ phần tử kết quả** và trạng thái **Xuất hiện/Biến mất/Có thể tương tác** để xác định khi thao tác hoàn tất; xem [cú pháp và ví dụ completion](SCENARIOS.md#waiting-for-actions-to-finish).
 4. Với `click`, `waitFor`, `type`, `upload`, bấm **◎ Chọn trên trang**, chuyển sang tab mục tiêu, di chuột lên phần tử và click. Locator sẽ được điền vào bước. Nhấn Esc để hủy.
-5. Bấm **Lưu**, rồi **▶ Chạy kịch bản**. Thanh **Trạng thái** hiển thị bước hiện tại hoặc lỗi. Bấm **Dừng** nếu cần.
-6. Có thể chạy bằng terminal agent: `run scenarios/facebook-reels.json`, kiểm tra `status`, dừng bằng `stop`, thoát bằng `exit`.
+5. Chọn profile, bấm **Lưu**, rồi **▶ Chạy kịch bản**. Thanh **Trạng thái** hiển thị bước hiện tại hoặc lỗi. **Dừng** chỉ dừng profile đang chọn. Có thể chuyển profile và chạy kịch bản khác đồng thời.
+6. Có thể chạy bằng terminal agent: `run scenarios/facebook-reels.json --profile "Profile 1"`, kiểm tra `status`, dừng bằng `stop "Profile 1"`, thoát tất cả bằng `exit`.
 
 ## 5. Upload file
 
@@ -48,8 +50,10 @@ Thêm `waitFor` cho nút mới trong dialog trước bước click/upload tiếp
 
 ## 7. Kiểm tra và xử lý lỗi
 
-- Chạy `npm test` để kiểm tra luồng click dialog và upload mẫu. Kiểm tra này không truy cập Facebook.
-- **Extension chưa kết nối:** bảo đảm agent đang chạy, extension đã Reload và tab mục tiêu đã tải lại. Đúng profile phải chứa extension.
+- Chạy `npm test` để kiểm tra điều phối nhiều profile, navigation/SPA, dialog và upload mẫu. Kiểm tra này không truy cập Facebook hay profile đăng nhập của bạn.
+- **Extension chưa kết nối:** bảo đảm agent đang chạy, extension đã Reload và Extension options đã chọn đúng thư mục profile. Đúng profile phải chứa extension.
+- **Another extension is connected as this profile:** kiểm tra `chrome://version` trong từng cửa sổ và sửa ánh xạ profile ở Extension options; không chọn cùng thư mục cho hai profile khác nhau.
+- **Page did not finish loading / Completion condition timed out:** kiểm tra dấu hiệu kết quả và tăng **Timeout tải trang / kết quả**. Với trang liên tục thay đổi DOM, đặt **DOM ổn định** bằng 0 và dùng điều kiện kết quả rõ ràng.
 - **Element not found/actionable:** dùng **Chọn trên trang** khi dialog đã mở; kiểm tra tên nút/role và tăng `timeoutMs` nếu trang tải chậm.
 - **Upload file does not exist:** kiểm tra đường dẫn tuyệt đối, tên file và quyền đọc trên máy.
 - **File input không xác định:** chọn đúng nút upload hoặc dùng locator CSS/XPath cho `input[type=file]` trong dialog.

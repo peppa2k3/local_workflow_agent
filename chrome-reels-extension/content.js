@@ -1,9 +1,24 @@
 (() => {
+  if (globalThis.__localWorkflowBridge) return;
+  globalThis.__localWorkflowBridge = true;
   let busy = false;
   let picking = false;
-  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  let cancelPicker = null;
+  let currentRunId = null;
+  let cancelled = false;
+  let actionAbort = new AbortController();
+  const checkCancelled = () => { if (cancelled) throw new Error('Stopped'); };
+  let lastMutation = Date.now();
+  new MutationObserver(() => { lastMutation = Date.now(); }).observe(document.documentElement, { subtree: true, childList: true, attributes: true, characterData: true });
+  const sleep = ms => new Promise((resolve, reject) => {
+    checkCancelled();
+    const signal = actionAbort.signal;
+    const abort = () => { clearTimeout(timer); reject(new Error('Stopped')); };
+    const timer = setTimeout(() => { signal.removeEventListener('abort', abort); resolve(); }, ms);
+    signal.addEventListener('abort', abort, { once: true });
+  });
   const send = message => new Promise(resolve => {
-    chrome.runtime.sendMessage(message, response => {
+    chrome.runtime.sendMessage({ ...message, runId: currentRunId }, response => {
       resolve(chrome.runtime.lastError ? { ok: false, error: chrome.runtime.lastError.message } : response);
     });
   });
@@ -71,6 +86,7 @@
   async function find(step, includeHidden = false, actionable = false) {
     const deadline = Date.now() + (step.timeoutMs || 10000);
     while (Date.now() < deadline) {
+      checkCancelled();
       const found = matches(step, includeHidden).filter(element => !actionable || receivesPointer(element));
       if (found.length) {
         if (step.index !== undefined) {
@@ -117,7 +133,7 @@
       document.removeEventListener('mousemove', move, true);
       document.removeEventListener('click', click, true);
       document.removeEventListener('keydown', keydown, true);
-      outline.remove(); picking = false;
+      outline.remove(); picking = false; cancelPicker = null;
       send({ type: 'pickResult', payload: { id, locator } });
     };
     const click = event => {
@@ -132,24 +148,29 @@
       finish(locator);
     };
     const keydown = event => { if (event.key === 'Escape') finish(null); };
+    cancelPicker = () => finish(null);
     document.addEventListener('mousemove', move, true);
     document.addEventListener('click', click, true);
     document.addEventListener('keydown', keydown, true);
   }
 
   async function clickElement(step) {
+    const point = await clickPoint(step);
+    const response = await send({ type: 'input', kind: 'click', ...point, runId: currentRunId });
+    if (!response?.ok) throw new Error(response?.error || 'Click failed');
+  }
+
+  async function clickPoint(step) {
     let element = await find(step);
     element.scrollIntoView({ block: 'center', inline: 'center' });
     await sleep(200);
     element = await find(step, false, true);
     const rect = element.getBoundingClientRect();
     if (!rect.width || !rect.height) throw new Error('Element is not visible');
-    const response = await send({
-      type: 'input', kind: 'click',
+    return {
       x: Math.floor(rect.left + rect.width / 2),
       y: Math.floor(rect.top + rect.height / 2)
-    });
-    if (!response?.ok) throw new Error(response?.error || 'Click failed');
+    };
   }
 
   function fileInputFor(element) {
@@ -193,6 +214,7 @@
       const deadline = Date.now() + (step.timeoutMs || 10000);
       let chooserOpened = false;
       while (Date.now() < deadline) {
+        checkCancelled();
         if (prepared) {
           const status = await send({ type: 'input', kind: 'chooserStatus' });
           if (status?.opened) { chooserOpened = true; break; }
@@ -235,16 +257,11 @@
 
   async function execute(step, runId) {
     switch (step.action) {
-      case 'openUrl':
-        await send({ type: 'result', payload: { runId, id: step.id, ok: true } });
-        location.assign(step.url);
-        return;
       case 'waitFor':
         await find(step, false, true);
         break;
       case 'click':
         await clickElement(step);
-        await sleep(400);
         break;
       case 'type': {
         await clickElement(step);
@@ -279,28 +296,44 @@
       default:
         throw new Error(`Unsupported browser action: ${step.action}`);
     }
-    await send({ type: 'result', payload: { runId, id: step.id, ok: true } });
   }
 
-  setInterval(async () => {
-    if (busy || picking) return;
-    busy = true;
-    try {
-      const pick = await send({ type: 'pickNext' });
-      if (pick?.active) { startPicker(pick.id); return; }
-      const next = await send({ type: 'next' });
-      if (next?.step) {
-        try {
-          await execute(next.step, next.runId);
-        } catch (error) {
-          await send({ type: 'result', payload: {
-            runId: next.runId, id: next.step.id,
-            ok: false, error: String(error.message || error)
-          } });
-        }
-      }
-    } finally {
-      busy = false;
+  function conditionSatisfied(condition) {
+    const elements = matches(condition);
+    if (condition.state === 'hidden') return condition.index === undefined ? elements.length === 0 : !elements[condition.index];
+    const element = condition.index === undefined ? (elements.length === 1 ? elements[0] : null) : elements[condition.index];
+    return Boolean(element && (condition.state !== 'enabled' || receivesPointer(element)));
+  }
+
+  chrome.runtime.onMessage.addListener((message, sender, respond) => {
+    if (message.type === 'cancelPicker') { cancelPicker?.(); respond({ ok: true }); return; }
+    if (message.type === 'conditionStatus') {
+      try { respond({ ok: true, satisfied: conditionSatisfied(message.condition) }); }
+      catch (error) { respond({ ok: false, error: error.message }); }
+      return;
     }
-  }, 700);
+    if (message.type === 'cancel') {
+      if (message.runId === currentRunId) { cancelled = true; actionAbort.abort(); }
+      respond({ ok: true }); return;
+    }
+    if (message.type === 'ready') {
+      respond({ ok: true, readyState: document.readyState, href: location.href, quietForMs: Date.now() - lastMutation });
+      return;
+    }
+    if (message.type === 'startPicker') {
+      if (!picking && !busy) startPicker(message.id);
+      respond({ ok: true }); return;
+    }
+    if (!['execute', 'clickPoint'].includes(message.type)) return;
+    if (busy || picking) { respond({ ok: false, error: 'Page is busy' }); return; }
+    busy = true; currentRunId = message.runId; cancelled = false; actionAbort = new AbortController();
+    (async () => {
+      if (message.type === 'clickPoint') return { ok: true, ...await clickPoint(message.step) };
+      await execute(message.step, message.runId);
+      return { ok: true };
+    })().catch(error => ({ ok: false, error: String(error.message || error) }))
+      .then(respond).finally(() => { busy = false; currentRunId = null; });
+    return true;
+  });
+  send({ type: 'wake' });
 })();

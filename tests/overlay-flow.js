@@ -1,5 +1,6 @@
 const { chromium } = require('playwright');
 const path = require('path');
+const assert = require('node:assert/strict');
 
 (async () => {
   const browser = await chromium.launch({ channel: 'chrome' });
@@ -23,17 +24,8 @@ const path = require('path');
       </script>
     `);
     await page.evaluate(() => {
-      const steps = [
-        { id: 0, action: 'click', locatorType: 'role', role: 'button', locator: 'Open' },
-        { id: 1, action: 'waitFor', locatorType: 'role', role: 'button', locator: 'Choose' },
-        { id: 2, action: 'click', locatorType: 'role', role: 'button', locator: 'Choose' },
-        { id: 3, action: 'upload', locatorType: 'role', role: 'button', locator: 'Select file', filePath: 'C:\\test\\photo.jpg' }
-      ];
-      let index = 0;
-      window.chrome = { runtime: { sendMessage(message, callback) {
-        if (message.type === 'pickNext') callback({ active: false });
-        else if (message.type === 'next') callback({ runId: 1, step: steps[index] || null });
-        else if (message.type === 'result') { if (message.payload.ok) index++; callback({ ok: true }); }
+      window.chrome = { runtime: { onMessage: { addListener(handler) { window.bridgeMessage = handler; } }, sendMessage(message, callback) {
+        if (message.type === 'state') callback({ running: true, runId: 1 });
         else if (message.type === 'input' && message.kind === 'prepareUpload') callback({ ok: true });
         else if (message.type === 'input' && message.kind === 'chooserStatus') callback({ ok: true, opened: Boolean(window.uploadTriggerClicked) });
         else if (message.type === 'input' && message.kind === 'click') {
@@ -49,7 +41,25 @@ const path = require('path');
       } } };
     });
     await page.addScriptTag({ path: path.join(__dirname, '..', 'chrome-reels-extension', 'content.js') });
-    await page.waitForFunction(() => window.chosen && window.uploadTargetIsModal, { timeout: 10000 });
+    for (const step of [
+      { action: 'click', locatorType: 'role', role: 'button', locator: 'Open' },
+      { action: 'waitFor', locatorType: 'role', role: 'button', locator: 'Choose' },
+      { action: 'click', locatorType: 'role', role: 'button', locator: 'Choose' },
+      { action: 'upload', locatorType: 'role', role: 'button', locator: 'Select file', filePath: 'C:\\test\\photo.jpg' }
+    ]) {
+      const result = await page.evaluate(step => new Promise(resolve => window.bridgeMessage({ type: 'execute', step, runId: 1 }, {}, resolve)), step);
+      assert.equal(result.ok, true, result.error);
+    }
+    assert(await page.evaluate(() => window.chosen && window.uploadTargetIsModal));
+    const stopped = await page.evaluate(async () => {
+      const started = Date.now();
+      const result = new Promise(resolve => window.bridgeMessage({ type: 'execute', runId: 1, step: { action: 'scroll', times: 2, intervalMs: 10000 } }, {}, resolve));
+      setTimeout(() => window.bridgeMessage({ type: 'cancel', runId: 1 }, {}, () => {}), 200);
+      return { result: await result, elapsed: Date.now() - started };
+    });
+    assert.equal(stopped.result.ok, false);
+    assert.match(stopped.result.error, /Stopped/);
+    assert(stopped.elapsed < 2000, 'Stop must interrupt long action delays');
     console.log('Overlay click and modal upload target: OK');
   } finally {
     await browser.close();

@@ -54,6 +54,7 @@
     .message.error { color: #ff9aa7; }
     .progress { margin-top: 18px; border: 1px solid #2c3b57; border-radius: 13px; padding: 14px 16px; background: #101a2d; font-size: 13px; color: #b7c5df; }
     .progress strong { color: #f2f5ff; }
+    .profiles-summary { margin: 12px 0; color: #acbbd6; font-size: 13px; line-height: 1.7; }
     @media (max-width: 700px) { .top { flex-direction: column; } .fields { grid-template-columns: 1fr; } .fields label:first-child { grid-column: auto; } .toolbar select, .toolbar input { width: 100%; } .toolbar label { flex: 1 1 100%; } }
   </style>
 </head>
@@ -65,6 +66,8 @@
     </header>
 
     <section class="toolbar" aria-label="Quản lý kịch bản">
+      <label>Chrome profile<select id="profileSelect" aria-label="Chrome profile"></select></label>
+      <button class="btn ghost" id="openProfileBtn">Mở profile</button>
       <label>Kịch bản đã lưu<select id="scenarioSelect"></select></label>
       <button class="btn ghost" id="loadBtn">Mở</button>
       <label>Tên file mới<input id="fileName" placeholder="vi-du: facebook-reels" spellcheck="false"></label>
@@ -75,6 +78,8 @@
       <button class="btn success" id="runBtn">▶ Chạy kịch bản</button>
       <button class="btn danger" id="stopBtn">Dừng</button>
     </section>
+    <p>Cài extension trong từng profile, mở Extension options và chọn đúng thư mục profile. Mỗi profile có thể chạy một kịch bản riêng.</p>
+    <div id="profilesSummary" class="profiles-summary" aria-live="polite"></div>
 
     <section class="editor">
       <div class="editor-head"><div><h2>Các bước thực hiện</h2><p>Kéo luồng theo thứ tự từ trên xuống bằng nút ↑ ↓.</p></div><label>Tên hiển thị<input id="scenarioName" placeholder="Tên kịch bản"></label></div>
@@ -95,6 +100,16 @@
       upload: { label: 'Upload file', fields: [['locatorType', 'Cách tìm nút / input file', 'locatorType'], ['locator', 'Nút mở chọn file (click trước), hoặc input[type=file]', 'text'], ['role', 'Role (khi tìm theo role)', 'text'], ['index', 'Vị trí từ 0 (nếu trùng)', 'number'], ['filePath', 'Đường dẫn file đầy đủ', 'text'], ['folder', 'Hoặc: thư mục', 'text'], ['filename', 'Và: tên file', 'text'], ['timeoutMs', 'Timeout chờ ô file (ms)', 'number'], ['waitAfterMs', 'Chờ sau khi chọn file (ms)', 'number']] },
       scroll: { label: 'Cuộn trang', fields: [['pixels', 'Số pixel', 'number'], ['times', 'Số lần', 'number'], ['intervalMs', 'Khoảng cách (ms)', 'number']] }
     };
+    for (const action of ['openUrl', 'click', 'type', 'upload']) {
+      actions[action].fields.push(
+        ['navigationTimeoutMs', 'Timeout tải trang / kết quả (ms, mặc định 30000)', 'number'],
+        ['completion.locatorType', 'Điều kiện hoàn tất: cách tìm', 'locatorType'],
+        ['completion.locator', 'Chờ phần tử kết quả (tùy chọn)', 'text'],
+        ['completion.role', 'Role của phần tử kết quả', 'text'],
+        ['completion.state', 'Trạng thái cần chờ', 'conditionState']
+      );
+    }
+    for (const action of ['openUrl', 'click']) actions[action].fields.push(['settleMs', 'DOM ổn định (ms, mặc định 350; 0 để bỏ qua)', 'number']);
     const defaults = {
       openUrl: { url: 'https://www.facebook.com/' }, openFolder: { path: 'C:\\Users\\Administrator\\Downloads' },
       wait: { ms: 1000 }, waitFor: { locatorType: 'text', locator: 'Tiếp', timeoutMs: 5000 },
@@ -108,6 +123,7 @@
     let scenario = { name: 'Mở và cuộn Facebook Reels', steps: [] };
     let pickTargetIndex = null;
     let pickId = null;
+    let selectedProfile = localStorage.getItem('workflowProfile') || '';
 
     async function api(route, method = 'GET', body) {
       const response = await fetch(route, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
@@ -129,14 +145,17 @@
     function field(labelText, value, type, update) {
       const label = document.createElement('label');
       label.textContent = labelText;
-      const input = document.createElement(type === 'locatorType' ? 'select' : 'input');
-      if (type === 'locatorType') {
-        for (const [key, text] of Object.entries({ role: 'Role + tên', text: 'Chữ hiển thị', label: 'Label', placeholder: 'Placeholder', testid: 'Test ID', xpath: 'XPath', css: 'CSS' })) {
+      const isSelect = ['locatorType', 'conditionState'].includes(type);
+      const input = document.createElement(isSelect ? 'select' : 'input');
+      input.setAttribute('aria-label', labelText);
+      if (isSelect) {
+        const options = type === 'conditionState' ? { visible: 'Xuất hiện', hidden: 'Biến mất', enabled: 'Có thể tương tác' } : { role: 'Role + tên', text: 'Chữ hiển thị', label: 'Label', placeholder: 'Placeholder', testid: 'Test ID', xpath: 'XPath', css: 'CSS' };
+        for (const [key, text] of Object.entries(options)) {
           const option = document.createElement('option'); option.value = key; option.textContent = text; input.append(option);
         }
       } else input.type = type === 'number' ? 'number' : 'text';
       input.value = value ?? '';
-      input.addEventListener(type === 'locatorType' ? 'change' : 'input', () => update(type === 'number' ? (input.value === '' ? undefined : Number(input.value)) : type === 'boolean' ? input.value === 'true' : input.value));
+      input.addEventListener(isSelect ? 'change' : 'input', () => update(type === 'number' ? (input.value === '' ? undefined : Number(input.value)) : type === 'boolean' ? input.value === 'true' : input.value));
       if (labelText === 'Đường dẫn file đầy đủ') {
         const control = document.createElement('span'); control.className = 'file-path-control';
         const button = document.createElement('button'); button.type = 'button'; button.className = 'btn ghost'; button.textContent = 'Chọn file…';
@@ -172,14 +191,21 @@
         if (['click', 'waitFor', 'type', 'upload'].includes(step.action)) {
           const pick = document.createElement('button'); pick.className = 'btn ghost'; pick.textContent = '◎ Chọn trên trang';
           pick.addEventListener('click', () => handle(async () => {
-            const result = await api('/api/pick/start', 'POST');
+            const result = await api('/api/pick/start', 'POST', { profile: selectedProfile });
             pickTargetIndex = index; pickId = result.id;
             notice('Chuyển sang tab cần thao tác, đưa chuột lên phần tử và click. Nhấn Esc để hủy.');
           }));
           head.append(pick);
         }
         const fields = document.createElement('div'); fields.className = 'fields';
-        for (const [key, label, type] of actions[step.action].fields) fields.append(field(label, step[key] ?? (key === 'locatorType' ? 'css' : ''), type, value => { if (value === undefined) delete step[key]; else step[key] = value; }));
+        for (const [key, label, type] of actions[step.action].fields) {
+          const [parent, child] = key.split('.');
+          const value = child ? step[parent]?.[child] : step[parent];
+          fields.append(field(label, value ?? (type === 'locatorType' ? 'css' : type === 'conditionState' ? 'visible' : ''), type, value => {
+            const target = child ? (step[parent] ||= {}) : step;
+            if (value === undefined) delete target[child || parent]; else target[child || parent] = value;
+          }));
+        }
         card.append(head, fields); list.append(card);
       });
     }
@@ -210,19 +236,43 @@
       fileName = name; scenario = { name, steps: [{ action: 'openUrl', ...defaults.openUrl }] }; render(); notice('Kịch bản mới chưa lưu.');
     });
     $('saveBtn').onclick = () => handle(save);
-    $('runBtn').onclick = () => handle(async () => { await save(); await api('/api/run', 'POST', { name: fileName, uploadPath: $('uploadPath').value.trim() }); notice('Đã bắt đầu chạy.'); });
+    $('runBtn').onclick = () => handle(async () => {
+      const targetProfile = selectedProfile;
+      await save(); await api('/api/run', 'POST', { name: fileName, profile: targetProfile, uploadPath: $('uploadPath').value.trim() });
+      notice(`Đã bắt đầu chạy trên ${targetProfile}.`);
+    });
     $('chooseRunFile').onclick = () => handle(() => chooseFile($('uploadPath')));
-    $('stopBtn').onclick = () => handle(async () => { await api('/api/stop', 'POST'); notice('Đã dừng.'); });
+    $('stopBtn').onclick = () => handle(async () => { await api('/api/stop', 'POST', { profile: selectedProfile }); notice(`Đã dừng ${selectedProfile}.`); });
+    $('openProfileBtn').onclick = () => handle(async () => { await api('/api/profiles/open', 'POST', { profile: selectedProfile }); notice(`Đã mở ${selectedProfile}.`); });
+    $('profileSelect').onchange = () => {
+      selectedProfile = $('profileSelect').value; localStorage.setItem('workflowProfile', selectedProfile);
+      pickId = null; pickTargetIndex = null; void updateStatus();
+    };
     $('addBtn').onclick = () => { scenario.steps.push({ action: 'click', ...defaults.click }); render(); };
     $('scenarioName').oninput = event => { scenario.name = event.target.value; };
     async function updateStatus() {
       try {
-        const state = await api('/api/status');
+        const data = await api('/api/profiles');
+        if (!data.profiles.some(item => item.directory === selectedProfile)) selectedProfile = data.defaultProfile;
+        const select = $('profileSelect');
+        const signature = JSON.stringify(data.profiles.map(item => [item.directory, item.name, item.extensionConnected]));
+        if (select.dataset.signature !== signature) {
+          select.replaceChildren(...data.profiles.map(item => {
+            const option = document.createElement('option'); option.value = item.directory;
+            option.textContent = `${item.name} (${item.directory}) · ${item.extensionConnected ? 'đã kết nối' : 'offline'}`; return option;
+          }));
+          select.dataset.signature = signature;
+        }
+        select.value = selectedProfile;
+        $('profilesSummary').textContent = data.profiles.map(item => `${item.name} (${item.directory}): ${item.error || (item.running ? `bước ${item.index + 1}/${item.total} · ${item.action}` : item.extensionConnected ? 'sẵn sàng' : 'chưa kết nối')}`).join(' | ');
+        const state = data.profiles.find(item => item.directory === selectedProfile);
+        $('runBtn').disabled = state.running || !state.extensionConnected;
+        $('stopBtn').disabled = !state.running;
         $('connectionDot').classList.toggle('ok', state.extensionConnected);
         $('connectionText').textContent = `${state.profile} · Extension ${state.extensionConnected ? 'đã kết nối' : 'chưa kết nối'}`;
-        $('progress').textContent = state.error || (state.running ? `Đang chạy bước ${state.index + 1}/${state.total}: ${state.action || 'đang chờ'}${state.requiredUrl ? ' · chờ tab tải xong' : ''}` : 'Đang chờ lệnh');
+        $('progress').textContent = state.error || (state.running ? `Đang chạy bước ${state.index + 1}/${state.total}: ${state.action || 'đang chờ'}${state.waiting ? ' · chờ hành động hoàn tất' : ''}` : 'Đang chờ lệnh');
         if (pickId !== null) {
-          const picked = await api('/api/pick/status');
+          const picked = await api(`/api/pick/status?profile=${encodeURIComponent(selectedProfile)}`);
           if (picked.id === pickId && !picked.active) {
             if (picked.result && scenario.steps[pickTargetIndex]) {
               Object.assign(scenario.steps[pickTargetIndex], picked.result);

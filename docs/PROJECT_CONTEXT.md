@@ -8,7 +8,8 @@ Người dùng xây dựng kịch bản tự động local và chạy chúng tr�
 
 - Playwright không điều khiển profile Chrome mặc định đang chạy. Chrome khóa thư mục profile và các phiên bản Chrome mới hạn chế remote debugging trên `User Data` mặc định. Vì vậy Playwright chỉ còn ở thử nghiệm cũ và bài test tách biệt.
 - Agent lắng nghe tại `127.0.0.1:34719`; extension gửi yêu cầu HTTP qua service worker. Dashboard cũng dùng server này.
-- `openUrl`, `openFolder`, `wait` chạy trong agent. `waitFor`, `click`, `type`, `scroll`, `upload` chạy trong extension, trên tab Chrome đã kết nối.
+- `openFolder`, `wait` chạy trong agent. `openUrl` chạy trong background extension và chờ trang tải xong; `waitFor`, `click`, `type`, `scroll`, `upload` thao tác trên tab Chrome đã kết nối. Background giữ trách nhiệm xác nhận hoàn tất khi click thay thế document.
+- Mỗi Chrome profile có workflow và tab riêng. Dashboard chọn profile; extension lưu ánh xạ thư mục profile + ID kết nối trong storage riêng của profile. Agent đọc danh sách tên/thư mục từ metadata `Local State`, không đọc phiên đăng nhập.
 - Extension dùng `chrome.debugger` để gửi input và chọn file; content script tìm phần tử bằng locator semantic/CSS/XPath và ưu tiên dialog đang mở.
 - Kịch bản là JSON trong `scenarios/`. Agent chấp nhận file upload cố định trong bước hoặc đường dẫn truyền lúc chạy.
 - `local-agent.js`, đường dẫn thư mục extension, dashboard URL và cổng 34719 là các điểm vào ổn định để không làm hỏng cách chạy hiện tại.
@@ -25,5 +26,5 @@ Người dùng xây dựng kịch bản tự động local và chạy chúng tr�
 
 - `upload` chọn file và có thể kích hoạt upload của website; nếu website cần nút xác nhận hoặc chờ server xử lý, thêm các bước `waitFor`/`click` tương ứng.
 - Locator hiện tìm trong document chính; iframe khác origin và Shadow DOM đóng chưa được hỗ trợ.
-- Nếu một click mở tab mới, kịch bản hiện nên dùng `openUrl` để chuyển sang URL cần chạy tiếp.
+- Click theo tab mới mở trong khoảng quan sát 500 ms; nếu website mở tab trễ hơn, dùng `openUrl` để chọn URL rõ ràng. Tác vụ AJAX/upload cần `completion` hoặc `waitFor` theo dấu hiệu kết quả của website.
 - Extension dùng cổng cố định 34719. Biến `LOCAL_AGENT_PORT` chỉ hữu ích để kiểm tra agent riêng; extension sẽ không tự đổi cổng.

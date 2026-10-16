@@ -21,6 +21,15 @@ function createScenarioStore(scenariosDir) {
       }
       const prepared = structuredClone(scenario);
       for (const step of prepared.steps) {
+        if (!['openUrl', 'openFolder', 'wait', 'waitFor', 'click', 'type', 'scroll', 'upload'].includes(step.action)) throw new Error(`Unsupported action: ${step.action}`);
+        for (const key of ['timeoutMs', 'navigationTimeoutMs', 'settleMs', 'waitAfterMs', 'ms', 'times', 'intervalMs']) {
+          if (step[key] !== undefined && (!Number.isFinite(step[key]) || step[key] < 0 || step[key] > 300000)) throw new Error(`Invalid ${key}`);
+        }
+        if (step.action === 'openUrl') {
+          const url = new URL(step.url);
+          if (!['http:', 'https:'].includes(url.protocol)) throw new Error('openUrl requires http or https');
+        }
+        if (step.completion?.state && !['visible', 'hidden', 'enabled'].includes(step.completion.state)) throw new Error('Invalid completion state');
         if (step.action !== 'upload') continue;
         const inputPath = uploadPath || step.filePath ||
           (step.folder && step.filename ? path.join(step.folder, step.filename) : '');
