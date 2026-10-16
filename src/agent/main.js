@@ -5,6 +5,7 @@ const readline = require('readline');
 const { spawn } = require('child_process');
 const { port, scenariosDir, dashboardPath, chromePath, profile } = require('./config');
 const { createScenarioStore } = require('./scenario-store');
+const { chooseFile } = require('./file-picker');
 
 const scenarios = createScenarioStore(scenariosDir);
 let workflow = null;
@@ -115,6 +116,11 @@ const server = http.createServer(async (request, response) => {
       if (origin && origin !== `http://127.0.0.1:${port}`) throw new Error('Origin not allowed');
       if (request.method === 'GET' && route === '/api/status') return json(200, status());
       if (request.method === 'GET' && route === '/api/pick/status') return json(200, picker);
+      if (request.method === 'POST' && route === '/api/choose-file') {
+        const body = await readBody(request);
+        const filePath = await chooseFile(body.initialDirectory || '');
+        return json(200, { filePath });
+      }
       if (request.method === 'POST' && route === '/api/pick/start') {
         if (running) throw new Error('Stop the scenario before picking an element');
         picker = { id: picker.id + 1, active: true, result: null };

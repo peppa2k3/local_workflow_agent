@@ -25,6 +25,9 @@
     input:focus, select:focus { border-color: #7b9fff; box-shadow: 0 0 0 3px #789cff26; }
     .toolbar select { width: 230px; }
     .toolbar input { width: 220px; }
+    .file-path-control { display: flex; gap: 6px; align-items: center; }
+    .file-path-control input { min-width: 0; flex: 1; }
+    .file-path-control .btn { white-space: nowrap; }
     .btn { min-height: 40px; border-radius: 9px; padding: 9px 15px; color: #edf2ff; background: #263956; font-weight: 700; }
     .btn:hover { filter: brightness(1.15); }
     .btn.primary { background: #587cff; color: white; }
@@ -66,7 +69,7 @@
       <button class="btn ghost" id="loadBtn">Mở</button>
       <label>Tên file mới<input id="fileName" placeholder="vi-du: facebook-reels" spellcheck="false"></label>
       <button class="btn ghost" id="newBtn">Tạo mới</button>
-      <label>File upload cho lần chạy<input id="uploadPath" placeholder="C:\\...\\anh.jpg (tùy chọn)" spellcheck="false"></label>
+      <label>File upload cho lần chạy<span class="file-path-control"><input id="uploadPath" placeholder="C:\\...\\anh.jpg (tùy chọn)" spellcheck="false"><button class="btn ghost" id="chooseRunFile" type="button">Chọn file…</button></span></label>
       <span class="spacer"></span>
       <button class="btn" id="saveBtn">Lưu</button>
       <button class="btn success" id="runBtn">▶ Chạy kịch bản</button>
@@ -113,6 +116,16 @@
       return data;
     }
     function notice(text, error = false) { $('message').textContent = text; $('message').classList.toggle('error', error); }
+    async function chooseFile(input) {
+      const current = input.value.trim();
+      const initialDirectory = current.replace(/[\\/][^\\/]*$/, '');
+      const result = await api('/api/choose-file', 'POST', { initialDirectory });
+      if (result.filePath) {
+        input.value = result.filePath;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        notice(`Đã chọn file: ${result.filePath}`);
+      }
+    }
     function field(labelText, value, type, update) {
       const label = document.createElement('label');
       label.textContent = labelText;
@@ -124,7 +137,12 @@
       } else input.type = type === 'number' ? 'number' : 'text';
       input.value = value ?? '';
       input.addEventListener(type === 'locatorType' ? 'change' : 'input', () => update(type === 'number' ? (input.value === '' ? undefined : Number(input.value)) : type === 'boolean' ? input.value === 'true' : input.value));
-      label.append(input);
+      if (labelText === 'Đường dẫn file đầy đủ') {
+        const control = document.createElement('span'); control.className = 'file-path-control';
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'btn ghost'; button.textContent = 'Chọn file…';
+        button.addEventListener('click', () => handle(() => chooseFile(input)));
+        control.append(input, button); label.append(control);
+      } else label.append(input);
       return label;
     }
     function render() {
@@ -193,6 +211,7 @@
     });
     $('saveBtn').onclick = () => handle(save);
     $('runBtn').onclick = () => handle(async () => { await save(); await api('/api/run', 'POST', { name: fileName, uploadPath: $('uploadPath').value.trim() }); notice('Đã bắt đầu chạy.'); });
+    $('chooseRunFile').onclick = () => handle(() => chooseFile($('uploadPath')));
     $('stopBtn').onclick = () => handle(async () => { await api('/api/stop', 'POST'); notice('Đã dừng.'); });
     $('addBtn').onclick = () => { scenario.steps.push({ action: 'click', ...defaults.click }); render(); };
     $('scenarioName').oninput = event => { scenario.name = event.target.value; };
