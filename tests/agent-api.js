@@ -40,6 +40,7 @@ const { spawn } = require('node:child_process');
     assert.deepEqual(profiles.profiles.map(item => item.directory), ['Profile 1', 'Profile 2']);
     assert.equal(profiles.profiles[0].name, 'First test profile');
     assert.equal(typeof profiles.performance.memoryMb, 'number');
+    assert(profiles.capabilities.includes('variables-v1'));
     const clients = [{ profile: 'Profile 1', clientId: 'first' }, { profile: 'Profile 2', clientId: 'second' }];
     await api('/state', { clientId: 'legacy' }, 'POST', 400);
     for (const client of clients) await api('/state', client);
@@ -63,6 +64,20 @@ const { spawn } = require('node:child_process');
     assert.equal((await api('/api/status?profile=Profile%201')).running, false);
     assert.equal((await api('/api/status?profile=Profile%202')).running, true);
     await api('/api/profiles/open', { profile: '../invalid' }, 'POST', 400);
+    await api('/api/scenarios/typing', { variables: { tenphimn: 'Tên phim tiếng Việt lần một' }, steps: [{ action: 'type', selector: '#editor', text: '{{tenphimn}}' }] }, 'PUT');
+    await api('/api/run', { name: 'typing', profile: 'Profile 1' });
+    const typing = await api('/next', clients[0]);
+    assert.equal(typing.step.text, 'Tên phim tiếng Việt lần một', 'HTTP dispatch must expand the variable rather than send its token');
+    assert.equal((await api('/api/scenarios/typing')).steps[0].text, '{{tenphimn}}', 'running does not hard-code the saved template');
+    await api('/api/stop', { profile: 'Profile 1' });
+    const updated = await api('/api/scenarios/typing'); updated.variables.tenphimn = 'Tên phim mới cho lần hai';
+    await api('/api/scenarios/typing', updated, 'PUT');
+    await api('/api/run', { name: 'typing', profile: 'Profile 1' });
+    assert.equal((await api('/next', clients[0])).step.text, 'Tên phim mới cho lần hai', 'next run reads the latest variable value');
+    await api('/api/stop', { profile: 'Profile 1' });
+    delete updated.variables.tenphimn;
+    await api('/api/scenarios/typing', updated, 'PUT');
+    await api('/api/run', { name: 'typing', profile: 'Profile 1' }, 'POST', 400);
     console.log('Agent HTTP profile discovery, registration, dispatch and scoped stop: OK');
   } finally {
     if (child && child.exitCode === null) {

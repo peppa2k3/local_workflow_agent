@@ -13,6 +13,7 @@ Người dùng xây dựng kịch bản tự động local và chạy chúng tr�
 - Extension dùng `chrome.debugger` để gửi input và chọn file; content script tìm phần tử bằng locator semantic/CSS/XPath và ưu tiên dialog đang mở.
 - Kịch bản là JSON trong `scenarios/`. Agent chấp nhận file upload cố định trong bước hoặc đường dẫn truyền lúc chạy.
 - `variables` là object theo kịch bản; agent resolve `{{name}}` trên bản sao trước khi chạy, kiểm tra biến thiếu/vòng lặp, rồi validate ngày/giờ và đường dẫn file. Dashboard tự tải kịch bản được chọn; clone tạo file mới không ghi đè.
+- `type` click/focus/caret trên input, textarea hoặc contenteditable (kể cả wrapper presentation và editor xuất hiện sau click), xóa qua browser editing. Dashboard yêu cầu capability `variables-v1` để tránh chạy với Node process cũ; extension từ chối text còn token biến chưa resolve.
 - Dashboard theo dõi CPU/RSS/event loop của Node agent và thời gian workflow/bước theo profile. File picker là một hộp thoại Windows tại một thời điểm; debugger được tái sử dụng tới khi detach.
 - `local-agent.js`, đường dẫn thư mục extension, dashboard URL và cổng 34719 là các điểm vào ổn định để không làm hỏng cách chạy hiện tại.
 

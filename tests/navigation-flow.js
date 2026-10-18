@@ -5,6 +5,7 @@ const http = require('node:http');
 const vm = require('node:vm');
 const os = require('node:os');
 const { chromium } = require('playwright');
+const { createScenarioStore } = require('../src/agent/scenario-store');
 
 // Real isolated Chrome pages + CDP input exercise the production worker and
 // content script. The Chrome extension API adapter supplies only browser APIs.
@@ -21,6 +22,14 @@ const { chromium } = require('playwright');
     response.end(`<a id="go" href="/next">Next</a><img src="/image${request.url}">
       <button id="spa" onclick="setTimeout(()=>{document.getElementById('done').hidden=false;document.getElementById('spinner').remove()},800)">Load data</button>
       <span id="spinner">Loading</span><span id="done" hidden>Done</span><input id="text">
+      <div role="presentation" aria-label="Mô tả thước phim của bạn...">Outside duplicate</div>
+      <div role="presentation" aria-label="Mô tả thước phim của bạn..." style="padding:12px;border:1px solid">
+        <div id="rich" contenteditable="true" role="textbox" aria-label="Nội dung phim" style="min-height:35px"><p>Nội dung cũ</p></div>
+      </div>
+      <textarea id="textarea">Cũ</textarea><input id="readonly-text" readonly value="Giữ nguyên">
+      <div id="activation" style="padding:12px" onclick="if(!this.querySelector('input'))setTimeout(()=>{this.innerHTML='<input id=activated>';},200)">Click to edit</div>
+      <button id="not-editable">Cannot type here</button>
+      <script>window.richEvents=[];document.getElementById('rich').addEventListener('input',e=>richEvents.push({type:e.type,trusted:e.isTrusted}));</script>
       <input id="date" type="date"><input id="time" type="time"><input id="date-text" aria-label="Date text">
       <input id="limited-date" type="date" min="2026-10-01"><input id="readonly-date" type="date" readonly>
       <input id="file" type="file" hidden><button id="upload" onclick="document.getElementById('file').click()">Upload</button>
@@ -102,6 +111,31 @@ const { chromium } = require('playwright');
     assert(Date.now() - started >= 800, 'wait for asynchronous SPA result');
     await execute(job, { action: 'type', selector: '#text', text: 'Ready' });
     assert.equal(await tabs.get(job.tabId).page.locator('#text').inputValue(), 'Ready');
+    const typingPage = tabs.get(job.tabId).page;
+    const store = createScenarioStore(temp);
+    const template = { variables: { tenphimn: 'Tên phim tiếng Việt từ biến' }, steps: [{ action: 'type', locatorType: 'role', role: 'presentation', locator: 'Mô tả thước phim của bạn...', index: 1, text: '{{tenphimn}}', clear: true }] };
+    await typingPage.locator('#text').focus();
+    await execute(job, store.prepare(template).steps[0]);
+    assert.equal(await typingPage.locator('#rich').innerText(), template.variables.tenphimn);
+    assert.equal(await typingPage.locator('#text').inputValue(), 'Ready', 'typing must focus the chosen editor, not a previously active field');
+    assert(await typingPage.locator('#rich').evaluate(element => document.activeElement === element && element.contains(window.getSelection().anchorNode)), 'rich editor must have focus and a caret');
+    assert((await typingPage.evaluate(() => richEvents)).every(event => event.trusted), 'clear and insert must use real browser editing events');
+    template.variables.tenphimn = 'Giá trị mới khi chạy lại';
+    await execute(job, store.prepare(template).steps[0]);
+    assert.equal(await typingPage.locator('#rich').innerText(), 'Giá trị mới khi chạy lại');
+    assert.equal(template.steps[0].text, '{{tenphimn}}', 'template is never replaced with a hard-coded value');
+    await execute(job, { action: 'type', selector: '#rich p', text: ' + thêm', clear: false });
+    assert.equal(await typingPage.locator('#rich').innerText(), 'Giá trị mới khi chạy lại + thêm');
+    await execute(job, { action: 'type', selector: '#textarea', text: 'Dòng mới\nDòng hai' });
+    assert.equal(await typingPage.locator('#textarea').inputValue(), 'Dòng mới\nDòng hai');
+    await execute(job, { action: 'type', selector: '#text', text: ' + nối', clear: false });
+    assert.equal(await typingPage.locator('#text').inputValue(), 'Ready + nối');
+    await execute(job, { action: 'type', selector: '#activation', text: 'Editor mở sau click', timeoutMs: 2000 });
+    assert.equal(await typingPage.locator('#activated').inputValue(), 'Editor mở sau click');
+    await assert.rejects(execute(job, { action: 'type', selector: '#readonly-text', text: 'Sai' }), /chỉ đọc/);
+    await assert.rejects(execute(job, { action: 'type', selector: '#not-editable', text: 'Sai', timeoutMs: 300 }), /focus\/con trỏ/);
+    await assert.rejects(execute(job, { action: 'type', selector: '#text', text: '{{tenphimn}}' }), /Biến chưa được truy xuất/);
+    assert.equal(await typingPage.locator('#text').inputValue(), 'Ready + nối', 'unresolved variables must fail before clearing or inserting text');
     await execute(job, { action: 'setDate', selector: '#date', value: '2026-10-18' });
     await execute(job, { action: 'setTime', locatorType: 'css', locator: '#time', value: '09:35' });
     await execute(job, { action: 'setDate', locatorType: 'label', locator: 'Date text', value: '2026-10-18' });
@@ -131,8 +165,10 @@ const { chromium } = require('playwright');
     console.log('Navigation load, redirect, document replacement, SPA completion, timeout and stop: OK');
 
     let savedScenario, runRequest, cloneRequest, pickerCalls = 0, finishPicker;
+    let legacyAgent = false;
     const fixtures = {
       'facebook-reels': { name: 'Dashboard test', steps: [{ action: 'click', selector: '#go' }] },
+      typing: { name: 'Typing test', variables: { tenphimn: 'Giá trị nhập từ navbar' }, steps: [{ action: 'type', selector: '#rich', text: '', clear: true }] },
       schedule: { name: 'Schedule test', variables: { day: '2026-10-18', hour: '09:35' }, steps: [{ action: 'setDate', selector: '#date', value: '{{day}}' }, { action: 'setTime', selector: '#time', value: '{{hour}}' }] }
     };
     await browserContext.route('http://dashboard.test/**', async route => {
@@ -142,7 +178,7 @@ const { chromium } = require('playwright');
       if (endpoint === '/') {
         return route.fulfill({ contentType: 'text/html', body: fs.readFileSync(path.join(__dirname, '../dashboard/index.html'), 'utf8') });
       }
-      if (endpoint === '/api/profiles') data = { defaultProfile: 'Profile 1', performance: { cpuPercent: 0.5, memoryMb: 42, eventLoopP95Ms: 20.1 }, profiles: ['Profile 1', 'Profile 2'].map(directory => ({ directory, profile: directory, name: directory, extensionConnected: true, running: false, elapsedMs: 1200, lastStepMs: 230 })) };
+      if (endpoint === '/api/profiles') data = { defaultProfile: 'Profile 1', capabilities: legacyAgent ? [] : ['variables-v1'], performance: { cpuPercent: 0.5, memoryMb: 42, eventLoopP95Ms: 20.1 }, profiles: ['Profile 1', 'Profile 2'].map(directory => ({ directory, profile: directory, name: directory, extensionConnected: true, running: false, elapsedMs: 1200, lastStepMs: 230 })) };
       if (endpoint === '/api/scenarios') data = { names: Object.keys(fixtures) };
       const clone = endpoint.match(/^\/api\/scenarios\/([^/]+)\/clone$/);
       if (clone) {
@@ -171,6 +207,19 @@ const { chromium } = require('playwright');
     assert.equal(savedScenario.steps[0].completion.state, 'hidden');
     assert.equal(savedScenario.steps[0].locator, '#go');
     console.log('Dashboard profile selection and completion condition persistence: OK');
+    await dashboard.locator('#scenarioSelect').selectOption('typing');
+    await dashboard.waitForFunction(() => document.getElementById('scenarioName').value === 'Typing test' && !document.getElementById('runBtn').disabled);
+    await dashboard.getByLabel('Chèn biến: Nội dung nhập', { exact: true }).selectOption('tenphimn');
+    await dashboard.getByLabel('Giá trị biến 1', { exact: true }).fill('Giá trị navbar đã sửa trước khi chạy');
+    await Promise.all([
+      dashboard.waitForResponse(response => new URL(response.url()).pathname === '/api/run'),
+      dashboard.getByRole('button', { name: '▶ Chạy kịch bản', exact: true }).click()
+    ]);
+    assert.equal(savedScenario.steps[0].text, '{{tenphimn}}');
+    assert.equal(store.prepare(savedScenario).steps[0].text, 'Giá trị navbar đã sửa trước khi chạy');
+    running = true; job.tabId = 1;
+    await execute(job, store.prepare(savedScenario).steps[0]);
+    assert.equal(await typingPage.locator('#rich').innerText(), 'Giá trị navbar đã sửa trước khi chạy', 'select navbar variable -> save template -> resolve at run -> type its value');
     await dashboard.locator('#scenarioSelect').selectOption('schedule');
     await dashboard.getByLabel('Tên hiển thị', { exact: true }).waitFor();
     await dashboard.waitForFunction(() => document.getElementById('scenarioName').value === 'Schedule test' && !document.getElementById('runBtn').disabled);
@@ -197,6 +246,10 @@ const { chromium } = require('playwright');
     finishPicker();
     await dashboard.waitForFunction(() => !document.getElementById('chooseRunFile').disabled);
     assert.equal(await dashboard.locator('#uploadPath').inputValue(), 'C:\\Uploads\\test.txt');
+    legacyAgent = true;
+    await dashboard.waitForFunction(() => document.getElementById('runBtn').disabled && document.getElementById('connectionText').textContent.includes('Agent cũ'));
+    legacyAgent = false;
+    await dashboard.waitForFunction(() => !document.getElementById('runBtn').disabled);
     const screenshotDir = path.join(__dirname, '../test-results'); fs.mkdirSync(screenshotDir, { recursive: true });
     await dashboard.screenshot({ path: path.join(screenshotDir, 'dashboard.png'), fullPage: true });
     console.log('Native/text dates, times, CDP upload, debugger reuse, dashboard variables, dropdown run, clone and picker busy state: OK');

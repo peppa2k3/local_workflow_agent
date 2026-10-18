@@ -68,7 +68,7 @@
       elements = [...document.querySelectorAll('label')]
         .filter(label => normalize(label.innerText) === normalize(value))
         .map(label => label.control || label.querySelector('input,textarea,select') || label);
-      elements.push(...[...document.querySelectorAll('input[aria-label],textarea[aria-label]')]
+      elements.push(...[...document.querySelectorAll('input[aria-label],textarea[aria-label],[contenteditable][aria-label]')]
         .filter(element => normalize(element.getAttribute('aria-label')) === normalize(value)));
     } else if (type === 'placeholder') {
       elements = [...document.querySelectorAll('input[placeholder],textarea[placeholder]')]
@@ -124,7 +124,7 @@
     document.documentElement.append(outline);
     let selected = null;
     const move = event => {
-      selected = event.target.closest('button,[role="button"],a,input,textarea,select,label') || event.target;
+      selected = event.target.closest('input,textarea,[contenteditable="true"],[contenteditable="plaintext-only"],button,[role="button"],a,select,label') || event.target;
       const rect = selected.getBoundingClientRect();
       Object.assign(outline.style, { left: `${rect.left}px`, top: `${rect.top}px`,
         width: `${rect.width}px`, height: `${rect.height}px` });
@@ -223,6 +223,67 @@
     if (element.value !== formatted || !element.validity.valid) throw new Error('Trang từ chối giá trị ngày/giờ (kiểm tra min/max/step và định dạng)');
   }
 
+  const isTextInput = element => element instanceof HTMLTextAreaElement ||
+    (element instanceof HTMLInputElement && ['text', 'search', 'email', 'url', 'tel', 'password', 'number'].includes(element.type));
+  function editableRoot(element) {
+    if (!element) return null;
+    if (isTextInput(element)) return element;
+    if (element.isContentEditable) {
+      while (element.parentElement?.isContentEditable) element = element.parentElement;
+      return element;
+    }
+    return null;
+  }
+  function editableFor(target) {
+    const direct = editableRoot(target) || editableRoot(target?.control);
+    if (direct) return direct;
+    const candidates = [...new Set([...target.querySelectorAll('input,textarea,[contenteditable]')].map(editableRoot).filter(Boolean))].filter(visible);
+    if (candidates.length > 1) throw new Error('Vùng được chọn có nhiều ô nhập. Chọn chính xác input hoặc contenteditable.');
+    return candidates[0] || null;
+  }
+  function positionCaret(element, clear) {
+    if (element.readOnly || element.closest(':disabled,[aria-disabled="true"]')) throw new Error('Ô nhập bị khóa hoặc chỉ đọc');
+    element.focus({ preventScroll: true });
+    if (document.activeElement !== element && !element.contains(document.activeElement)) return false;
+    if (isTextInput(element)) {
+      if (clear) element.select();
+      else if (typeof element.selectionStart === 'number') element.setSelectionRange(element.value.length, element.value.length);
+      return true;
+    }
+    const selection = window.getSelection();
+    const range = document.createRange(); range.selectNodeContents(element);
+    if (!clear) range.collapse(false);
+    selection.removeAllRanges(); selection.addRange(range);
+    return element.contains(selection.anchorNode) && element.contains(selection.focusNode);
+  }
+  async function typeText(step) {
+    const target = await find(step);
+    const previousFocus = document.activeElement;
+    let element = editableFor(target);
+    const clickTarget = element || target;
+    clickTarget.scrollIntoView({ block: 'center', inline: 'center' });
+    await sleep(200);
+    if (!receivesPointer(clickTarget)) throw new Error('Vùng nhập đang bị che hoặc không thể click');
+    const rect = clickTarget.getBoundingClientRect();
+    const clicked = await send({ type: 'input', kind: 'click', x: Math.floor(rect.left + rect.width / 2), y: Math.floor(rect.top + rect.height / 2) });
+    if (!clicked?.ok) throw new Error(clicked?.error || 'Click input failed');
+    const deadline = Date.now() + (step.timeoutMs ?? 10000);
+    while (Date.now() < deadline) {
+      checkCancelled();
+      const active = editableRoot(document.activeElement);
+      // Clicking a placeholder can replace it or open a separate editor.
+      if (active && (active !== previousFocus || target.contains(active) || active.contains(target))) element = active;
+      else if (target.isConnected) element = editableFor(target);
+      if (element?.isConnected && visible(element) && positionCaret(element, step.clear !== false)) {
+        const response = await send({ type: 'input', kind: 'text', text: String(step.text ?? ''), clear: step.clear !== false });
+        if (!response?.ok) throw new Error(response?.error || 'Typing failed');
+        return;
+      }
+      await sleep(100);
+    }
+    throw new Error('Không tìm thấy ô nhập có focus/con trỏ. Chọn input, textarea hoặc contenteditable.');
+  }
+
   async function upload(step) {
     const hasLocator = Boolean(step.locator || step.selector);
     const target = hasLocator ? await find(step, ['css', 'xpath'].includes(step.locatorType || 'css')) : null;
@@ -293,17 +354,7 @@
         await clickElement(step);
         break;
       case 'type': {
-        await clickElement(step);
-        const element = await find(step);
-        if (step.clear !== false && 'value' in element) {
-          const prototype = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-          const setter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
-          if (setter) setter.call(element, '');
-          else element.value = '';
-          element.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-        const response = await send({ type: 'input', kind: 'text', text: step.text });
-        if (!response?.ok) throw new Error(response?.error || 'Typing failed');
+        await typeText(step);
         break;
       }
       case 'setDate':

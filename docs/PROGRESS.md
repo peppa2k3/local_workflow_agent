@@ -4,6 +4,9 @@ Cập nhật: 2026-10-18 (Asia/Bangkok).
 
 ## Completed
 
+- Sửa `type` cho input/textarea/contenteditable và wrapper presentation: click, chờ editor, xác nhận focus/caret rồi mới nhập; xóa rich text bằng browser editing, append khi clear=false, lỗi rõ với readonly/vùng không nhập được.
+- Xác nhận nguyên nhân nhập nguyên token biến ở phiên chạy cũ: agent cũ vẫn đang chạy. Thêm kiểm tra capability trên dashboard và chặn token chưa resolve trong extension; test HTTP chứng minh lấy giá trị mới mỗi lần chạy và JSON luôn giữ tham chiếu.
+
 - Thao tác `setDate`/`setTime`: click input, nhập ngày/giờ native hoặc text, phát input/change, kiểm tra giá trị; giữ CSS selector cũ.
 - Biến theo kịch bản ở navbar, chèn `{{name}}` vào input, resolve trước khi chạy và báo lỗi biến thiếu/vòng lặp.
 - Chọn kịch bản tự mở đúng editor, chạy trên profile đã chọn; clone độc lập giữ steps/variables và không ghi đè bản sao cũ.

@@ -89,7 +89,7 @@
     <p>Cài extension trong từng profile, mở Extension options và chọn đúng thư mục profile. Mỗi profile có thể chạy một kịch bản riêng.</p>
     <div id="profilesSummary" class="profiles-summary" aria-live="polite"></div>
     <nav class="variables" aria-label="Biến kịch bản">
-      <strong>Danh sách biến</strong> <span>Tham chiếu bằng {{ten_bien}} trong các input. Biến được lưu theo kịch bản.</span>
+      <strong>Danh sách biến</strong> <span>Tham chiếu bằng {{ten_bien}} trong các input. Khi chạy sẽ lấy giá trị hiện tại; JSON giữ tên tham chiếu.</span>
       <div id="variables"></div><button class="btn ghost" id="addVariableBtn">＋ Thêm biến</button>
     </nav>
     <div id="performance" class="performance" aria-label="Hiệu suất agent"></div>
@@ -109,7 +109,7 @@
       wait: { label: 'Chờ thời gian', fields: [['ms', 'Mili giây', 'number']] },
       waitFor: { label: 'Chờ phần tử', fields: [['locatorType', 'Cách tìm', 'locatorType'], ['locator', 'Chữ / tên / XPath / selector', 'text'], ['role', 'Role (khi tìm theo role)', 'text'], ['index', 'Vị trí từ 0 (nếu trùng)', 'number'], ['timeoutMs', 'Timeout (ms)', 'number']] },
       click: { label: 'Click phần tử', fields: [['locatorType', 'Cách tìm', 'locatorType'], ['locator', 'Chữ / tên / XPath / selector', 'text'], ['role', 'Role (khi tìm theo role)', 'text'], ['index', 'Vị trí từ 0 (nếu trùng)', 'number'], ['timeoutMs', 'Timeout (ms)', 'number']] },
-      type: { label: 'Nhập chữ', fields: [['locatorType', 'Cách tìm', 'locatorType'], ['locator', 'Chữ / tên / XPath / selector', 'text'], ['role', 'Role (khi tìm theo role)', 'text'], ['index', 'Vị trí từ 0 (nếu trùng)', 'number'], ['text', 'Nội dung nhập', 'text'], ['clear', 'Xóa nội dung cũ (true/false)', 'boolean']] },
+      type: { label: 'Nhập chữ', fields: [['locatorType', 'Cách tìm', 'locatorType'], ['locator', 'Chữ / tên / XPath / selector', 'text'], ['role', 'Role (khi tìm theo role)', 'text'], ['index', 'Vị trí từ 0 (nếu trùng)', 'number'], ['text', 'Nội dung nhập', 'text'], ['clear', 'Xóa nội dung cũ (true/false)', 'boolean'], ['timeoutMs', 'Timeout chờ ô nhập / con trỏ (ms)', 'number']] },
       setDate: { label: 'Click và nhập ngày', fields: [['locatorType', 'Cách tìm', 'locatorType'], ['locator', 'Ô ngày tháng năm', 'text'], ['role', 'Role (khi tìm theo role)', 'text'], ['index', 'Vị trí từ 0 (nếu trùng)', 'number'], ['value', 'Ngày (YYYY-MM-DD hoặc biến)', 'date'], ['format', 'Định dạng cho input text', 'dateFormat'], ['timeoutMs', 'Timeout (ms)', 'number']] },
       setTime: { label: 'Click và nhập giờ', fields: [['locatorType', 'Cách tìm', 'locatorType'], ['locator', 'Ô giờ phút', 'text'], ['role', 'Role (khi tìm theo role)', 'text'], ['index', 'Vị trí từ 0 (nếu trùng)', 'number'], ['value', 'Giờ (HH:mm hoặc biến)', 'time'], ['timeoutMs', 'Timeout (ms)', 'number']] },
       upload: { label: 'Upload file', fields: [['locatorType', 'Cách tìm nút / input file', 'locatorType'], ['locator', 'Nút mở chọn file (click trước), hoặc input[type=file]', 'text'], ['role', 'Role (khi tìm theo role)', 'text'], ['index', 'Vị trí từ 0 (nếu trùng)', 'number'], ['filePath', 'Đường dẫn file đầy đủ', 'text'], ['folder', 'Hoặc: thư mục', 'text'], ['filename', 'Và: tên file', 'text'], ['timeoutMs', 'Timeout chờ ô file (ms)', 'number'], ['waitAfterMs', 'Chờ sau khi chọn file (ms)', 'number']] },
@@ -144,10 +144,11 @@
     let variableDrafts = [];
     let filePicking = false, statusPending = false, editorBusy = false;
     let profileState = null;
+    let agentCompatible = false;
 
     function updateButtons() {
       for (const id of ['loadBtn', 'newBtn', 'saveBtn', 'cloneBtn', 'addBtn', 'addVariableBtn', 'scenarioSelect']) $(id).disabled = editorBusy;
-      $('runBtn').disabled = editorBusy || !profileState?.extensionConnected || profileState.running;
+      $('runBtn').disabled = editorBusy || !agentCompatible || !profileState?.extensionConnected || profileState.running;
       $('steps').inert = editorBusy;
       $('variables').inert = editorBusy;
       $('scenarioName').disabled = editorBusy;
@@ -337,6 +338,8 @@
     $('saveBtn').onclick = () => handle(() => editTask(save));
     $('runBtn').onclick = () => handle(() => editTask(async () => {
       const targetProfile = selectedProfile;
+      const agent = await api('/api/profiles');
+      if (!agent.capabilities?.includes('variables-v1')) throw new Error('Agent đang chạy bản cũ. Dừng và chạy lại node local-agent.js, rồi tải lại dashboard.');
       await save(); await api('/api/run', 'POST', { name: fileName, profile: targetProfile, uploadPath: $('uploadPath').value.trim() });
       notice(`Đã bắt đầu chạy trên ${targetProfile}.`);
     }));
@@ -356,6 +359,7 @@
       statusPending = true;
       try {
         const data = await api('/api/profiles');
+        agentCompatible = data.capabilities?.includes('variables-v1') === true;
         if (!data.profiles.some(item => item.directory === selectedProfile)) selectedProfile = data.defaultProfile;
         const select = $('profileSelect');
         const signature = JSON.stringify(data.profiles.map(item => [item.directory, item.name, item.extensionConnected]));
@@ -372,7 +376,7 @@
         profileState = state; updateButtons();
         $('stopBtn').disabled = !state.running;
         $('connectionDot').classList.toggle('ok', state.extensionConnected);
-        $('connectionText').textContent = `${state.profile} · Extension ${state.extensionConnected ? 'đã kết nối' : 'chưa kết nối'}`;
+        $('connectionText').textContent = agentCompatible ? `${state.profile} · Extension ${state.extensionConnected ? 'đã kết nối' : 'chưa kết nối'}` : 'Agent cũ: dừng và chạy lại node local-agent.js';
         $('progress').textContent = state.error || (state.running ? `Đang chạy bước ${state.index + 1}/${state.total}: ${state.action || 'đang chờ'}${state.waiting ? ' · chờ hành động hoàn tất' : ''}` : 'Đang chờ lệnh');
         const perf = data.performance;
         $('performance').textContent = `${perf ? `Agent: CPU ${perf.cpuPercent}% · RAM ${perf.memoryMb} MB · Event loop p95 ${perf.eventLoopP95Ms} ms · ` : ''}Profile ${selectedProfile}: tổng ${((state.elapsedMs || 0) / 1000).toFixed(1)}s · bước hiện tại ${((state.stepElapsedMs || 0) / 1000).toFixed(1)}s${state.lastStepMs == null ? '' : ` · bước trước ${(state.lastStepMs / 1000).toFixed(1)}s`}`;

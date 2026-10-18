@@ -19,7 +19,7 @@ Edit a JSON file in `scenarios` and run it again. Steps run in order:
 | `wait` | `ms` | Waits for a duration. |
 | `waitFor` | `locatorType`, `locator`, optional `role`, `index`, `timeoutMs` | Waits for a visible matching element (default 10 seconds). |
 | `click` | `locatorType`, `locator`, optional `role`, `index`, `timeoutMs`, `navigationTimeoutMs`, `settleMs`, `completion` | Clicks an actionable element and waits for navigation/DOM stability and the optional result condition. |
-| `type` | `locatorType`, `locator`, `text`, optional `clear` | Clicks a field and enters text. |
+| `type` | `locatorType`, `locator`, `text`, optional `clear`, `timeoutMs` | Clicks an editable input/textarea/rich text area, confirms focus and caret, then enters text. |
 | `setDate` | locator fields, `value` (`YYYY-MM-DD`), optional `format`, `timeoutMs`, `completion` | Clicks an input and fills a valid calendar date, then fires input/change and blurs. |
 | `setTime` | locator fields, `value` (`HH:mm`), optional `timeoutMs`, `completion` | Clicks an input and fills a 24-hour time, then fires input/change and blurs. |
 | `upload` | optional locator fields; `filePath` or `folder` + `filename` | Sets the chosen local file on a page's `input[type=file]`. |
@@ -41,6 +41,8 @@ Example:
 ```
 
 In the dashboard, choose **Role + name**, **Visible text**, **Label**, **Placeholder**, **Test ID**, **XPath**, or **CSS** for `click`, `type`, and `waitFor`. For example, a button with visible text "Tiếp" can use `{ "action": "click", "locatorType": "role", "role": "button", "locator": "Tiếp" }`. Text matching is exact after whitespace normalization. XPath can use `//button[normalize-space(.)='Tiếp']`. If multiple elements match, use `index` starting at 0 or a more specific locator. Old `selector` steps still work as CSS.
+
+`type` handles normal inputs, textarea, and `contenteditable` editors. It clicks the field, focuses it, and positions the caret before browser input. A locator may identify a label, a child of a rich text editor, or a container such as `role=presentation` with one editable field. If clicking a placeholder reveals an editor, the action waits for it using `timeoutMs` (default 10000). A container with multiple editable fields must use a more specific locator. Readonly/disabled fields and containers without a usable editor fail instead of typing into the previously focused field. `clear: true` (default) selects and deletes old content through browser editing, including rich text; `clear: false` appends at the end. No separate click step is needed.
 
 ## Waiting for actions to finish
 
@@ -100,6 +102,8 @@ Manage **Danh sách biến** in the top bar. Add names such as `ngay_dang`, `gio
 ```
 
 References work in string fields in steps, including URLs, locators, completion locators, text, date/time values, upload paths, and numeric settings. Names use ASCII letters/numbers/underscore and start with a letter or underscore. Values may be strings, numbers, or booleans. Nested references are supported; missing/circular references stop the run before any action. Numeric settings and `clear` are converted after expansion. The saved JSON retains templates. A literal run-time upload path still takes precedence over the resolved paths in upload steps.
+
+For example, keep `"text": "{{tenphimn}}"` in the step and set `variables.tenphimn` to the desired film name in the navbar. Run saves current values and the agent resolves the reference in memory before dispatching browser actions. Changing the variable changes the next run without editing the step. Seeing `{{tenphimn}}` in the editor/JSON is expected; the website receives its value. The dashboard checks agent capabilities and disables Run with an explicit restart message if an older Node process is still running. The extension also rejects unresolved variable tokens before clearing/inserting text. After updating, stop the old terminal agent (Ctrl+C or `exit`), run `node local-agent.js` again, Reload the extension, and reload the target tab/dashboard.
 
 ## Selecting and cloning scenarios
 

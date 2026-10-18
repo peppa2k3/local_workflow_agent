@@ -205,6 +205,14 @@ async function input(tabId, message) {
       });
     }
   } else if (message.kind === 'text') {
+    if (/\{\{\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\}\}/.test(message.text)) throw new Error('Biến chưa được truy xuất. Khởi động lại node local-agent.js và kiểm tra giá trị biến trước khi chạy.');
+    if (message.clear) {
+      // Browser editing preserves input/beforeinput events for rich text editors.
+      await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'a', code: 'KeyA', modifiers: 2, windowsVirtualKeyCode: 65 });
+      await command('Input.dispatchKeyEvent', { type: 'keyUp', key: 'a', code: 'KeyA', modifiers: 0, windowsVirtualKeyCode: 65 });
+      await command('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Backspace', code: 'Backspace', windowsVirtualKeyCode: 8 });
+      await command('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Backspace', code: 'Backspace', windowsVirtualKeyCode: 8 });
+    }
     await command('Input.insertText', { text: message.text });
   } else if (message.kind === 'upload') {
     try {
