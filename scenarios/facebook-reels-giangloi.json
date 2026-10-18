@@ -4,6 +4,40 @@
     {
       "action": "openUrl",
       "url": "https://www.facebook.com/profile.php?id=61551343781361&sk=reels_tab"
+    },
+    {
+      "action": "upload",
+      "locatorType": "role",
+      "locator": "Tạo thước phim",
+      "filePath": "",
+      "role": "button"
+    },
+    {
+      "action": "click",
+      "locatorType": "role",
+      "role": "presentation",
+      "locator": "Mô tả thước phim của bạn...",
+      "timeoutMs": 5000,
+      "index": 1
+    },
+    {
+      "action": "type",
+      "locatorType": "role",
+      "locator": "Mô tả thước phim của bạn...",
+      "text": "{{tenphimn}}",
+      "clear": true,
+      "role": "presentation",
+      "index": 1
+    },
+    {
+      "action": "click",
+      "locatorType": "role",
+      "role": "button",
+      "locator": "Tiếp",
+      "timeoutMs": 5000
     }
-  ]
+  ],
+  "variables": {
+    "tenphimn": "Tổng Tài tỷ phú giả nghèo thử lòng cô vợ quê, ai ngờ cô không chê bai còn xuống ruộng nuôi anh cảđời"
+  }
 }
