@@ -97,6 +97,11 @@ const { createScenarioStore } = require('../src/agent/scenario-store');
         const endpoint = new URL(url).pathname;
         let state = { running, runId: 'test-run' };
         if (endpoint === '/idm/start' || endpoint === '/idm/status') {
+          if (endpoint === '/idm/start') {
+            const markerPage = tabs.get(job.tabId).page;
+            await markerPage.evaluate(() => { document.title = 'Site updates title after video starts'; });
+            await markerPage.waitForFunction(() => document.title.startsWith('Workflow-IDM-'));
+          }
           nativeRequests.push({ endpoint, body: JSON.parse(options.body) });
           state = endpoint === '/idm/start' ? { state: 'running' } : nativeFailure ? { state: 'error', error: 'No 1080p/720p' } : { state: 'complete', result: { filePath: uploadFile, quality: 1080 } };
         }

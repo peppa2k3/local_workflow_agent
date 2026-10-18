@@ -16,6 +16,7 @@ Người dùng xây dựng kịch bản tự động local và chạy chúng tr�
 - `type` click/focus/caret trên input, textarea hoặc contenteditable (kể cả wrapper presentation và editor xuất hiện sau click), xóa qua browser editing. Dashboard yêu cầu capability `variables-v1` để tránh chạy với Node process cũ; extension từ chối text còn token biến chưa resolve.
 - Dashboard theo dõi CPU/RSS/event loop của Node agent và thời gian workflow/bước theo profile. File picker là một hộp thoại Windows tại một thời điểm; debugger được tái sử dụng tới khi detach.
 - `idmDownload` là action riêng: extension mở video trong profile được chọn, đánh dấu title cửa sổ và gọi job native trong agent. Helper Windows UI Automation chỉ thao tác Chrome có marker + IDMan; đọc chất lượng (1080 rồi 720), xác nhận Save As và file hoàn tất. Một workflow IDM tại một thời điểm, start idempotent theo runId/index, Stop hủy helper nhưng không hủy download đã gửi sang IDM. Bridge cần capability `idm-download-v1` (4.1.0).
+- Native IDM bind HWND/PID sau khi tìm marker, chấp nhận title cập nhật tạm thời nhưng không tự đổi tab/window; pha chờ tạm dừng khi mất focus. Live test là lệnh opt-in `test:idm-live`, luôn tạo profile + agent riêng và chỉ dùng extension IDM lấy từ Program Files, không sao chép profile đăng nhập.
 - `local-agent.js`, đường dẫn thư mục extension, dashboard URL và cổng 34719 là các điểm vào ổn định để không làm hỏng cách chạy hiện tại.
 
 ## Quy ước làm việc

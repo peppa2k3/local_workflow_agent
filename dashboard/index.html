@@ -299,7 +299,13 @@
             if (value === undefined) delete target[child || parent]; else target[child || parent] = value;
           }));
         }
-        card.append(head, fields); list.append(card);
+        card.append(head, fields);
+        if (step.action === 'idmDownload') {
+          const hint = document.createElement('p'); hint.className = 'message';
+          hint.textContent = 'IDM cần hiện panel tải video. Nếu chuyển sang cửa sổ khác, bước chờ sẽ tạm dừng đến khi đưa Chrome này lên trước; giữ nguyên tab video.';
+          card.append(hint);
+        }
+        list.append(card);
       });
       updateButtons();
     }

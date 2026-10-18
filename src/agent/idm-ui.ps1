@@ -1,4 +1,4 @@
-﻿param([switch]$ValidateOnly)
+﻿param([switch]$ValidateOnly, [string]$InspectMarker)
 # JSON-lines adapter. Only windows of the marked Chrome tab and IDMan are used.
 $ErrorActionPreference = 'Stop'
 [Console]::InputEncoding = [System.Text.Encoding]::UTF8
@@ -28,26 +28,67 @@ function Progress($message) { Emit @{ event = 'progress'; message = $message } }
 function Roots { return @($AE::RootElement.FindAll($Scope::Children, $allCondition)) }
 function IdmRoots { return @(Roots | Where-Object { $_.Current.ProcessId -eq $script:idmPid }) }
 function Descendants($element) { return @($element.FindAll($Scope::Descendants, $allCondition)) }
+function IdmElements {
+  $seen = New-Object 'System.Collections.Generic.HashSet[string]'
+  foreach ($root in (IdmRoots)) {
+    foreach ($element in (@($root) + @(Descendants $root))) {
+      if ($element.Current.ProcessId -eq $script:idmPid -and $seen.Add(($element.GetRuntimeId() -join '.'))) { $element }
+    }
+  }
+  # Some IDM builds parent the panel to Chrome rather than expose a top-level
+  # IDM window. Include only IDMan-owned descendants of the already bound HWND.
+  $condition = New-Object System.Windows.Automation.PropertyCondition($AE::ProcessIdProperty, [int]$script:idmPid)
+  foreach ($element in ((ChromeWindow).FindAll($Scope::Descendants, $condition))) {
+    if ($seen.Add(($element.GetRuntimeId() -join '.'))) { $element }
+  }
+}
 function Value($element) {
   $pattern = $null
   if ($element.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$pattern)) { return $pattern.Current.Value }
   return ''
 }
 function ChromeWindow {
-  $windows = @(Roots | Where-Object { $_.Current.Name.Contains($script:config.marker) -and $_.Current.ClassName -like 'Chrome_WidgetWin*' })
-  if ($windows.Count -ne 1) { throw 'Không tìm thấy duy nhất cửa sổ Chrome của profile được chọn. Không chuyển tab/cửa sổ trong bước IDM.' }
-  if ((Get-Process -Id $windows[0].Current.ProcessId).ProcessName -ne 'chrome') { throw 'IDM marker is not in Chrome' }
-  return $windows[0]
+  # Bind the native handle once. UIA window names may lag document.title while
+  # YouTube updates metadata; never switch to a different Chrome window.
+  $markerUntil = [DateTime]::UtcNow.AddSeconds(3)
+  do {
+    if ($script:boundBrowserHandle) {
+      $window = $AE::FromHandle($script:boundBrowserHandle)
+      if ($window.Current.ProcessId -ne $script:boundBrowserPid) { throw 'Chrome window identity changed' }
+      if ($window.Current.Name.Contains($script:config.marker)) { return $window }
+    } else {
+      $windows = @(Roots | Where-Object { $_.Current.Name.Contains($script:config.marker) -and $_.Current.ClassName -like 'Chrome_WidgetWin*' })
+      if ($windows.Count -gt 1) { throw 'Có nhiều cửa sổ cùng marker IDM; chưa thao tác.' }
+      if ($windows.Count -eq 1) {
+        if ((Get-Process -Id $windows[0].Current.ProcessId).ProcessName -ne 'chrome') { throw 'IDM marker is not in Chrome' }
+        $script:boundBrowserHandle = [IntPtr]$windows[0].Current.NativeWindowHandle
+        $script:boundBrowserPid = $windows[0].Current.ProcessId
+        return $windows[0]
+      }
+    }
+    Start-Sleep -Milliseconds 100
+  } while ([DateTime]::UtcNow -lt $markerUntil)
+  throw 'Mất marker của cửa sổ Chrome đã chọn quá 3 giây. Không chuyển tab/cửa sổ trong bước IDM.'
 }
-function AssertScope {
+function ScopeReady {
   $browser = ChromeWindow
   $foreground = [IdmNative]::GetForegroundWindow()
   $foregroundPid = [uint32]0
   [void][IdmNative]::GetWindowThreadProcessId($foreground, [ref]$foregroundPid)
   $browserHandle = [IntPtr]$browser.Current.NativeWindowHandle
-  if ($foreground -ne $browserHandle -and -not [IdmNative]::IsChild($browserHandle, $foreground) -and $foregroundPid -ne $script:idmPid) {
-    throw 'Cửa sổ khác đang có focus. Dừng thao tác IDM để tránh click nhầm profile.'
+  return ($foreground -eq $browserHandle -or [IdmNative]::IsChild($browserHandle, $foreground) -or $foregroundPid -eq $script:idmPid)
+}
+function AssertScope {
+  if (-not (ScopeReady)) { throw 'Cửa sổ khác đang có focus. Dừng thao tác IDM để tránh click nhầm profile.' }
+}
+function WaitForScope($deadline, $resumeMessage) {
+  $waiting = $false
+  while ([DateTime]::UtcNow -lt $deadline) {
+    if (ScopeReady) { if ($waiting) { Progress $resumeMessage }; return }
+    if (-not $waiting) { Progress 'Đang chờ focus: đưa cửa sổ Chrome của video lên trước để tiếp tục IDM'; $waiting = $true }
+    Start-Sleep -Milliseconds 200
   }
+  throw 'Hết thời gian chờ focus cửa sổ Chrome của video. Chưa click IDM.'
 }
 function Click($element) {
   AssertScope
@@ -74,6 +115,24 @@ function DownloadDialog {
   return $null
 }
 if ($ValidateOnly) { Emit @{ event = 'validated'; adapter = 'idm-ui'; panelLabel = 'Tải video này' }; exit 0 }
+if ($InspectMarker) {
+  try {
+    if ($InspectMarker -notmatch '^Workflow-IDM-[a-f0-9-]{36}$') { throw 'Invalid inspection marker' }
+    $script:config = @{ marker = $InspectMarker }
+    $script:idmPid = (Get-Process -Name IDMan -ErrorAction Stop | Select-Object -First 1).Id
+    $browser = ChromeWindow
+    $buttons = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::Button)
+    $items = @($browser.FindAll($Scope::Descendants, $buttons)) + @(IdmElements)
+    $controls = @(foreach ($element in $items) {
+      $current = $element.Current
+      if ($current.Name -match '(?i)IDM|download|tải' -or $current.HelpText -match '(?i)download.*video|tải.*video') {
+        @{ name = $current.Name; help = $current.HelpText; processId = $current.ProcessId; class = $current.ClassName; controlType = $current.ControlType.ProgrammaticName; offscreen = $current.IsOffscreen }
+      }
+    })
+    Emit @{ event = 'inspection'; browserProcessId = $browser.Current.ProcessId; idmProcessId = $script:idmPid; controls = $controls }
+    exit 0
+  } catch { Emit @{ event = 'error'; message = $_.Exception.Message }; exit 1 }
+}
 try {
   [void][IdmNative]::SetThreadDpiAwarenessContext([IntPtr](-4))
   $script:config = [Console]::ReadLine() | ConvertFrom-Json
@@ -93,13 +152,12 @@ try {
   Progress 'Đang chờ nút Download this video / Tải video này của IDM'
   $panel = $null
   while ([DateTime]::UtcNow -lt $until) {
-    AssertScope
+    WaitForScope $until 'Đang chờ nút Download this video / Tải video này của IDM'
     $bounds = (ChromeWindow).Current.BoundingRectangle
-    $candidates = @(foreach ($root in (IdmRoots)) {
-      foreach ($element in (@($root) + @(Descendants $root))) {
+    $candidates = @(foreach ($element in (IdmElements)) {
         $current = $element.Current; $rect = $current.BoundingRectangle
-        if (-not $current.IsOffscreen -and $current.IsEnabled -and $current.Name -match '(?i)^(Download (this )?video|Tải (xuống )?video này)' -and $rect.Width -gt 0 -and $rect.Width -lt 800 -and $rect.Height -lt 300 -and $bounds.Contains($rect.Left + $rect.Width / 2, $rect.Top + $rect.Height / 2)) { $element }
-      }
+        $panelName = '(?i)^(Download (this )?video|Tải (xuống )?video này|IDM.*Download.*Panel)'
+        if (-not $current.IsOffscreen -and $current.IsEnabled -and ($current.Name -match $panelName -or $current.HelpText -match $panelName) -and $rect.Width -gt 0 -and $rect.Width -lt 800 -and $rect.Height -lt 300 -and $bounds.Contains($rect.Left + $rect.Width / 2, $rect.Top + $rect.Height / 2)) { $element }
     })
     # Prefer a button to its enclosing panel with the same accessible name.
     $buttons = @($candidates | Where-Object { $_.Current.ControlType -eq [System.Windows.Automation.ControlType]::Button })
@@ -114,11 +172,9 @@ try {
   $choices = @()
   $lastChoices = ''; $choicesStableSince = [DateTime]::UtcNow
   while ([DateTime]::UtcNow -lt $until) {
-    AssertScope
-    $choices = @(foreach ($root in (IdmRoots)) {
-      foreach ($element in (Descendants $root)) {
+    WaitForScope $until 'Đang đọc danh sách chất lượng IDM'
+    $choices = @(foreach ($element in (IdmElements)) {
         if (-not $element.Current.IsOffscreen -and $element.Current.IsEnabled -and $element.Current.Name -match '(?:\b(1080|720)\s*(p|px)?\b|\b\d{3,4}\s*[x×]\s*(1080|720)\b)' -and $element.Current.ControlType -in @([System.Windows.Automation.ControlType]::MenuItem, [System.Windows.Automation.ControlType]::ListItem, [System.Windows.Automation.ControlType]::Button)) { $element }
-      }
     })
     $signature = ($choices | ForEach-Object { $_.Current.Name }) -join '|'
     if ($signature -ne $lastChoices) { $lastChoices = $signature; $choicesStableSince = [DateTime]::UtcNow }
@@ -136,7 +192,7 @@ try {
   Progress ('Đã chọn ' + $options[[int]$selection.choice].label)
   $dialog = $null
   while ([DateTime]::UtcNow -lt $until) {
-    AssertScope; $dialog = DownloadDialog
+    WaitForScope $until 'Đang chờ Download File Info'; $dialog = DownloadDialog
     if ($dialog) { break }
     Start-Sleep -Milliseconds 200
   }

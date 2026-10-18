@@ -11,6 +11,7 @@
   function releaseIdm(marker) {
     if (idmTitle?.marker !== marker) return;
     clearInterval(idmTitle.timer);
+    idmTitle.observer.disconnect();
     if (document.title.startsWith(marker)) document.title = idmTitle.original;
     idmTitle = null;
   }
@@ -404,7 +405,9 @@
       const original = document.title, marker = message.marker;
       const update = () => { if (!document.title.startsWith(marker)) document.title = `${marker} ${original}`; };
       update();
-      idmTitle = { marker, original, timer: setInterval(update, 500) };
+      const observer = new MutationObserver(update);
+      observer.observe(document.head || document.documentElement, { childList: true, characterData: true, subtree: true });
+      idmTitle = { marker, original, observer, timer: setInterval(update, 500) };
       // IDM captures media requests after playback. Custom/iframe players can
       // use playSelector or a manual Play click during the panel wait.
       if (message.playVideo) {
