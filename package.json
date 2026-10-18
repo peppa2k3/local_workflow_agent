@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "start": "node local-agent.js",
-    "test": "node tests/workflows.js && node tests/agent-api.js && node tests/overlay-flow.js && node tests/navigation-flow.js && node tests/file-picker.js"
+    "test": "node tests/scenario-features.js && node tests/workflows.js && node tests/agent-api.js && node tests/overlay-flow.js && node tests/navigation-flow.js && node tests/file-picker.js"
   },
   "dependencies": {
     "playwright": "^1.64.0"

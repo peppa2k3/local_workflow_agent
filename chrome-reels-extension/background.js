@@ -1,5 +1,7 @@
 const base = 'http://127.0.0.1:34719';
 const fileChoosers = new Map();
+const debuggerTabs = new Set();
+chrome.debugger.onDetach?.addListener(source => { debuggerTabs.delete(source.tabId); fileChoosers.delete(source.tabId); });
 let polling = false;
 let activeJob = null;
 let lastPick = null;
@@ -7,6 +9,7 @@ const newTabs = new Map();
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 chrome.tabs.onCreated.addListener(tab => {
+  for (const [id, opened] of newTabs) if (Date.now() - opened.at > 30000) newTabs.delete(id);
   if (tab.openerTabId !== undefined) newTabs.set(tab.openerTabId, { id: tab.id, at: Date.now() });
 });
 
@@ -174,9 +177,10 @@ async function poll() {
 
 async function input(tabId, message) {
   const target = { tabId };
-  const targets = await chrome.debugger.getTargets();
-  if (!targets.some(item => item.tabId === tabId && item.attached)) {
-    await chrome.debugger.attach(target, '1.3');
+  if (!debuggerTabs.has(tabId)) {
+    const targets = await chrome.debugger.getTargets();
+    if (!targets.some(item => item.tabId === tabId && item.attached)) await chrome.debugger.attach(target, '1.3');
+    debuggerTabs.add(tabId);
   }
   const command = (method, params) => chrome.debugger.sendCommand(target, method, params);
   if (message.kind === 'prepareUpload') {

@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 const { spawn } = require('child_process');
+const { monitorEventLoopDelay } = require('perf_hooks');
 const { port, scenariosDir, dashboardPath, chromePath, profile, userDataDir } = require('./config');
 const { createScenarioStore } = require('./scenario-store');
 const { chooseFile } = require('./file-picker');
@@ -10,6 +11,11 @@ const { listProfiles } = require('./profiles');
 const { createWorkflows } = require('./workflows');
 
 const scenarios = createScenarioStore(scenariosDir);
+const eventLoop = monitorEventLoopDelay({ resolution: 20 });
+eventLoop.enable();
+let previousCpu = process.cpuUsage(), previousCpuAt = process.hrtime.bigint();
+let performance = { cpuPercent: 0, eventLoopP95Ms: 0, memoryMb: 0 };
+let filePickerPending = false;
 let profileCache, profileCacheAt = 0;
 const profiles = () => {
   if (!profileCache || Date.now() - profileCacheAt > 2000) {
@@ -63,7 +69,7 @@ const server = http.createServer(async (request, response) => {
       const selected = url.searchParams.get('profile') || profile;
       if (request.method === 'GET' && route === '/api/status') return json(200, workflows.status(selected));
       if (request.method === 'GET' && route === '/api/profiles') {
-        return json(200, { defaultProfile: profile, profiles: profiles().map(item => ({ ...item, ...workflows.status(item.directory) })) });
+        return json(200, { defaultProfile: profile, performance, profiles: profiles().map(item => ({ ...item, ...workflows.status(item.directory) })) });
       }
       if (request.method === 'POST' && route === '/api/profiles/open') {
         const body = await readBody(request);
@@ -73,8 +79,12 @@ const server = http.createServer(async (request, response) => {
       }
       if (request.method === 'GET' && route === '/api/pick/status') return json(200, workflows.session(selected).picker);
       if (request.method === 'POST' && route === '/api/choose-file') {
+        if (filePickerPending) throw new Error('Hộp chọn file đang mở. Chọn file hoặc Hủy trong cửa sổ đó.');
         const body = await readBody(request);
-        return json(200, { filePath: await chooseFile(body.initialDirectory || '') });
+        if (filePickerPending) throw new Error('Hộp chọn file đang mở');
+        filePickerPending = true;
+        try { return json(200, { filePath: await chooseFile(body.initialDirectory || '') }); }
+        finally { filePickerPending = false; }
       }
       if (request.method === 'POST' && route === '/api/pick/start') {
         const body = await readBody(request);
@@ -85,6 +95,11 @@ const server = http.createServer(async (request, response) => {
         return json(200, s.picker);
       }
       if (request.method === 'GET' && route === '/api/scenarios') return json(200, { names: scenarios.list() });
+      const cloneMatch = route.match(/^\/api\/scenarios\/([^/]+)\/clone$/);
+      if (cloneMatch && request.method === 'POST') {
+        const body = await readBody(request);
+        return json(200, { name: body.name, scenario: scenarios.clone(cloneMatch[1], body.name) });
+      }
       const match = route.match(/^\/api\/scenarios\/([^/]+)$/);
       if (match && request.method === 'GET') return json(200, scenarios.load(match[1]));
       if (match && request.method === 'PUT') {
@@ -121,6 +136,16 @@ const server = http.createServer(async (request, response) => {
 });
 const expiry = setInterval(workflows.expire, 1000);
 expiry.unref();
+const performanceTimer = setInterval(() => {
+  const now = process.hrtime.bigint(), cpu = process.cpuUsage();
+  performance = {
+    cpuPercent: Math.round(((cpu.user - previousCpu.user) + (cpu.system - previousCpu.system)) / (Number(now - previousCpuAt) / 1000) * 1000) / 10,
+    eventLoopP95Ms: Math.round(eventLoop.percentile(95) / 1e5) / 10,
+    memoryMb: Math.round(process.memoryUsage().rss / 1048576 * 10) / 10
+  };
+  previousCpu = cpu; previousCpuAt = now; eventLoop.reset();
+}, 2000);
+performanceTimer.unref();
 server.listen(port, '127.0.0.1', () => {
   console.log(`Local agent ready. Default Chrome profile: ${profile}.`);
   console.log(`Dashboard: http://127.0.0.1:${port}`);

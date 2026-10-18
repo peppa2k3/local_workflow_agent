@@ -194,6 +194,35 @@
     throw new Error(`Cannot identify file input (${inputs.length} found). Pick the upload button in the open dialog, or select its input[type=file].`);
   }
 
+  async function fillDateTime(step) {
+    await clickElement(step);
+    const element = await find(step, false, true);
+    if (!(element instanceof HTMLInputElement)) throw new Error('Ngày/giờ cần một input');
+    const date = step.action === 'setDate';
+    const value = String(step.value ?? '');
+    if (date) {
+      const parsed = new Date(`${value}T00:00:00Z`);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) throw new Error('Ngày phải có định dạng YYYY-MM-DD hợp lệ');
+    } else if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) throw new Error('Giờ phải có định dạng HH:mm');
+    let formatted = value;
+    const nativeType = date ? 'date' : 'time';
+    if (element.type !== nativeType) {
+      if (!['text', 'search', 'tel'].includes(element.type)) throw new Error(`Input phải là ${nativeType} hoặc text`);
+      if (date) {
+        const [year, month, day] = value.split('-');
+        const formats = { 'DD/MM/YYYY': `${day}/${month}/${year}`, 'MM/DD/YYYY': `${month}/${day}/${year}`, 'YYYY-MM-DD': value };
+        formatted = formats[step.format || 'DD/MM/YYYY'];
+        if (!formatted) throw new Error('Định dạng ngày không hỗ trợ');
+      }
+    }
+    if (element.readOnly || element.disabled) throw new Error('Input ngày/giờ không cho phép nhập');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(element, formatted);
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    element.blur();
+    if (element.value !== formatted || !element.validity.valid) throw new Error('Trang từ chối giá trị ngày/giờ (kiểm tra min/max/step và định dạng)');
+  }
+
   async function upload(step) {
     const hasLocator = Boolean(step.locator || step.selector);
     const target = hasLocator ? await find(step, ['css', 'xpath'].includes(step.locatorType || 'css')) : null;
@@ -208,7 +237,6 @@
         if (!ready?.ok) throw new Error(ready?.error || 'Cannot prepare file chooser');
         prepared = true;
         await clickElement(step);
-        await sleep(200);
       }
 
       const deadline = Date.now() + (step.timeoutMs || 10000);
@@ -217,6 +245,7 @@
         checkCancelled();
         if (prepared) {
           const status = await send({ type: 'input', kind: 'chooserStatus' });
+          if (!status?.ok) throw new Error(status?.error || 'Cannot check file chooser');
           if (status?.opened) { chooserOpened = true; break; }
         }
         try { input = fileInputFor(target); } catch { /* The dialog may still be rendering. */ }
@@ -226,7 +255,7 @@
             target?.contains(input) || target?.control === input;
           if (!prepared || isNewOrRelated) break;
         }
-        await sleep(200);
+        await sleep(100);
       }
       if (prepared && !chooserOpened && input && existingInputs.has(input) &&
           !activeDialog()?.contains(input) && !target?.contains(input) && target?.control !== input) {
@@ -277,6 +306,10 @@
         if (!response?.ok) throw new Error(response?.error || 'Typing failed');
         break;
       }
+      case 'setDate':
+      case 'setTime':
+        await fillDateTime(step);
+        break;
       case 'upload':
         await upload(step);
         break;

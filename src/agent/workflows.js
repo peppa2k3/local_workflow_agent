@@ -18,12 +18,16 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder }) {
       profile: s.profile, running: s.running, runId: s.runId, index: s.index,
       total: s.workflow?.steps.length || 0, action: s.workflow?.steps[s.index]?.action || null,
       extensionConnected: Date.now() - s.lastContact < 10000, error: s.error,
-      tabId: s.tabId, waiting: s.inFlight
+      tabId: s.tabId, waiting: s.inFlight,
+      elapsedMs: s.startedAt ? (s.endedAt || Date.now()) - s.startedAt : 0,
+      stepElapsedMs: s.running && s.stepStartedAt ? Date.now() - s.stepStartedAt : 0,
+      lastStepMs: s.lastStepMs ?? null
     };
   }
   function stop(profile) {
     const s = session(profile);
     s.controller.abort(); s.controller = new AbortController();
+    if (s.running) s.endedAt = Date.now();
     s.running = false; s.inFlight = false; s.localPending = false;
     s.picker.active = false; s.runId = randomUUID();
   }
@@ -35,13 +39,15 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder }) {
     try {
       while (s.running && s.runId === runId && s.index < s.workflow.steps.length) {
         const step = s.workflow.steps[s.index];
+        s.stepStartedAt = Date.now();
         if (step.action === 'wait') await delay(step.ms, undefined, { signal: s.controller.signal });
         else if (step.action === 'openFolder') await openFolder(step.path);
         else break;
         if (!s.running || s.runId !== runId) return;
+        s.lastStepMs = Date.now() - s.stepStartedAt;
         s.index++;
       }
-      if (s.runId === runId && s.index === s.workflow.steps.length) s.running = false;
+      if (s.runId === runId && s.index === s.workflow.steps.length) { s.running = false; s.endedAt = Date.now(); }
     } catch (error) {
       if (s.runId === runId) fail(s, error);
     } finally {
@@ -56,7 +62,7 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder }) {
       throw new Error('Extension chưa kết nối profile này. Mở profile, cài/reload extension và chọn đúng profile trong Extension options.');
     }
     stop(profile);
-    Object.assign(s, { workflow, index: 0, error: '', tabId: null, running: true });
+    Object.assign(s, { workflow, index: 0, error: '', tabId: null, running: true, startedAt: Date.now(), endedAt: null, lastStepMs: null });
     void advance(s, s.runId);
   }
   function connect(body) {
@@ -74,6 +80,7 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder }) {
     const answer = { running: s.running, runId: s.runId, step: null, tabId: s.tabId };
     if (s.running && !s.localPending && !s.inFlight) {
       s.inFlight = true;
+      s.stepStartedAt = Date.now();
       const step = s.workflow.steps[s.index];
       const budget = (step.timeoutMs || 10000) + (step.navigationTimeoutMs || 30000) +
         (step.waitAfterMs || 0) + (step.times || 1) * (step.intervalMs || 2500) + 30000;
@@ -86,6 +93,7 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder }) {
     if (!s.running || !s.inFlight || body.runId !== s.runId || body.id !== s.index) return;
     s.inFlight = false;
     if (!body.ok) return fail(s, `Step ${s.index + 1}: ${body.error || 'Action failed'}`);
+    s.lastStepMs = Date.now() - s.stepStartedAt;
     if (Number.isInteger(body.tabId)) s.tabId = body.tabId;
     s.index++;
     void advance(s, s.runId);

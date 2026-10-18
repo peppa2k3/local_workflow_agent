@@ -20,6 +20,8 @@ Edit a JSON file in `scenarios` and run it again. Steps run in order:
 | `waitFor` | `locatorType`, `locator`, optional `role`, `index`, `timeoutMs` | Waits for a visible matching element (default 10 seconds). |
 | `click` | `locatorType`, `locator`, optional `role`, `index`, `timeoutMs`, `navigationTimeoutMs`, `settleMs`, `completion` | Clicks an actionable element and waits for navigation/DOM stability and the optional result condition. |
 | `type` | `locatorType`, `locator`, `text`, optional `clear` | Clicks a field and enters text. |
+| `setDate` | locator fields, `value` (`YYYY-MM-DD`), optional `format`, `timeoutMs`, `completion` | Clicks an input and fills a valid calendar date, then fires input/change and blurs. |
+| `setTime` | locator fields, `value` (`HH:mm`), optional `timeoutMs`, `completion` | Clicks an input and fills a 24-hour time, then fires input/change and blurs. |
 | `upload` | optional locator fields; `filePath` or `folder` + `filename` | Sets the chosen local file on a page's `input[type=file]`. |
 | `scroll` | optional `pixels`, `times`, `intervalMs` | Sends mouse wheel input (defaults: 650, 1, 2500). |
 
@@ -44,7 +46,7 @@ In the dashboard, choose **Role + name**, **Visible text**, **Label**, **Placeho
 
 Only one step is issued at a time **per profile**. The next step, including local `wait`/`openFolder`, starts after the extension acknowledges completion. `openUrl` and `click` wait for Chrome's tab load status and `document.readyState === 'complete'`, then a quiet DOM/URL interval (`settleMs`, default 350 ms). The background worker owns navigation, so replacing the old document or redirecting does not lose the completion acknowledgement. A click observes navigation/new-tab creation for at least 500 ms; if it opens a new tab during that interval, later steps use that tab. The selected target tab remains bound even if you switch to another tab.
 
-Page load does not tell an agent when a website's business operation is finished. For AJAX, delayed navigation, upload processing, or pages with continuously changing content, set **Chờ phần tử kết quả** in the dashboard or add `completion` to the action. It works on `openUrl`, `click`, `type`, and `upload` and accepts normal locator fields plus `state`: `visible` (default), `hidden`, or `enabled` (can receive a pointer click). For example:
+Page load does not tell an agent when a website's business operation is finished. For AJAX, delayed navigation, upload processing, or pages with continuously changing content, set **Chờ phần tử kết quả** in the dashboard or add `completion` to the action. It works on `openUrl`, `click`, `type`, `setDate`, `setTime`, and `upload` and accepts normal locator fields plus `state`: `visible` (default), `hidden`, or `enabled` (can receive a pointer click). For example:
 
 ```json
 {
@@ -72,3 +74,41 @@ For upload, add an **Upload file** step and pick the button that opens file sele
 When a click opens a dialog or full-page overlay, put a `waitFor` step for a button in that dialog before the next `click` or `upload`. The agent waits until that button can receive a pointer click and prefers matching elements inside the visible dialog. Use **Chọn trên trang** after opening the dialog manually to capture its new button. If the button opens the Windows file chooser, use an `upload` step targeting that button instead of a separate `click` step.
 
 `status` reports progress and errors for all profiles. Use `run scenarios/my-workflow.json --profile "Profile 1" --upload "C:\\Uploads\\photo.jpg"` to select a profile from the terminal. `stop "Profile 1"` interrupts only that workflow; plain `stop` uses the default profile. `exit` stops all workflows and ends the agent. If a new tab opens long after a click, use a later `openUrl` step to explicitly select its URL.
+
+## Dates, times and variables
+
+In the dashboard, add **Click và nhập ngày** or **Click và nhập giờ**, then use **Chọn trên trang** to identify the input. Native `input[type=date]` always receives `YYYY-MM-DD` regardless of Chrome's display language; native time receives `HH:mm`. For text/search/tel inputs, date `format` accepts `DD/MM/YYYY` (default), `MM/DD/YYYY`, or `YYYY-MM-DD`. Time text inputs receive `HH:mm`. Impossible dates, invalid times, readonly fields, and native min/max/step violations fail the action. Custom calendar widgets with readonly inputs require ordinary click steps on their calendar controls. These actions do not combine separate day/month/year controls or `datetime-local`; use separate steps for the page's fields.
+
+Manage **Danh sách biến** in the top bar. Add names such as `ngay_dang`, `gio_dang`, or `noi_dung` and their values. Choose **Chèn tham chiếu biến…** under an input, or type `{{name}}` directly. Date/time fields offer **Nhập tham chiếu trực tiếp** to switch from the calendar/time picker to text. Variables are saved with each scenario, shared across that scenario's steps, and resolved afresh for every run on the chosen profile.
+
+```json
+{
+  "name": "Schedule a post",
+  "variables": {
+    "ngay_dang": "2026-10-18",
+    "gio_dang": "09:35",
+    "noi_dung": "Bài đăng ngày {{ngay_dang}}",
+    "cho_ms": "500"
+  },
+  "steps": [
+    { "action": "setDate", "selector": "#date", "value": "{{ngay_dang}}" },
+    { "action": "setTime", "selector": "#time", "value": "{{gio_dang}}" },
+    { "action": "type", "selector": "#caption", "text": "{{noi_dung}}" },
+    { "action": "wait", "ms": "{{cho_ms}}" }
+  ]
+}
+```
+
+References work in string fields in steps, including URLs, locators, completion locators, text, date/time values, upload paths, and numeric settings. Names use ASCII letters/numbers/underscore and start with a letter or underscore. Values may be strings, numbers, or booleans. Nested references are supported; missing/circular references stop the run before any action. Numeric settings and `clear` are converted after expansion. The saved JSON retains templates. A literal run-time upload path still takes precedence over the resolved paths in upload steps.
+
+## Selecting and cloning scenarios
+
+Changing **Kịch bản đã lưu** loads that scenario immediately; save edits before switching. Select a connected profile, select a scenario, then press Run. Run saves the editor and dispatches it to the profile captured when Run was pressed. Each profile still needs the one-time extension Options mapping described above. The dashboard locks editor operations while loading/saving/cloning to prevent overlapping requests from mixing scenarios.
+
+**Clone kịch bản** saves the editor and creates an independent file with all steps and variables, using `-copy`, `-copy-2`, etc. It opens the copy for editing. The source is preserved; a destination that already exists is never overwritten. HTTP clients can use `POST /api/scenarios/<source>/clone` with `{ "name": "destination" }`.
+
+## Performance and upload feedback
+
+The dashboard shows agent CPU percentage (one core = 100%), process RSS memory, event loop p95 in milliseconds over two-second windows, and the selected profile's total/current/previous step times. These describe the Node agent, not Chrome's CPU or website/server processing. A long upload step can include locating the control, waiting for a chooser, assigning a file, `waitAfterMs`, and any explicit completion condition. Use a result element in `completion` to determine when the website has processed the upload.
+
+The Windows file picker runs asynchronously with its console hidden and a foreground owner. Its buttons disable until selection/cancel, and the agent rejects duplicate picker requests. Other dashboard requests have a 10-second timeout and status polling does not overlap. The extension reuses its debugger connection, handles detach, and checks chooser readiness without a fixed extra 200 ms pause. `waitAfterMs` still defaults to 500 ms for compatibility; set `0` and use a meaningful completion condition if the page supports it.

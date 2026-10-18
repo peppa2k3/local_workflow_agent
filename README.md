@@ -4,6 +4,10 @@ Công cụ tạo và chạy kịch bản tự động trên Chrome profile đang
 
 Dashboard hỗ trợ chọn/mở nhiều Chrome profile và chạy kịch bản độc lập trên từng profile. Cài extension trong mỗi profile, vào **Extension options** để chọn đúng thư mục profile, rồi chọn profile trên dashboard. `openUrl`/`click` chờ trang tải xong; dùng điều kiện hoàn tất để chờ kết quả AJAX hoặc upload.
 
+Chọn **Chrome profile** và **Kịch bản đã lưu** rồi bấm **Chạy kịch bản**; dropdown tự mở kịch bản vừa chọn. **Clone kịch bản** lưu nội dung đang sửa và tạo bản sao độc lập với tên `-copy`. Thanh **Danh sách biến** quản lý biến theo kịch bản; dùng **Chèn tham chiếu biến…** dưới mỗi input hoặc nhập `{{ten_bien}}`. Có thêm **Click và nhập ngày** (`YYYY-MM-DD`) và **Click và nhập giờ** (`HH:mm`), hỗ trợ cả input native và input text. Chọn định dạng ngày/tháng/năm cho input text nếu cần.
+
+Dashboard hiển thị CPU/RAM/event loop của agent cùng thời gian chạy theo profile để tìm bước chậm. Nút chọn file báo đang mở hộp thoại và chặn bấm lặp. Sau khi cập nhật, khởi động lại agent, Reload extension trong từng profile và tải lại dashboard/tab mục tiêu.
+
 **Bắt đầu:** [Hướng dẫn cài đặt và chạy từng bước](docs/SETUP.md).
 
 ## Cấu trúc

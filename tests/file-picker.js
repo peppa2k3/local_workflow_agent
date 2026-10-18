@@ -3,9 +3,10 @@ const { EventEmitter } = require('node:events');
 const { chooseFile } = require('../src/agent/file-picker');
 
 function fakeLaunch(output, code = 0) {
-  return (command, args) => {
+  return (command, args, options) => {
     assert.equal(command, 'powershell.exe');
     assert(args.includes('-STA'));
+    assert.equal(options.windowsHide, true, 'hide PowerShell console while keeping the file dialog');
     assert.equal(args.at(-1), 'C:\\Uploads');
     const child = new EventEmitter();
     child.stdout = new EventEmitter();

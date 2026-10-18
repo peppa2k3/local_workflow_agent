@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { resolveVariables } = require('./variables');
 
 function createScenarioStore(scenariosDir) {
   function file(name) {
@@ -15,16 +16,37 @@ function createScenarioStore(scenariosDir) {
       if (!Array.isArray(scenario.steps) || !scenario.steps.length) throw new Error('Add at least one step');
       fs.writeFileSync(file(name), JSON.stringify(scenario, null, 2) + '\n');
     },
+    clone: (source, destination) => {
+      const scenario = JSON.parse(fs.readFileSync(file(source), 'utf8'));
+      scenario.name = `${scenario.name || source} (bản sao)`;
+      fs.writeFileSync(file(destination), JSON.stringify(scenario, null, 2) + '\n', { flag: 'wx' });
+      return scenario;
+    },
     prepare: (scenario, uploadPath = '') => {
       if (!Array.isArray(scenario.steps) || !scenario.steps.length) {
         throw new Error('Scenario needs a nonempty steps array');
       }
-      const prepared = structuredClone(scenario);
+      const prepared = resolveVariables(scenario);
       for (const step of prepared.steps) {
-        if (!['openUrl', 'openFolder', 'wait', 'waitFor', 'click', 'type', 'scroll', 'upload'].includes(step.action)) throw new Error(`Unsupported action: ${step.action}`);
-        for (const key of ['timeoutMs', 'navigationTimeoutMs', 'settleMs', 'waitAfterMs', 'ms', 'times', 'intervalMs']) {
+        if (!['openUrl', 'openFolder', 'wait', 'waitFor', 'click', 'type', 'setDate', 'setTime', 'scroll', 'upload'].includes(step.action)) throw new Error(`Unsupported action: ${step.action}`);
+        for (const key of ['url', 'path', 'text', 'locator', 'selector', 'role', 'filePath', 'folder', 'filename', 'value', 'format']) {
+          if (step[key] !== undefined) step[key] = String(step[key]);
+        }
+        for (const key of ['timeoutMs', 'navigationTimeoutMs', 'settleMs', 'waitAfterMs', 'ms', 'times', 'intervalMs', 'index', 'pixels']) {
+          if (typeof step[key] === 'string' && step[key].trim() !== '') step[key] = Number(step[key]);
+          if (key === 'pixels') {
+            if (step[key] !== undefined && !Number.isFinite(step[key])) throw new Error(`Invalid ${key}`);
+            continue;
+          }
           if (step[key] !== undefined && (!Number.isFinite(step[key]) || step[key] < 0 || step[key] > 300000)) throw new Error(`Invalid ${key}`);
         }
+        if (step.clear === 'true' || step.clear === 'false') step.clear = step.clear === 'true';
+        if (step.action === 'setDate') {
+          const value = String(step.value ?? '');
+          const date = new Date(`${value}T00:00:00Z`);
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value) throw new Error('setDate requires a valid YYYY-MM-DD value');
+        }
+        if (step.action === 'setTime' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(step.value ?? ''))) throw new Error('setTime requires HH:mm (00:00–23:59)');
         if (step.action === 'openUrl') {
           const url = new URL(step.url);
           if (!['http:', 'https:'].includes(url.protocol)) throw new Error('openUrl requires http or https');

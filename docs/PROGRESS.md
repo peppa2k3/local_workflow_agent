@@ -1,8 +1,14 @@
 # Tiến độ phát triển
 
-Cập nhật: 2026-10-16 (Asia/Bangkok).
+Cập nhật: 2026-10-18 (Asia/Bangkok).
 
 ## Completed
+
+- Thao tác `setDate`/`setTime`: click input, nhập ngày/giờ native hoặc text, phát input/change, kiểm tra giá trị; giữ CSS selector cũ.
+- Biến theo kịch bản ở navbar, chèn `{{name}}` vào input, resolve trước khi chạy và báo lỗi biến thiếu/vòng lặp.
+- Chọn kịch bản tự mở đúng editor, chạy trên profile đã chọn; clone độc lập giữ steps/variables và không ghi đè bản sao cũ.
+- Hiển thị CPU/RAM/event loop agent và thời gian bước theo profile; tránh poll chồng; khóa picker khi chờ, đưa hộp thoại lên trước và tái sử dụng debugger để giảm lượt dò lặp.
+- Kiểm thử cục bộ bằng Chrome tách biệt cho ngày/giờ, file chooser CDP thực, biến, clone và lựa chọn profile/kịch bản trên dashboard.
 
 - Điều phối tuần tự theo xác nhận hoàn tất: chờ navigation/DOM ổn định sau openUrl/click; hỗ trợ điều kiện kết quả visible/hidden/enabled cho tác vụ bất đồng bộ, timeout và dừng riêng.
 - Dashboard chọn/mở nhiều Chrome profile và chạy đồng thời các workflow độc lập; extension cấu hình profile một lần trong Options, từ chối kết nối trùng và kết quả cũ.

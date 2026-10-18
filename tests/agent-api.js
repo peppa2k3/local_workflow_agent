@@ -39,6 +39,7 @@ const { spawn } = require('node:child_process');
     const profiles = await api('/api/profiles');
     assert.deepEqual(profiles.profiles.map(item => item.directory), ['Profile 1', 'Profile 2']);
     assert.equal(profiles.profiles[0].name, 'First test profile');
+    assert.equal(typeof profiles.performance.memoryMb, 'number');
     const clients = [{ profile: 'Profile 1', clientId: 'first' }, { profile: 'Profile 2', clientId: 'second' }];
     await api('/state', { clientId: 'legacy' }, 'POST', 400);
     for (const client of clients) await api('/state', client);
@@ -46,6 +47,10 @@ const { spawn } = require('node:child_process');
     await api('/api/scenarios/test', { name: 'test', steps: [
       { action: 'openUrl', url: 'https://example.test/' }, { action: 'click', selector: '#next' }
     ] }, 'PUT');
+    await api('/api/scenarios/test/clone', { name: 'test-copy' });
+    assert.deepEqual((await api('/api/scenarios/test-copy')).steps, (await api('/api/scenarios/test')).steps);
+    await api('/api/scenarios/test/clone', { name: 'test-copy' }, 'POST', 400);
+    await api('/api/scenarios/test/clone', { name: '../escape' }, 'POST', 400);
     for (const client of clients) await api('/api/run', { name: 'test', profile: client.profile });
     const first = await api('/next', clients[0]);
     const second = await api('/next', clients[1]);

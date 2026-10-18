@@ -3,11 +3,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
 const vm = require('node:vm');
+const os = require('node:os');
 const { chromium } = require('playwright');
 
 // Real isolated Chrome pages + CDP input exercise the production worker and
 // content script. The Chrome extension API adapter supplies only browser APIs.
 (async () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'workflow-browser-'));
+  const uploadFile = path.join(temp, 'upload.txt'); fs.writeFileSync(uploadFile, 'upload fixture');
   const server = http.createServer((request, response) => {
     if (request.url === '/redirect') { response.writeHead(302, { Location: '/start' }); response.end(); return; }
     if (request.url.startsWith('/image')) {
@@ -18,6 +21,10 @@ const { chromium } = require('playwright');
     response.end(`<a id="go" href="/next">Next</a><img src="/image${request.url}">
       <button id="spa" onclick="setTimeout(()=>{document.getElementById('done').hidden=false;document.getElementById('spinner').remove()},800)">Load data</button>
       <span id="spinner">Loading</span><span id="done" hidden>Done</span><input id="text">
+      <input id="date" type="date"><input id="time" type="time"><input id="date-text" aria-label="Date text">
+      <input id="limited-date" type="date" min="2026-10-01"><input id="readonly-date" type="date" readonly>
+      <input id="file" type="file" hidden><button id="upload" onclick="document.getElementById('file').click()">Upload</button>
+      <script>window.dateEvents=[];document.getElementById('date').addEventListener('input',e=>dateEvents.push(e.type));document.getElementById('date').addEventListener('change',e=>dateEvents.push(e.type));</script>
       <button id="noop">No operation</button>
       <button id="delayed" onclick="setTimeout(()=>location.assign('/delayed-result'),900)">Delayed navigation</button>
       ${request.url === '/delayed-result' ? '<span id="arrived">Arrived</span>' : ''}`);
@@ -31,12 +38,14 @@ const { chromium } = require('playwright');
     const tabs = new Map(); let nextTabId = 1;
     const content = fs.readFileSync(path.join(__dirname, '../chrome-reels-extension/content.js'), 'utf8');
     let workerListener;
+    let debuggerListener, debuggerQueries = 0;
     let running = true;
     const event = () => ({ addListener() {} });
     async function createTab({ url }) {
       const id = nextTabId++;
       const page = await browserContext.newPage();
       const cdp = await browserContext.newCDPSession(page);
+      cdp.on('Page.fileChooserOpened', params => debuggerListener?.({ tabId: id }, 'Page.fileChooserOpened', params));
       const tab = { id, page, cdp, status: 'loading' }; tabs.set(id, tab);
       page.on('request', request => { if (request.isNavigationRequest() && request.frame() === page.mainFrame()) tab.status = 'loading'; });
       page.on('load', () => { tab.status = 'complete'; });
@@ -65,7 +74,7 @@ const { chromium } = require('playwright');
       },
       scripting: { executeScript: async ({ target }) => { await tabs.get(target.tabId).page.addScriptTag({ content }); } },
       debugger: {
-        onEvent: event(), getTargets: async () => [...tabs.keys()].map(tabId => ({ tabId, attached: true })),
+        onEvent: { addListener(listener) { debuggerListener = listener; } }, getTargets: async () => { debuggerQueries++; return [...tabs.keys()].map(tabId => ({ tabId, attached: true })); },
         sendCommand: async (target, method, params) => tabs.get(target.tabId).cdp.send(method, params)
       }
     };
@@ -93,6 +102,25 @@ const { chromium } = require('playwright');
     assert(Date.now() - started >= 800, 'wait for asynchronous SPA result');
     await execute(job, { action: 'type', selector: '#text', text: 'Ready' });
     assert.equal(await tabs.get(job.tabId).page.locator('#text').inputValue(), 'Ready');
+    await execute(job, { action: 'setDate', selector: '#date', value: '2026-10-18' });
+    await execute(job, { action: 'setTime', locatorType: 'css', locator: '#time', value: '09:35' });
+    await execute(job, { action: 'setDate', locatorType: 'label', locator: 'Date text', value: '2026-10-18' });
+    const targetPage = tabs.get(job.tabId).page;
+    assert.equal(await targetPage.locator('#date').inputValue(), '2026-10-18');
+    assert.equal(await targetPage.locator('#time').inputValue(), '09:35');
+    assert.equal(await targetPage.locator('#date-text').inputValue(), '18/10/2026');
+    assert.deepEqual(await targetPage.evaluate(() => window.dateEvents), ['input', 'change']);
+    await execute(job, { action: 'setDate', selector: '#date-text', value: '2026-10-18', format: 'YYYY-MM-DD' });
+    assert.equal(await targetPage.locator('#date-text').inputValue(), '2026-10-18');
+    await assert.rejects(execute(job, { action: 'setDate', selector: '#date', value: '2026-02-30' }), /YYYY-MM-DD/);
+    await assert.rejects(execute(job, { action: 'setDate', selector: '#limited-date', value: '2026-09-18' }), /min\/max\/step/);
+    await assert.rejects(execute(job, { action: 'setDate', selector: '#readonly-date', value: '2026-10-18' }), /không cho phép/);
+    started = Date.now();
+    await execute(job, { action: 'upload', selector: '#upload', filePath: uploadFile, waitAfterMs: 0 });
+    assert.equal(await targetPage.locator('#file').evaluate(input => input.files[0].name), 'upload.txt');
+    assert(Date.now() - started < 5000, 'upload chooser should complete without waiting for its full timeout');
+    assert.equal(debuggerQueries, 1, 'reuse debugger connection across repeated input commands');
+    await execute(job, { action: 'upload', selector: '#file', filePath: uploadFile, waitAfterMs: 0 });
     await execute(job, { action: 'click', selector: '#noop', completion: { locator: '#spinner', state: 'hidden' }, navigationTimeoutMs: 1000 });
     await assert.rejects(execute(job, { action: 'click', selector: '#noop', completion: { locator: '#missing' }, navigationTimeoutMs: 250 }), /Completion condition timed out/);
     await execute(job, { action: 'click', selector: '#delayed', completion: { locator: '#arrived' }, navigationTimeoutMs: 5000 });
@@ -102,7 +130,11 @@ const { chromium } = require('playwright');
     await assert.rejects(execute(job, { action: 'click', selector: '#noop' }), /Stopped/);
     console.log('Navigation load, redirect, document replacement, SPA completion, timeout and stop: OK');
 
-    let savedScenario, runRequest;
+    let savedScenario, runRequest, cloneRequest, pickerCalls = 0, finishPicker;
+    const fixtures = {
+      'facebook-reels': { name: 'Dashboard test', steps: [{ action: 'click', selector: '#go' }] },
+      schedule: { name: 'Schedule test', variables: { day: '2026-10-18', hour: '09:35' }, steps: [{ action: 'setDate', selector: '#date', value: '{{day}}' }, { action: 'setTime', selector: '#time', value: '{{hour}}' }] }
+    };
     await browserContext.route('http://dashboard.test/**', async route => {
       const request = route.request();
       const endpoint = new URL(request.url()).pathname;
@@ -110,13 +142,19 @@ const { chromium } = require('playwright');
       if (endpoint === '/') {
         return route.fulfill({ contentType: 'text/html', body: fs.readFileSync(path.join(__dirname, '../dashboard/index.html'), 'utf8') });
       }
-      if (endpoint === '/api/profiles') data = { defaultProfile: 'Profile 1', profiles: ['Profile 1', 'Profile 2'].map(directory => ({ directory, profile: directory, name: directory, extensionConnected: true, running: false })) };
-      if (endpoint === '/api/scenarios') data = { names: ['facebook-reels'] };
-      if (endpoint === '/api/scenarios/facebook-reels') {
-        if (request.method() === 'PUT') savedScenario = request.postDataJSON();
-        else data = { name: 'Dashboard test', steps: [{ action: 'click', selector: '#go' }] };
+      if (endpoint === '/api/profiles') data = { defaultProfile: 'Profile 1', performance: { cpuPercent: 0.5, memoryMb: 42, eventLoopP95Ms: 20.1 }, profiles: ['Profile 1', 'Profile 2'].map(directory => ({ directory, profile: directory, name: directory, extensionConnected: true, running: false, elapsedMs: 1200, lastStepMs: 230 })) };
+      if (endpoint === '/api/scenarios') data = { names: Object.keys(fixtures) };
+      const clone = endpoint.match(/^\/api\/scenarios\/([^/]+)\/clone$/);
+      if (clone) {
+        cloneRequest = request.postDataJSON(); fixtures[cloneRequest.name] = structuredClone(fixtures[clone[1]]);
+        data = { name: cloneRequest.name, scenario: fixtures[cloneRequest.name] };
+      } else if (endpoint.startsWith('/api/scenarios/')) {
+        const name = endpoint.split('/').at(-1);
+        if (request.method() === 'PUT') { savedScenario = request.postDataJSON(); fixtures[name] = savedScenario; }
+        else data = fixtures[name];
       }
       if (endpoint === '/api/run') runRequest = request.postDataJSON();
+      if (endpoint === '/api/choose-file') { pickerCalls++; await new Promise(resolve => { finishPicker = resolve; }); data = { filePath: 'C:\\Uploads\\test.txt' }; }
       await route.fulfill({ contentType: 'application/json', body: JSON.stringify(data) });
     });
     const dashboard = await browserContext.newPage();
@@ -133,8 +171,39 @@ const { chromium } = require('playwright');
     assert.equal(savedScenario.steps[0].completion.state, 'hidden');
     assert.equal(savedScenario.steps[0].locator, '#go');
     console.log('Dashboard profile selection and completion condition persistence: OK');
+    await dashboard.locator('#scenarioSelect').selectOption('schedule');
+    await dashboard.getByLabel('Tên hiển thị', { exact: true }).waitFor();
+    await dashboard.waitForFunction(() => document.getElementById('scenarioName').value === 'Schedule test' && !document.getElementById('runBtn').disabled);
+    await dashboard.getByLabel('Giá trị biến 1', { exact: true }).fill('2026-11-20');
+    await dashboard.getByLabel('Chèn biến: Ngày (YYYY-MM-DD hoặc biến)', { exact: true }).selectOption('day');
+    await Promise.all([
+      dashboard.waitForResponse(response => new URL(response.url()).pathname === '/api/run'),
+      dashboard.getByRole('button', { name: '▶ Chạy kịch bản', exact: true }).click()
+    ]);
+    assert.equal(runRequest.name, 'schedule', 'dropdown selection must load and run that scenario without pressing Open');
+    assert.equal(runRequest.profile, 'Profile 2');
+    assert.equal(savedScenario.variables.day, '2026-11-20');
+    assert.equal(savedScenario.steps[0].value, '{{day}}');
+    await dashboard.getByRole('button', { name: 'Clone kịch bản', exact: true }).click();
+    await dashboard.waitForFunction(() => document.getElementById('scenarioSelect').value === 'schedule-copy' && !document.getElementById('cloneBtn').disabled);
+    assert.equal(cloneRequest.name, 'schedule-copy');
+    assert.equal(fixtures['schedule-copy'].variables.day, '2026-11-20');
+    await dashboard.getByRole('button', { name: 'Clone kịch bản', exact: true }).click();
+    await dashboard.waitForFunction(() => document.getElementById('scenarioSelect').value === 'schedule-copy-copy' && !document.getElementById('cloneBtn').disabled);
+    const pickerButton = dashboard.locator('#chooseRunFile');
+    await pickerButton.click();
+    await dashboard.waitForFunction(() => document.getElementById('chooseRunFile').disabled);
+    assert.equal(pickerCalls, 1);
+    finishPicker();
+    await dashboard.waitForFunction(() => !document.getElementById('chooseRunFile').disabled);
+    assert.equal(await dashboard.locator('#uploadPath').inputValue(), 'C:\\Uploads\\test.txt');
+    const screenshotDir = path.join(__dirname, '../test-results'); fs.mkdirSync(screenshotDir, { recursive: true });
+    await dashboard.screenshot({ path: path.join(screenshotDir, 'dashboard.png'), fullPage: true });
+    console.log('Native/text dates, times, CDP upload, debugger reuse, dashboard variables, dropdown run, clone and picker busy state: OK');
   } finally {
     if (browser) await browser.close();
     server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
+    if (path.dirname(path.resolve(temp)) !== path.resolve(os.tmpdir())) throw new Error('Unexpected browser test directory');
+    fs.rmSync(temp, { recursive: true, force: true });
   }
 })().catch(error => { console.error(error); process.exitCode = 1; });
