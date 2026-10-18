@@ -113,6 +113,10 @@ const { spawnSync } = require('node:child_process');
       assert.equal(compiled.status, 0, compiled.stderr);
       assert.equal(JSON.parse(compiled.stdout.trim()).event, 'validated', 'compile native adapter without inspecting or touching live windows');
       assert.equal(JSON.parse(compiled.stdout.trim()).panelLabel, 'Tải video này', 'Windows PowerShell must read Vietnamese UI selectors as UTF-8');
+      const native = spawnSync('powershell.exe', ['-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'idm-native.ps1')], { encoding: 'utf8', windowsHide: true, timeout: 30000 });
+      assert.equal(native.status, 0, native.stdout + native.stderr);
+      assert.match(native.stdout, /floating panel discovery.*OK/, 'exercise real native HWND detection and click in an isolated fixture');
+      console.log(native.stdout.trim());
     }
     console.log('IDM quality policy, validation, helper protocol, cancellation, profile isolation and idempotent completion: OK');
   } finally {

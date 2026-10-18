@@ -4,6 +4,8 @@ Cập nhật: 2026-10-18 (Asia/Bangkok).
 
 ## Completed
 
+- Sửa panel IDM nổi ngoài DOM: dò Win32 HWND `IDM Download Button class`, kể cả DLL inject vào Chrome và control không có accessibility label; không còn bắt buộc PID IDMan cho panel. Kiểm tra process/bounds/hit-test, click vùng tải tránh help/close; hỗ trợ menu native Chrome và giữ focus guard. Bỏ quét sâu toàn bộ cây accessibility của trang để tìm child IDM. Test Windows fixture riêng kiểm tra panel không nhãn, visibility, PID/bounds và click hoặc từ chối khi không có focus. Bridge 4.1.2.
+
 - Thêm tính năng riêng `idmDownload` và mẫu `idm-video`: URL + thư mục + chất lượng, chọn profile từ dashboard, chọn thư mục Windows, chờ panel/menu IDM, chọn 1080p rồi 720p, điền Save As và xác nhận file cuối. Native helper định danh cửa sổ bằng marker, chống workflow IDM đồng thời, không ghi đè, timeout/cancel và start idempotent.
 - Test cục bộ policy/helper IPC/cancel/isolation, Chrome tách biệt cho dispatch IDM và cleanup marker, dashboard mẫu IDM/chọn thư mục/profile. Đã thử URL YouTube `9qq_Fqp2rnM` bằng profile tách biệt: phát được ban đầu, module IDM kết nối, chưa thấy panel/file tải hoàn tất; một số lượt player báo lỗi sau đó. Không ghi nhận thành công giả.
 - Sửa marker khi trang đổi title: MutationObserver khôi phục marker, helper bind HWND/PID và chờ cập nhật UIA ngắn hạn. Tìm cả panel IDMan là child của Chrome; chờ focus rồi tiếp tục thay vì hủy ngay khi cửa sổ khác được đưa lên trước. Kiểm chứng native pause/resume bằng cửa sổ thử tách biệt; thêm lệnh opt-in `test:idm-live` và kịch bản `idm-youtube-sample`.

@@ -302,7 +302,7 @@
         card.append(head, fields);
         if (step.action === 'idmDownload') {
           const hint = document.createElement('p'); hint.className = 'message';
-          hint.textContent = 'IDM cần hiện panel tải video. Nếu chuyển sang cửa sổ khác, bước chờ sẽ tạm dừng đến khi đưa Chrome này lên trước; giữ nguyên tab video.';
+          hint.textContent = 'Agent chờ và click panel IDM nổi trên cửa sổ Chrome bằng Windows native (không dùng CSS/element của web). Khi IDM phát hiện video và hiện nút Tải video này, giữ cửa sổ này ở phía trước để tiếp tục chọn chất lượng và lưu file.';
           card.append(hint);
         }
         list.append(card);

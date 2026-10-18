@@ -2,6 +2,10 @@
 
 URL người dùng cung cấp: https://www.youtube.com/watch?v=9qq_Fqp2rnM
 
+2026-10-18, phản hồi mới: ảnh người dùng cho thấy panel nổi "Tải video này" trên UI Chrome; mở trang được nhưng helper chưa click tải. Tìm nguyên nhân trong code: chỉ xét UI Automation control thuộc PID IDMan, bỏ sót HWND do DLL IDM inject vào Chrome. Gói `idmbrbtn64.dll` đang cài chứa class `IDM Download Button class`. Đã thêm dò/click Win32 theo class này (không cần Name/HelpText/DOM), kiểm tra PID/bounds/visibility/hit-test, click vùng trái tránh nút trợ giúp/đóng; hỗ trợ menu native Chrome sau khi panel đã được xác minh. Thêm `tests/idm-native.ps1` tạo HWND thật trong tiến trình test riêng, không dùng Chrome/profile người dùng. Bridge 4.1.2.
+
+Lượt thử sau bản sửa: `test-results/idm-live/2026-10-18T13-30-52-785Z/report.json`, Chrome profile mới, module IDM kết nối. Không lấy được foreground trong desktop thử nên helper dừng đúng timeout focus; player YouTube báo lỗi, `download: null`. Fixture native bắt đúng panel không nhãn/Chrome PID, loại sai PID/ngoài bounds/ẩn; desktop cũng từ chối foreground nên nhánh click fixture xác nhận từ chối input, chưa kiểm chứng click thực trong lượt này. Không dùng kết quả này để kết luận tải video thành công.
+
 Mục tiêu: kiểm tra trình phát, panel/menu chất lượng và Save As bằng môi trường Chrome tách biệt; thư mục tải thử riêng dưới test-results, không dùng profile đăng nhập. Không thay đổi các kịch bản sẵn có hoặc tải vào thư mục chưa được người dùng chỉ định.
 
 Đã thử: Chrome for Testing 155 và Chrome 155 với profile mới, extension IDM 6.43.1 từ Program Files giữ nguyên public key/native-host ID, bridge tạm dùng port riêng và agent riêng. Không dùng dữ liệu đăng nhập hoặc port agent chính; các browser/agent thử được đóng sau mỗi lần.

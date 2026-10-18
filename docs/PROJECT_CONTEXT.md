@@ -17,6 +17,7 @@ Người dùng xây dựng kịch bản tự động local và chạy chúng tr�
 - Dashboard theo dõi CPU/RSS/event loop của Node agent và thời gian workflow/bước theo profile. File picker là một hộp thoại Windows tại một thời điểm; debugger được tái sử dụng tới khi detach.
 - `idmDownload` là action riêng: extension mở video trong profile được chọn, đánh dấu title cửa sổ và gọi job native trong agent. Helper Windows UI Automation chỉ thao tác Chrome có marker + IDMan; đọc chất lượng (1080 rồi 720), xác nhận Save As và file hoàn tất. Một workflow IDM tại một thời điểm, start idempotent theo runId/index, Stop hủy helper nhưng không hủy download đã gửi sang IDM. Bridge cần capability `idm-download-v1` (4.1.0).
 - Native IDM bind HWND/PID sau khi tìm marker, chấp nhận title cập nhật tạm thời nhưng không tự đổi tab/window; pha chờ tạm dừng khi mất focus. Live test là lệnh opt-in `test:idm-live`, luôn tạo profile + agent riêng và chỉ dùng extension IDM lấy từ Program Files, không sao chép profile đăng nhập.
+- Panel tải IDM có thể là HWND `IDM Download Button class` do DLL inject vào Chrome, không phải DOM và không nhất thiết thuộc PID IDMan. Dò Win32 trong các tiến trình Chrome/IDMan liên quan, xác minh class/bounds/hit-test trước click vùng tải; menu native Chrome chỉ được xét sau click panel đã xác minh. Test fixture Windows riêng kiểm tra panel không nhãn, cách ly PID/bounds và click/focus guard.
 - `local-agent.js`, đường dẫn thư mục extension, dashboard URL và cổng 34719 là các điểm vào ổn định để không làm hỏng cách chạy hiện tại.
 
 ## Quy ước làm việc

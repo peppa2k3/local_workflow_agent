@@ -3,12 +3,14 @@
 ## Tải video bằng IDM
 
 1. Cài IDM và bật **IDM Integration Module** trong Chrome profile muốn dùng. Mở thử một trang video, phát video và kiểm tra có panel **Download this video / Tải video này**. Đặt chất lượng player thành 1080p/720p nếu website chỉ gửi luồng theo chất lượng đang phát.
-2. Khởi động lại `node local-agent.js`. Reload **Local Workflow Agent Bridge 4.1.0** trong từng profile cần chạy rồi tải lại dashboard. Nếu IDM cài ở vị trí khác, đặt `$env:IDM_PATH = 'C:\\duong-dan\\IDMan.exe'` trước khi chạy agent.
+2. Khởi động lại `node local-agent.js`. Reload **Local Workflow Agent Bridge 4.1.2** trong từng profile cần chạy rồi tải lại dashboard. Nếu IDM cài ở vị trí khác, đặt `$env:IDM_PATH = 'C:\\duong-dan\\IDMan.exe'` trước khi chạy agent.
 3. Chọn Chrome profile trên dashboard. Bấm **＋ Kịch bản tải video IDM**, điền `video_url` và `thu_muc_tai` trong Danh sách biến; hoặc mở `idm-video` rồi thay URL mẫu và thư mục. Có thể nhập trực tiếp URL/thư mục trong bước và dùng **Chọn thư mục…**.
 4. Giữ mặc định **1080p, nếu không có thì 720p**, hoặc chọn 720p. Tên file để trống sẽ dùng tên IDM gợi ý và thêm hậu tố nếu trùng. Tên file chỉ định đã tồn tại sẽ báo lỗi để tránh ghi đè.
 5. Bấm **Chạy kịch bản**. Để Windows mở khóa và không chuyển tab/cửa sổ trong lúc agent chọn panel/menu/thư mục IDM. Player tùy chỉnh có thể điền **CSS nút Play** hoặc bấm Play thủ công khi agent đang chờ panel. Tiến độ và file đích xuất hiện trong Trạng thái.
 
 Mặc định chờ panel/menu tối đa 2 phút, tải file tối đa 30 phút; điều chỉnh trong bước nếu cần. Agent chỉ chạy một workflow IDM tại một thời điểm. Bấm Dừng hủy chờ/điều khiển; file đã bắt đầu tải có thể tiếp tục trong IDM. Xem [chi tiết và giới hạn IDM](SCENARIOS.md#idm-video-download). Không cần đưa cookie hay dữ liệu Chrome profile vào agent.
+
+Nút tải IDM nổi trên Chrome khi IDM phát hiện luồng video, không nằm trong source/element của website. Agent dò cửa sổ native Win32 của IDM, kể cả panel được inject vào tiến trình Chrome; không cần CSS selector cho nút tải này. CSS nút Play chỉ dành cho nút phát của website.
 
 ## 1. Chuẩn bị
 

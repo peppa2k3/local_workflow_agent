@@ -110,6 +110,8 @@ async function execute(job, step) {
         await input(job.tabId, { kind: 'click', x: point.x, y: point.y });
       }
       await pageMessage(job.tabId, { type: 'idmPrepare', marker, playVideo: step.playVideo !== false });
+      // IDM's floating download panel belongs to the Windows UI. The agent
+      // locates its native HWND; never look for it with a web CSS selector.
       const payload = { runId: job.runId, id: step.id, marker };
       let state;
       // Idempotent start: a lost response must never repeat the download.
