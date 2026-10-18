@@ -66,7 +66,7 @@ const { createScenarioStore } = require('../src/agent/scenario-store');
         } };
       });
       void page.goto(url).catch(() => {});
-      return { id };
+      return { id, windowId: 1 };
     }
     const chrome = {
       storage: { local: { get: async () => ({}), set: async () => {} }, onChanged: event() },
@@ -74,6 +74,7 @@ const { createScenarioStore } = require('../src/agent/scenario-store');
       alarms: { create() {}, onAlarm: event() },
       tabs: {
         onCreated: event(), create: createTab,
+        update: async id => ({ id, windowId: 1 }),
         get: async id => { const tab = tabs.get(id); if (!tab) throw new Error('Tab closed'); return { id, status: tab.status, url: tab.page.url() }; },
         query: async () => [],
         sendMessage: async (id, message) => tabs.get(id).page.evaluate(message => {
@@ -81,16 +82,26 @@ const { createScenarioStore } = require('../src/agent/scenario-store');
           return new Promise(resolve => window.bridgeListener(message, {}, resolve));
         }, message)
       },
+      windows: { update: async (id, changes) => ({ id, ...changes }) },
       scripting: { executeScript: async ({ target }) => { await tabs.get(target.tabId).page.addScriptTag({ content }); } },
       debugger: {
         onEvent: { addListener(listener) { debuggerListener = listener; } }, getTargets: async () => { debuggerQueries++; return [...tabs.keys()].map(tabId => ({ tabId, attached: true })); },
         sendCommand: async (target, method, params) => tabs.get(target.tabId).cdp.send(method, params)
       }
     };
+    let nativeRequests = [], nativeFailure = false;
     const context = vm.createContext({
       chrome, console: { warn() {} }, URL, AbortSignal, crypto: require('node:crypto').webcrypto,
       setTimeout, clearTimeout, setInterval: () => 1, clearInterval() {},
-      fetch: async () => ({ ok: true, json: async () => ({ running, runId: 'test-run' }) })
+      fetch: async (url, options) => {
+        const endpoint = new URL(url).pathname;
+        let state = { running, runId: 'test-run' };
+        if (endpoint === '/idm/start' || endpoint === '/idm/status') {
+          nativeRequests.push({ endpoint, body: JSON.parse(options.body) });
+          state = endpoint === '/idm/start' ? { state: 'running' } : nativeFailure ? { state: 'error', error: 'No 1080p/720p' } : { state: 'complete', result: { filePath: uploadFile, quality: 1080 } };
+        }
+        return { ok: true, json: async () => state };
+      }
     });
     vm.runInContext(fs.readFileSync(path.join(__dirname, '../chrome-reels-extension/background.js'), 'utf8'), context);
     await new Promise(resolve => setImmediate(resolve));
@@ -166,6 +177,7 @@ const { createScenarioStore } = require('../src/agent/scenario-store');
 
     let savedScenario, runRequest, cloneRequest, pickerCalls = 0, finishPicker;
     let legacyAgent = false;
+    let legacyBridge = false;
     const fixtures = {
       'facebook-reels': { name: 'Dashboard test', steps: [{ action: 'click', selector: '#go' }] },
       typing: { name: 'Typing test', variables: { tenphimn: 'Giá trị nhập từ navbar' }, steps: [{ action: 'type', selector: '#rich', text: '', clear: true }] },
@@ -178,7 +190,7 @@ const { createScenarioStore } = require('../src/agent/scenario-store');
       if (endpoint === '/') {
         return route.fulfill({ contentType: 'text/html', body: fs.readFileSync(path.join(__dirname, '../dashboard/index.html'), 'utf8') });
       }
-      if (endpoint === '/api/profiles') data = { defaultProfile: 'Profile 1', capabilities: legacyAgent ? [] : ['variables-v1'], performance: { cpuPercent: 0.5, memoryMb: 42, eventLoopP95Ms: 20.1 }, profiles: ['Profile 1', 'Profile 2'].map(directory => ({ directory, profile: directory, name: directory, extensionConnected: true, running: false, elapsedMs: 1200, lastStepMs: 230 })) };
+      if (endpoint === '/api/profiles') data = { defaultProfile: 'Profile 1', capabilities: legacyAgent ? [] : ['variables-v1', 'idm-download-v1'], performance: { cpuPercent: 0.5, memoryMb: 42, eventLoopP95Ms: 20.1 }, profiles: ['Profile 1', 'Profile 2'].map(directory => ({ directory, profile: directory, name: directory, extensionConnected: true, extensionCapabilities: legacyBridge ? [] : ['idm-download-v1'], running: false, elapsedMs: 1200, lastStepMs: 230 })) };
       if (endpoint === '/api/scenarios') data = { names: Object.keys(fixtures) };
       const clone = endpoint.match(/^\/api\/scenarios\/([^/]+)\/clone$/);
       if (clone) {
@@ -191,6 +203,7 @@ const { createScenarioStore } = require('../src/agent/scenario-store');
       }
       if (endpoint === '/api/run') runRequest = request.postDataJSON();
       if (endpoint === '/api/choose-file') { pickerCalls++; await new Promise(resolve => { finishPicker = resolve; }); data = { filePath: 'C:\\Uploads\\test.txt' }; }
+      if (endpoint === '/api/choose-folder') data = { directory: temp };
       await route.fulfill({ contentType: 'application/json', body: JSON.stringify(data) });
     });
     const dashboard = await browserContext.newPage();
@@ -250,9 +263,37 @@ const { createScenarioStore } = require('../src/agent/scenario-store');
     await dashboard.waitForFunction(() => document.getElementById('runBtn').disabled && document.getElementById('connectionText').textContent.includes('Agent cũ'));
     legacyAgent = false;
     await dashboard.waitForFunction(() => !document.getElementById('runBtn').disabled);
+    await dashboard.locator('#newIdmBtn').click();
+    await dashboard.getByLabel('URL trang chứa video', { exact: true }).waitFor();
+    await dashboard.getByLabel('Giá trị biến 1', { exact: true }).fill(base + '/video');
+    await dashboard.getByLabel('Giá trị biến 2', { exact: true }).fill(temp);
+    await dashboard.getByRole('button', { name: 'Chọn thư mục…', exact: true }).click();
+    await dashboard.waitForFunction(folder => document.querySelector('[aria-label="Thư mục lưu video IDM"]').value === folder, temp);
+    await dashboard.getByLabel('Chất lượng IDM ưu tiên', { exact: true }).selectOption('1080');
+    await Promise.all([
+      dashboard.waitForResponse(response => new URL(response.url()).pathname === '/api/run'),
+      dashboard.getByRole('button', { name: '▶ Chạy kịch bản', exact: true }).click()
+    ]);
+    assert.equal(runRequest.profile, 'Profile 2'); assert.equal(savedScenario.steps[0].action, 'idmDownload');
+    assert.equal(store.prepare(savedScenario).steps[0].url, base + '/video');
+    assert.equal(store.prepare(savedScenario).steps[0].directory, temp);
+    legacyBridge = true;
+    await dashboard.waitForFunction(() => document.getElementById('runBtn').disabled && document.getElementById('runBtn').title.includes('Reload'));
+    legacyBridge = false;
+    await dashboard.waitForFunction(() => !document.getElementById('runBtn').disabled);
+    job.client.profile = 'Profile 2';
+    await execute(job, { action: 'idmDownload', id: 9, url: base + '/video', directory: temp, playVideo: false, timeoutMs: 3000, downloadTimeoutMs: 3000 });
+    assert.equal(nativeRequests[0].body.profile, 'Profile 2');
+    assert.equal(nativeRequests[0].body.id, 9);
+    const idmPage = tabs.get(job.tabId).page;
+    assert(!(await idmPage.title()).includes('Workflow-IDM-'), 'temporary browser marker must be restored after completion');
+    nativeFailure = true;
+    await assert.rejects(execute(job, { action: 'idmDownload', id: 10, url: base + '/video', directory: temp, timeoutMs: 3000 }), /No 1080p\/720p/);
+    assert(!(await tabs.get(job.tabId).page.title()).includes('Workflow-IDM-'), 'restore the title even when IDM fails');
     const screenshotDir = path.join(__dirname, '../test-results'); fs.mkdirSync(screenshotDir, { recursive: true });
     await dashboard.screenshot({ path: path.join(screenshotDir, 'dashboard.png'), fullPage: true });
     console.log('Native/text dates, times, CDP upload, debugger reuse, dashboard variables, dropdown run, clone and picker busy state: OK');
+    console.log('IDM dashboard template/folder/profile, extension dispatch, native error and browser marker cleanup: OK');
   } finally {
     if (browser) await browser.close();
     server.closeAllConnections(); await new Promise(resolve => server.close(resolve));

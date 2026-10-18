@@ -4,6 +4,9 @@ Cập nhật: 2026-10-18 (Asia/Bangkok).
 
 ## Completed
 
+- Thêm tính năng riêng `idmDownload` và mẫu `idm-video`: URL + thư mục + chất lượng, chọn profile từ dashboard, chọn thư mục Windows, chờ panel/menu IDM, chọn 1080p rồi 720p, điền Save As và xác nhận file cuối. Native helper định danh cửa sổ bằng marker, chống workflow IDM đồng thời, không ghi đè, timeout/cancel và start idempotent.
+- Test cục bộ policy/helper IPC/cancel/isolation, Chrome tách biệt cho dispatch IDM và cleanup marker, dashboard mẫu IDM/chọn thư mục/profile. Native adapter đã compile/validate trên Windows; chưa kiểm thử tải thực qua IDM với URL đích vì chưa có URL mẫu.
+
 - Sửa `type` cho input/textarea/contenteditable và wrapper presentation: click, chờ editor, xác nhận focus/caret rồi mới nhập; xóa rich text bằng browser editing, append khi clear=false, lỗi rõ với readonly/vùng không nhập được.
 - Xác nhận nguyên nhân nhập nguyên token biến ở phiên chạy cũ: agent cũ vẫn đang chạy. Thêm kiểm tra capability trên dashboard và chặn token chưa resolve trong extension; test HTTP chứng minh lấy giá trị mới mỗi lần chạy và JSON luôn giữ tham chiếu.
 

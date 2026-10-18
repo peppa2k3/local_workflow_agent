@@ -20,7 +20,7 @@ async function identity() {
     config.clientId = crypto.randomUUID();
     await chrome.storage.local.set({ clientId: config.clientId });
   }
-  return config;
+  return { ...config, capabilities: ['idm-download-v1'] };
 }
 
 chrome.debugger.onEvent.addListener((source, method, params) => {
@@ -95,6 +95,40 @@ async function waitForCompletion(job, step) {
 }
 
 async function execute(job, step) {
+  if (step.action === 'idmDownload') {
+    const marker = `Workflow-IDM-${crypto.randomUUID()}`;
+    const url = new URL(step.url);
+    if (!['http:', 'https:'].includes(url.protocol)) throw new Error('IDM requires http or https');
+    const tab = await chrome.tabs.create({ url: url.href, active: true }); job.tabId = tab.id;
+    await waitForPage(job, { ...step, settleMs: 0 });
+    await checkRunning(job);
+    await chrome.tabs.update(job.tabId, { active: true });
+    await chrome.windows.update(tab.windowId, { focused: true, state: 'normal' });
+    try {
+      if (step.playSelector) {
+        const point = await pageMessage(job.tabId, { type: 'clickPoint', step: { selector: step.playSelector, timeoutMs: step.timeoutMs }, runId: job.runId });
+        await input(job.tabId, { kind: 'click', x: point.x, y: point.y });
+      }
+      await pageMessage(job.tabId, { type: 'idmPrepare', marker, playVideo: step.playVideo !== false });
+      const payload = { runId: job.runId, id: step.id, marker };
+      let state;
+      // Idempotent start: a lost response must never repeat the download.
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try { state = await call('/idm/start', payload, job.client); break; }
+        catch (error) { if (attempt === 2) throw error; await checkRunning(job); await sleep(500); }
+      }
+      const deadline = Date.now() + (step.timeoutMs ?? 120000) + (step.downloadTimeoutMs ?? 1800000) + 10000;
+      while (state.state === 'running') {
+        if (Date.now() > deadline) throw new Error('IDM download timed out');
+        await sleep(500); await checkRunning(job);
+        state = await call('/idm/status', payload, job.client);
+      }
+      if (state.state !== 'complete') throw new Error(state.error || 'IDM did not confirm download completion');
+    } finally {
+      try { await pageMessage(job.tabId, { type: 'idmRelease', marker }); } catch { /* Tab may have closed. */ }
+    }
+    await checkRunning(job); return;
+  }
   if (step.action === 'openUrl') {
     const url = new URL(step.url);
     if (!['http:', 'https:'].includes(url.protocol)) throw new Error('openUrl requires http or https');

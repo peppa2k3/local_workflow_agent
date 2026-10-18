@@ -1,13 +1,13 @@
 const path = require('path');
 const { spawn } = require('child_process');
 
-function chooseFile(initialDirectory = '', launch = spawn) {
+function chooseFile(initialDirectory = '', launch = spawn, folder = false) {
   if (process.platform !== 'win32') return Promise.reject(new Error('File picker requires Windows'));
   const script = path.join(__dirname, 'file-picker.ps1');
   return new Promise((resolve, reject) => {
     const child = launch('powershell.exe', [
       '-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', script,
-      '-InitialDirectory', initialDirectory
+      ...(folder ? ['-Folder'] : []), '-InitialDirectory', initialDirectory
     ], { windowsHide: true });
     let output = '';
     let errors = '';
@@ -23,4 +23,4 @@ function chooseFile(initialDirectory = '', launch = spawn) {
   });
 }
 
-module.exports = { chooseFile };
+module.exports = { chooseFile, chooseFolder: (initialDirectory = '', launch = spawn) => chooseFile(initialDirectory, launch, true) };

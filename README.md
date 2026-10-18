@@ -8,6 +8,8 @@ Chọn **Chrome profile** và **Kịch bản đã lưu** rồi bấm **Chạy k�
 
 Dashboard hiển thị CPU/RAM/event loop của agent cùng thời gian chạy theo profile để tìm bước chậm. Nút chọn file báo đang mở hộp thoại và chặn bấm lặp. Sau khi cập nhật, khởi động lại agent, Reload extension trong từng profile và tải lại dashboard/tab mục tiêu.
 
+**Tải video bằng IDM:** bấm **＋ Kịch bản tải video IDM** hoặc mở `idm-video`, điền URL video và thư mục lưu ở Danh sách biến, chọn profile đã cài **IDM Integration Module** rồi Chạy. Action `idmDownload` mở URL bằng profile đó, phát video HTML nếu có, chờ panel **Download this video / Tải video này**, ưu tiên 1080p rồi 720p, điền Save As và đợi file tải xong. Có nút **Chọn thư mục…**, timeout riêng và thông tin file tải trong trạng thái. Chỉ chạy một kịch bản IDM cùng lúc; không chuyển tab/cửa sổ trong lúc chọn panel và thư mục. Xem [thiết lập IDM](docs/SETUP.md#tải-video-bằng-idm) và [cú pháp IDM](docs/SCENARIOS.md#idm-video-download).
+
 **Bắt đầu:** [Hướng dẫn cài đặt và chạy từng bước](docs/SETUP.md).
 
 ## Cấu trúc

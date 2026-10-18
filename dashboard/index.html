@@ -80,6 +80,7 @@
       <button class="btn ghost" id="cloneBtn">Clone kịch bản</button>
       <label>Tên file mới<input id="fileName" placeholder="vi-du: facebook-reels" spellcheck="false"></label>
       <button class="btn ghost" id="newBtn">Tạo mới</button>
+      <button class="btn ghost" id="newIdmBtn">＋ Kịch bản tải video IDM</button>
       <label>File upload cho lần chạy<span class="file-path-control"><input id="uploadPath" placeholder="C:\\...\\anh.jpg (tùy chọn)" spellcheck="false"><button class="btn ghost" id="chooseRunFile" type="button">Chọn file…</button></span></label>
       <span class="spacer"></span>
       <button class="btn" id="saveBtn">Lưu</button>
@@ -113,6 +114,7 @@
       setDate: { label: 'Click và nhập ngày', fields: [['locatorType', 'Cách tìm', 'locatorType'], ['locator', 'Ô ngày tháng năm', 'text'], ['role', 'Role (khi tìm theo role)', 'text'], ['index', 'Vị trí từ 0 (nếu trùng)', 'number'], ['value', 'Ngày (YYYY-MM-DD hoặc biến)', 'date'], ['format', 'Định dạng cho input text', 'dateFormat'], ['timeoutMs', 'Timeout (ms)', 'number']] },
       setTime: { label: 'Click và nhập giờ', fields: [['locatorType', 'Cách tìm', 'locatorType'], ['locator', 'Ô giờ phút', 'text'], ['role', 'Role (khi tìm theo role)', 'text'], ['index', 'Vị trí từ 0 (nếu trùng)', 'number'], ['value', 'Giờ (HH:mm hoặc biến)', 'time'], ['timeoutMs', 'Timeout (ms)', 'number']] },
       upload: { label: 'Upload file', fields: [['locatorType', 'Cách tìm nút / input file', 'locatorType'], ['locator', 'Nút mở chọn file (click trước), hoặc input[type=file]', 'text'], ['role', 'Role (khi tìm theo role)', 'text'], ['index', 'Vị trí từ 0 (nếu trùng)', 'number'], ['filePath', 'Đường dẫn file đầy đủ', 'text'], ['folder', 'Hoặc: thư mục', 'text'], ['filename', 'Và: tên file', 'text'], ['timeoutMs', 'Timeout chờ ô file (ms)', 'number'], ['waitAfterMs', 'Chờ sau khi chọn file (ms)', 'number']] },
+      idmDownload: { label: 'Tải video bằng IDM', fields: [['url', 'URL trang chứa video', 'text'], ['directory', 'Thư mục lưu video IDM', 'text'], ['filename', 'Tên file (tùy chọn, không ghi đè)', 'text'], ['quality', 'Chất lượng IDM ưu tiên', 'idmQuality'], ['playVideo', 'Tự phát video HTML (true/false)', 'boolean'], ['playSelector', 'CSS nút Play của player (tùy chọn)', 'text'], ['timeoutMs', 'Timeout chờ panel / chất lượng IDM (ms)', 'number'], ['downloadTimeoutMs', 'Timeout tải xong (ms, mặc định 1800000)', 'number'], ['navigationTimeoutMs', 'Timeout mở trang video (ms)', 'number']] },
       scroll: { label: 'Cuộn trang', fields: [['pixels', 'Số pixel', 'number'], ['times', 'Số lần', 'number'], ['intervalMs', 'Khoảng cách (ms)', 'number']] }
     };
     for (const action of ['openUrl', 'click', 'type', 'setDate', 'setTime', 'upload']) {
@@ -133,6 +135,7 @@
       setDate: { locatorType: 'css', locator: 'input[type=date]', value: '', format: 'DD/MM/YYYY' },
       setTime: { locatorType: 'css', locator: 'input[type=time]', value: '' },
       upload: { locatorType: 'css', locator: '', filePath: '' },
+      idmDownload: { url: '', directory: '', quality: 1080, playVideo: true, timeoutMs: 120000, downloadTimeoutMs: 1800000 },
       scroll: { pixels: 650, times: 3, intervalMs: 2500 }
     };
     const $ = id => document.getElementById(id);
@@ -145,10 +148,14 @@
     let filePicking = false, statusPending = false, editorBusy = false;
     let profileState = null;
     let agentCompatible = false;
+    let agentCapabilities = [];
+    function usesIdm() { return scenario.steps.some(step => step.action === 'idmDownload'); }
 
     function updateButtons() {
-      for (const id of ['loadBtn', 'newBtn', 'saveBtn', 'cloneBtn', 'addBtn', 'addVariableBtn', 'scenarioSelect']) $(id).disabled = editorBusy;
-      $('runBtn').disabled = editorBusy || !agentCompatible || !profileState?.extensionConnected || profileState.running;
+      for (const id of ['loadBtn', 'newBtn', 'newIdmBtn', 'saveBtn', 'cloneBtn', 'addBtn', 'addVariableBtn', 'scenarioSelect']) $(id).disabled = editorBusy;
+      const idmReady = !usesIdm() || (agentCapabilities.includes('idm-download-v1') && profileState?.extensionCapabilities?.includes('idm-download-v1'));
+      $('runBtn').disabled = editorBusy || !agentCompatible || !profileState?.extensionConnected || profileState.running || !idmReady;
+      $('runBtn').title = idmReady ? '' : 'Khởi động lại agent và Reload extension 4.1.0 trong profile đã chọn để dùng IDM';
       $('steps').inert = editorBusy;
       $('variables').inert = editorBusy;
       $('scenarioName').disabled = editorBusy;
@@ -179,38 +186,39 @@
     }
 
     async function api(route, method = 'GET', body) {
-      const response = await fetch(route, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined, ...(route === '/api/choose-file' ? {} : { signal: AbortSignal.timeout(10000) }) });
+      const response = await fetch(route, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined, ...(['/api/choose-file', '/api/choose-folder'].includes(route) ? {} : { signal: AbortSignal.timeout(10000) }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Request failed');
       return data;
     }
     function notice(text, error = false) { $('message').textContent = text; $('message').classList.toggle('error', error); }
-    async function chooseFile(input) {
+    async function chooseFile(input, folder = false) {
       if (filePicking) return;
       filePicking = true;
       const buttons = [...document.querySelectorAll('[data-file-picker], #chooseRunFile')];
       buttons.forEach(button => { button.disabled = true; });
-      notice('Đang mở hộp chọn file Windows… Chọn file hoặc bấm Hủy trong hộp thoại.');
+      notice(folder ? 'Đang mở hộp chọn thư mục lưu video IDM…' : 'Đang mở hộp chọn file Windows… Chọn file hoặc bấm Hủy trong hộp thoại.');
       try {
       const current = input.value.trim();
-      const initialDirectory = current.replace(/[\\/][^\\/]*$/, '');
-      const result = await api('/api/choose-file', 'POST', { initialDirectory });
-      if (result.filePath) {
+      const initialDirectory = folder ? current : current.replace(/[\\/][^\\/]*$/, '');
+      const result = await api(folder ? '/api/choose-folder' : '/api/choose-file', 'POST', { initialDirectory });
+      const chosen = folder ? result.directory : result.filePath;
+      if (chosen) {
         if (!input.isConnected) return;
-        input.value = result.filePath;
+        input.value = chosen;
         input.dispatchEvent(new Event('input', { bubbles: true }));
-        notice(`Đã chọn file: ${result.filePath}`);
+        notice(`Đã chọn ${folder ? 'thư mục' : 'file'}: ${chosen}`);
       } else notice('Đã hủy chọn file.');
       } finally { filePicking = false; document.querySelectorAll('[data-file-picker], #chooseRunFile').forEach(button => { button.disabled = false; }); }
     }
     function field(labelText, value, type, update) {
       const label = document.createElement('label');
       label.textContent = labelText;
-      const isSelect = ['locatorType', 'conditionState', 'dateFormat'].includes(type);
+      const isSelect = ['locatorType', 'conditionState', 'dateFormat', 'idmQuality'].includes(type);
       const input = document.createElement(isSelect ? 'select' : 'input');
       input.setAttribute('aria-label', labelText);
       if (isSelect) {
-        const options = type === 'dateFormat' ? { 'DD/MM/YYYY': 'Ngày/tháng/năm', 'MM/DD/YYYY': 'Tháng/ngày/năm', 'YYYY-MM-DD': 'Năm-tháng-ngày' } : type === 'conditionState' ? { visible: 'Xuất hiện', hidden: 'Biến mất', enabled: 'Có thể tương tác' } : { role: 'Role + tên', text: 'Chữ hiển thị', label: 'Label', placeholder: 'Placeholder', testid: 'Test ID', xpath: 'XPath', css: 'CSS' };
+        const options = type === 'idmQuality' ? { 1080: '1080p, nếu không có thì 720p', 720: '720p' } : type === 'dateFormat' ? { 'DD/MM/YYYY': 'Ngày/tháng/năm', 'MM/DD/YYYY': 'Tháng/ngày/năm', 'YYYY-MM-DD': 'Năm-tháng-ngày' } : type === 'conditionState' ? { visible: 'Xuất hiện', hidden: 'Biến mất', enabled: 'Có thể tương tác' } : { role: 'Role + tên', text: 'Chữ hiển thị', label: 'Label', placeholder: 'Placeholder', testid: 'Test ID', xpath: 'XPath', css: 'CSS' };
         for (const [key, text] of Object.entries(options)) {
           const option = document.createElement('option'); option.value = key; option.textContent = text; input.append(option);
         }
@@ -219,11 +227,12 @@
       input.value = value ?? '';
       const commit = () => update(type === 'number' ? (input.value === '' ? undefined : input.value.includes('{{') ? input.value : Number(input.value)) : type === 'boolean' && !input.value.includes('{{') ? input.value === 'true' : input.value);
       input.addEventListener(isSelect ? 'change' : 'input', commit);
-      if (labelText === 'Đường dẫn file đầy đủ') {
+      if (['Đường dẫn file đầy đủ', 'Thư mục lưu video IDM'].includes(labelText)) {
+        const folder = labelText === 'Thư mục lưu video IDM';
         const control = document.createElement('span'); control.className = 'file-path-control';
-        const button = document.createElement('button'); button.type = 'button'; button.className = 'btn ghost'; button.textContent = 'Chọn file…';
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'btn ghost'; button.textContent = folder ? 'Chọn thư mục…' : 'Chọn file…';
         button.dataset.filePicker = 'true'; button.disabled = filePicking;
-        button.addEventListener('click', () => handle(() => chooseFile(input)));
+        button.addEventListener('click', () => handle(() => chooseFile(input, folder)));
         control.append(input, button); label.append(control);
       } else label.append(input);
       if (!isSelect) {
@@ -261,7 +270,7 @@
           const option = document.createElement('option'); option.value = key; option.textContent = value.label; select.append(option);
         }
         select.value = step.action;
-        select.addEventListener('change', () => { scenario.steps[index] = { action: select.value, ...defaults[select.value] }; render(); });
+        select.addEventListener('change', () => { scenario.steps[index] = { action: select.value, ...defaults[select.value] }; render(); updateButtons(); });
         head.append(number, select);
         const spacer = document.createElement('span'); spacer.className = 'spacer'; head.append(spacer);
         for (const [label, offset] of [['↑', -1], ['↓', 1]]) {
@@ -292,6 +301,7 @@
         }
         card.append(head, fields); list.append(card);
       });
+      updateButtons();
     }
     async function refreshNames() {
       const { names } = await api('/api/scenarios');
@@ -335,11 +345,22 @@
       if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(name)) throw new Error('Nhập tên file hợp lệ trước khi tạo');
       fileName = name; $('scenarioSelect').value = ''; scenario = { name, steps: [{ action: 'openUrl', ...defaults.openUrl }] }; variableDrafts = []; renderVariables(); render(); notice('Kịch bản mới chưa lưu.');
     }));
+    $('newIdmBtn').onclick = () => handle(() => editTask(async () => {
+      const { names } = await api('/api/scenarios');
+      let name = 'idm-video', suffix = 2;
+      while (names.includes(name)) name = `idm-video-${suffix++}`;
+      fileName = name; $('fileName').value = name; $('scenarioSelect').value = '';
+      scenario = { name: 'Tải video bằng IDM', variables: { video_url: '', thu_muc_tai: '' }, steps: [{ action: 'idmDownload', ...defaults.idmDownload, url: '{{video_url}}', directory: '{{thu_muc_tai}}' }] };
+      variableDrafts = Object.entries(scenario.variables).map(([name, value]) => ({ name, value }));
+      renderVariables(); render();
+      notice('Nhập video_url và thu_muc_tai ở Danh sách biến (hoặc điền trực tiếp trong bước). IDM Integration Module phải bật trong profile đã chọn.');
+    }));
     $('saveBtn').onclick = () => handle(() => editTask(save));
     $('runBtn').onclick = () => handle(() => editTask(async () => {
       const targetProfile = selectedProfile;
       const agent = await api('/api/profiles');
       if (!agent.capabilities?.includes('variables-v1')) throw new Error('Agent đang chạy bản cũ. Dừng và chạy lại node local-agent.js, rồi tải lại dashboard.');
+      if (usesIdm() && !agent.capabilities.includes('idm-download-v1')) throw new Error('Khởi động lại agent để dùng IDM');
       await save(); await api('/api/run', 'POST', { name: fileName, profile: targetProfile, uploadPath: $('uploadPath').value.trim() });
       notice(`Đã bắt đầu chạy trên ${targetProfile}.`);
     }));
@@ -360,6 +381,7 @@
       try {
         const data = await api('/api/profiles');
         agentCompatible = data.capabilities?.includes('variables-v1') === true;
+        agentCapabilities = data.capabilities || [];
         if (!data.profiles.some(item => item.directory === selectedProfile)) selectedProfile = data.defaultProfile;
         const select = $('profileSelect');
         const signature = JSON.stringify(data.profiles.map(item => [item.directory, item.name, item.extensionConnected]));
@@ -378,6 +400,8 @@
         $('connectionDot').classList.toggle('ok', state.extensionConnected);
         $('connectionText').textContent = agentCompatible ? `${state.profile} · Extension ${state.extensionConnected ? 'đã kết nối' : 'chưa kết nối'}` : 'Agent cũ: dừng và chạy lại node local-agent.js';
         $('progress').textContent = state.error || (state.running ? `Đang chạy bước ${state.index + 1}/${state.total}: ${state.action || 'đang chờ'}${state.waiting ? ' · chờ hành động hoàn tất' : ''}` : 'Đang chờ lệnh');
+        if (state.detail) $('progress').textContent += ` · ${state.detail}`;
+        if (usesIdm() && !state.extensionCapabilities?.includes('idm-download-v1')) $('progress').textContent += ' · Reload Local Workflow Agent Bridge 4.1.0 trong profile này để dùng IDM.';
         const perf = data.performance;
         $('performance').textContent = `${perf ? `Agent: CPU ${perf.cpuPercent}% · RAM ${perf.memoryMb} MB · Event loop p95 ${perf.eventLoopP95Ms} ms · ` : ''}Profile ${selectedProfile}: tổng ${((state.elapsedMs || 0) / 1000).toFixed(1)}s · bước hiện tại ${((state.stepElapsedMs || 0) / 1000).toFixed(1)}s${state.lastStepMs == null ? '' : ` · bước trước ${(state.lastStepMs / 1000).toFixed(1)}s`}`;
         if (pickId !== null) {

@@ -23,6 +23,7 @@ Edit a JSON file in `scenarios` and run it again. Steps run in order:
 | `setDate` | locator fields, `value` (`YYYY-MM-DD`), optional `format`, `timeoutMs`, `completion` | Clicks an input and fills a valid calendar date, then fires input/change and blurs. |
 | `setTime` | locator fields, `value` (`HH:mm`), optional `timeoutMs`, `completion` | Clicks an input and fills a 24-hour time, then fires input/change and blurs. |
 | `upload` | optional locator fields; `filePath` or `folder` + `filename` | Sets the chosen local file on a page's `input[type=file]`. |
+| `idmDownload` | `url`, `directory`, optional `filename`, `quality`, `playVideo`, `playSelector`, `timeoutMs`, `downloadTimeoutMs`, `navigationTimeoutMs` | Opens the video page in the selected profile and controls IDM's Windows video panel/menu/save dialog. Waits for the resulting file. |
 | `scroll` | optional `pixels`, `times`, `intervalMs` | Sends mouse wheel input (defaults: 650, 1, 2500). |
 
 Example:
@@ -116,3 +117,33 @@ Changing **Kịch bản đã lưu** loads that scenario immediately; save edits 
 The dashboard shows agent CPU percentage (one core = 100%), process RSS memory, event loop p95 in milliseconds over two-second windows, and the selected profile's total/current/previous step times. These describe the Node agent, not Chrome's CPU or website/server processing. A long upload step can include locating the control, waiting for a chooser, assigning a file, `waitAfterMs`, and any explicit completion condition. Use a result element in `completion` to determine when the website has processed the upload.
 
 The Windows file picker runs asynchronously with its console hidden and a foreground owner. Its buttons disable until selection/cancel, and the agent rejects duplicate picker requests. Other dashboard requests have a 10-second timeout and status polling does not overlap. The extension reuses its debugger connection, handles detach, and checks chooser readiness without a fixed extra 200 ms pause. `waitAfterMs` still defaults to 500 ms for compatibility; set `0` and use a meaningful completion condition if the page supports it.
+
+## IDM video download
+
+This is a separate feature: **＋ Kịch bản tải video IDM** creates a scenario with a single `idmDownload` action. Select the actual Chrome profile, enter `video_url` and `thu_muc_tai` in the navbar variables, and Run. You can instead put the URL and directory directly into the step; **Chọn thư mục…** fills the directory through a Windows folder picker. The saved example is `scenarios/idm-video.json`; replace its sample URL before running. CLI works too: `run scenarios/idm-video.json --profile "Profile 1"`.
+
+```json
+{
+  "name": "IDM video",
+  "variables": { "video_url": "https://example.com/video", "thu_muc_tai": "D:\\Videos" },
+  "steps": [{
+    "action": "idmDownload",
+    "url": "{{video_url}}",
+    "directory": "{{thu_muc_tai}}",
+    "quality": 1080,
+    "playVideo": true,
+    "timeoutMs": 120000,
+    "downloadTimeoutMs": 1800000
+  }]
+}
+```
+
+`quality: 1080` selects 1080p if offered, otherwise 720p. `quality: 720` selects only 720p. Other resolutions/audio-only options are never silently substituted. `directory` must be an absolute path; the agent creates it if needed. Optional `filename` is a filename only, including extension. An existing explicit filename fails without overwrite; when using IDM's suggested name, a numeric suffix avoids an existing file. Empty files or files outside the requested directory cannot count as successful downloads.
+
+The extension opens a new tab in its own selected profile, brings its window forward and temporarily marks its title so the native helper can identify it. It tries to play the largest visible HTML video muted. For custom players, optional `playSelector` is a CSS selector for the Play button and is clicked with debugger input; you can also press Play manually while waiting for the panel. The helper waits for IDM's English/Vietnamese panel, reads accessible menu labels, asks the agent to select a quality, opens **Download File Info**, verifies **Save As**, and clicks **Start Download**. The next step waits until a nonempty final file is stable and no matching IDM transfer window remains. Status includes native progress, the final path and selected quality.
+
+Defaults: panel/menu/save timeout 120 seconds (`timeoutMs`, 1–300 seconds); download timeout 30 minutes (`downloadTimeoutMs`, 1 second–24 hours); page loading timeout 30 seconds (`navigationTimeoutMs`). One IDM workflow can run at a time because IDM is shared across profiles. Native input is scoped to IDMan and the uniquely marked Chrome window; changing focus to another window during native selection stops the action rather than risking the wrong profile. Do not interact with other IDM dialogs during selection. Lost start responses are retried idempotently; actions are never repeated after an uncertain download result.
+
+Stop aborts the helper and scenario waits. A download already started in IDM may continue and must be managed in IDM. Files are not deleted and existing IDM downloads are not canceled. The adapter does not bypass DRM/login restrictions. It supports accessible Windows IDM panels/menu items and English/Vietnamese download dialogs; inaccessible/custom menu variants fail explicitly. If IDM opens a direct download dialog without a quality list, the action stops before Start because it cannot verify the requested quality. Cross-origin iframe players or sites that only request 360p need manual playback/quality selection in the player. Official IDM guidance says to play a video and, where needed, choose quality in the player before IDM can capture its request: [IDM video grabber FAQ](https://project.internetdownloadmanager.com/register/new_faq/functions20.html).
+
+Requires Windows desktop unlocked, installed IDM (automatically launched if found), IDM Integration Module enabled in the selected Chrome profile, and Local Workflow Agent Bridge 4.1.0 reloaded. Use `IDM_PATH` for a nonstandard IDMan.exe location. The agent exposes `GET /api/idm/status` for installation/busy diagnostics. Internal `/idm/start` and `/idm/status` only accept the currently dispatched action and its run/profile identity. The dashboard and agent reject old bridges that lack `idm-download-v1`.

@@ -4,13 +4,15 @@ const path = require('path');
 const readline = require('readline');
 const { spawn } = require('child_process');
 const { monitorEventLoopDelay } = require('perf_hooks');
-const { port, scenariosDir, dashboardPath, chromePath, profile, userDataDir } = require('./config');
+const { port, scenariosDir, dashboardPath, chromePath, profile, userDataDir, idmPath } = require('./config');
 const { createScenarioStore } = require('./scenario-store');
-const { chooseFile } = require('./file-picker');
+const { chooseFile, chooseFolder } = require('./file-picker');
+const { createIdm } = require('./idm');
 const { listProfiles } = require('./profiles');
 const { createWorkflows } = require('./workflows');
 
 const scenarios = createScenarioStore(scenariosDir);
+const idm = createIdm({ idmPath });
 const eventLoop = monitorEventLoopDelay({ resolution: 20 });
 eventLoop.enable();
 let previousCpu = process.cpuUsage(), previousCpuAt = process.hrtime.bigint();
@@ -23,7 +25,7 @@ const profiles = () => {
   }
   return profileCache;
 };
-const workflows = createWorkflows({ scenarios, defaultProfile: profile, profiles, openFolder(folderPath) {
+const workflows = createWorkflows({ scenarios, defaultProfile: profile, profiles, idm, openFolder(folderPath) {
   const folder = path.resolve(folderPath);
   if (!fs.existsSync(folder) || !fs.statSync(folder).isDirectory()) throw new Error(`Folder does not exist: ${folder}`);
   return launch('explorer.exe', [folder]);
@@ -69,8 +71,9 @@ const server = http.createServer(async (request, response) => {
       const selected = url.searchParams.get('profile') || profile;
       if (request.method === 'GET' && route === '/api/status') return json(200, workflows.status(selected));
       if (request.method === 'GET' && route === '/api/profiles') {
-        return json(200, { defaultProfile: profile, capabilities: ['variables-v1'], performance, profiles: profiles().map(item => ({ ...item, ...workflows.status(item.directory) })) });
+        return json(200, { defaultProfile: profile, capabilities: ['variables-v1', 'idm-download-v1'], performance, profiles: profiles().map(item => ({ ...item, ...workflows.status(item.directory) })) });
       }
+      if (request.method === 'GET' && route === '/api/idm/status') return json(200, { installed: Boolean(idmPath && fs.existsSync(idmPath)), busy: idm.isBusy(), platform: process.platform });
       if (request.method === 'POST' && route === '/api/profiles/open') {
         const body = await readBody(request);
         workflows.session(body.profile);
@@ -78,12 +81,16 @@ const server = http.createServer(async (request, response) => {
         return json(200, { ok: true });
       }
       if (request.method === 'GET' && route === '/api/pick/status') return json(200, workflows.session(selected).picker);
-      if (request.method === 'POST' && route === '/api/choose-file') {
+      if (request.method === 'POST' && ['/api/choose-file', '/api/choose-folder'].includes(route)) {
         if (filePickerPending) throw new Error('Hộp chọn file đang mở. Chọn file hoặc Hủy trong cửa sổ đó.');
         const body = await readBody(request);
         if (filePickerPending) throw new Error('Hộp chọn file đang mở');
         filePickerPending = true;
-        try { return json(200, { filePath: await chooseFile(body.initialDirectory || '') }); }
+        try {
+          const picker = route === '/api/choose-folder' ? chooseFolder : chooseFile;
+          const chosen = await picker(body.initialDirectory || '');
+          return json(200, route === '/api/choose-folder' ? { directory: chosen } : { filePath: chosen });
+        }
         finally { filePickerPending = false; }
       }
       if (request.method === 'POST' && route === '/api/pick/start') {
@@ -118,11 +125,12 @@ const server = http.createServer(async (request, response) => {
       }
       return json(404, { error: 'Not found' });
     }
-    if (request.method !== 'POST' || !['/next', '/result', '/state', '/pick/next', '/pick/result'].includes(route)) {
+    if (request.method !== 'POST' || !['/next', '/result', '/state', '/pick/next', '/pick/result', '/idm/start', '/idm/status'].includes(route)) {
       return json(404, { error: 'Not found' });
     }
     const body = await readBody(request);
     const s = workflows.connect(body);
+    if (route === '/idm/start' || route === '/idm/status') return json(200, workflows.idmJob(s, body, route === '/idm/start'));
     if (route === '/next') return json(200, workflows.next(s));
     if (route === '/result') workflows.result(s, body);
     if (route === '/pick/next') return json(200, s.picker);
