@@ -1,5 +1,4 @@
 const path = require('path');
-const fs = require('fs');
 
 const projectRoot = path.resolve(__dirname, '..', '..');
 
@@ -8,7 +7,6 @@ module.exports = {
   projectRoot,
   scenariosDir: process.env.LOCAL_AGENT_SCENARIOS_DIR || path.join(projectRoot, 'scenarios'),
   dashboardPath: path.join(projectRoot, 'dashboard', 'index.html'),
-  idmPath: process.env.IDM_PATH || ['C:\\Program Files (x86)\\Internet Download Manager\\IDMan.exe', 'C:\\Program Files\\Internet Download Manager\\IDMan.exe'].find(file => fs.existsSync(file)) || '',
   chromePath: process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
   profile: process.env.CHROME_PROFILE || 'Profile 2',
   userDataDir: process.env.CHROME_USER_DATA_DIR || path.join(process.env.LOCALAPPDATA || '', 'Google', 'Chrome', 'User Data')

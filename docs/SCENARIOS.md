@@ -23,7 +23,6 @@ Edit a JSON file in `scenarios` and run it again. Steps run in order:
 | `setDate` | locator fields, `value` (`YYYY-MM-DD`), optional `format`, `timeoutMs`, `completion` | Clicks an input and fills a valid calendar date, then fires input/change and blurs. |
 | `setTime` | locator fields, `value` (`HH:mm`), optional `timeoutMs`, `completion` | Clicks an input and fills a 24-hour time, then fires input/change and blurs. |
 | `upload` | optional locator fields; `filePath` or `folder` + `filename` | Sets the chosen local file on a page's `input[type=file]`. |
-| `idmDownload` | `url`, `directory`, optional `filename`, `quality`, `playVideo`, `playSelector`, `timeoutMs`, `downloadTimeoutMs`, `navigationTimeoutMs` | Opens the video page in the selected profile and controls IDM's Windows video panel/menu/save dialog. Waits for the resulting file. |
 | `scroll` | optional `pixels`, `times`, `intervalMs` | Sends mouse wheel input (defaults: 650, 1, 2500). |
 
 Example:
@@ -118,45 +117,20 @@ The dashboard shows agent CPU percentage (one core = 100%), process RSS memory, 
 
 The Windows file picker runs asynchronously with its console hidden and a foreground owner. Its buttons disable until selection/cancel, and the agent rejects duplicate picker requests. Other dashboard requests have a 10-second timeout and status polling does not overlap. The extension reuses its debugger connection, handles detach, and checks chooser readiness without a fixed extra 200 ms pause. `waitAfterMs` still defaults to 500 ms for compatibility; set `0` and use a meaningful completion condition if the page supports it.
 
-## IDM video download
+## Tải video bằng yt-dlp + FFmpeg
 
-This is a separate feature: **＋ Kịch bản tải video IDM** creates a scenario with a single `idmDownload` action. Select the actual Chrome profile, enter `video_url` and `thu_muc_tai` in the navbar variables, and Run. You can instead put the URL and directory directly into the step; **Chọn thư mục…** fills the directory through a Windows folder picker. The saved example is `scenarios/idm-video.json`; replace its sample URL before running. CLI works too: `run scenarios/idm-video.json --profile "Profile 1"`.
+Action `downloadVideo` chạy trong agent, không cần mở Chrome. Dashboard có nút **Phân tích URL / lấy tên** để đọc title/ID trước khi tải, hỗ trợ biến. Chọn profile để theo dõi tác vụ; workflow có bước trình duyệt vẫn cần extension.
 
-```json
-{
-  "name": "IDM video",
-  "variables": { "video_url": "https://example.com/video", "thu_muc_tai": "D:\\Videos" },
-  "steps": [{
-    "action": "idmDownload",
-    "url": "{{video_url}}",
-    "directory": "{{thu_muc_tai}}",
-    "quality": 1080,
-    "playVideo": true,
-    "timeoutMs": 120000,
-    "downloadTimeoutMs": 1800000
-  }]
-}
-```
+Ví dụ: `{"action":"downloadVideo","url":"https://www.youtube.com/watch?v=9qq_Fqp2rnM","directory":"D:\\Videos","quality":1080,"downloadTimeoutMs":1800000}`.
 
-`quality: 1080` selects 1080p if offered, otherwise 720p. `quality: 720` selects only 720p. Other resolutions/audio-only options are never silently substituted. `directory` must be an absolute path; the agent creates it if needed. Optional `filename` is a filename only, including extension. An existing explicit filename fails without overwrite; when using IDM's suggested name, a numeric suffix avoids an existing file. Empty files or files outside the requested directory cannot count as successful downloads.
+- `url`: HTTP/HTTPS của một video; không playlist/live, không credentials trong URL.
+- `directory`: đường dẫn tuyệt đối, được tạo nếu chưa có.
+- `quality`: độ cao tối đa 360/480/720/1080/1440/2160; mặc định 1080. Chọn luồng tốt nhất trong giới hạn, FFmpeg ghép hình/tiếng khi cần. Container ghép ưu tiên MP4; video một luồng giữ định dạng nguồn, không ép chuyển mã. URL trực tiếp không cung cấp độ cao trong metadata vẫn tải định dạng có sẵn; giới hạn độ cao chỉ áp dụng khi nguồn có thông tin này. Thiếu định dạng phù hợp sẽ báo lỗi.
+- Tên file: `tiêu đề [ID].ext`, lấy metadata thật, xử lý ký tự Windows, giới hạn tiêu đề 150 byte. Không ghi đè file đã có cùng tên.
+- Timeout tổng phân tích + tải: mặc định 30 phút, 1000–7200000 ms. Nút Dừng hủy cây tiến trình yt-dlp/FFmpeg; file .part hoặc file đã xong trước lúc dừng có thể còn lại.
 
-The extension opens a new tab in its own selected profile, brings its window forward and temporarily marks its title so the native helper can identify it. It tries to play the largest visible HTML video muted. For custom players, optional `playSelector` is a CSS selector for the web player's Play button and is clicked with debugger input; it does not locate IDM's floating button. You can also press Play manually while waiting for the panel. IDM's **Download this video / Tải video này** panel is a native Windows overlay, outside the web DOM. The helper enumerates Win32 HWNDs with IDM's `IDM Download Button class`, including injected Chrome-owned windows with no accessible label. It checks process, visibility and bounds against the marked browser, hit-tests the actual HWND, and clicks the left download region away from help/close controls. It also supports the earlier IDMan-owned accessible panels. It reads accessible menu labels (including native menus owned by the injected Chrome module), asks the agent to select a quality, opens **Download File Info**, verifies **Save As**, and clicks **Start Download**. The next step waits until a nonempty final file is stable and no matching IDM transfer window remains. Status includes native progress, the final path and selected quality.
+Status trả `download` gồm title, id, name, filePath, bytes; chỉ báo thành công sau hậu xử lý và xác nhận file tồn tại, khác rỗng. API phân tích: POST `/api/video/inspect` với `{"url":"https://..."}`, trả title/id/url/duration, timeout 60 giây.
 
-Defaults: panel/menu/save timeout 120 seconds (`timeoutMs`, 1–300 seconds); download timeout 30 minutes (`downloadTimeoutMs`, 1 second–24 hours); page loading timeout 30 seconds (`navigationTimeoutMs`). One IDM workflow can run at a time because IDM is shared across profiles. Native input is scoped to IDMan and the uniquely marked Chrome window. During panel/menu/dialog waits, moving focus to another window pauses native input until the marked window is brought forward or the timeout expires. Every click still verifies scope immediately; changing focus during a click can stop the action. The native HWND/process is bound once; transient title updates get a three-second grace, while a missing marker or different tab cannot silently switch the target. Do not interact with other IDM dialogs during selection. Lost start responses are retried idempotently; actions are never repeated after an uncertain download result.
+Dùng mẫu `scenarios/video-download.json`, sửa `video_url` và `thu_muc_tai`. Cài bằng `npm run setup:video`, xem [SETUP](SETUP.md). Không đọc cookies/profile Chrome. Website yêu cầu đăng nhập/chống bot có thể từ chối và lỗi được hiển thị.
 
-Stop aborts the helper and scenario waits. A download already started in IDM may continue and must be managed in IDM. Files are not deleted and existing IDM downloads are not canceled. The adapter does not bypass DRM/login restrictions. It supports accessible Windows IDM panels/menu items and English/Vietnamese download dialogs; inaccessible/custom menu variants fail explicitly. If IDM opens a direct download dialog without a quality list, the action stops before Start because it cannot verify the requested quality. Cross-origin iframe players or sites that only request 360p need manual playback/quality selection in the player. Official IDM guidance says to play a video and, where needed, choose quality in the player before IDM can capture its request: [IDM video grabber FAQ](https://project.internetdownloadmanager.com/register/new_faq/functions20.html).
-
-Requires Windows desktop unlocked, installed IDM (automatically launched if found), IDM Integration Module enabled in the selected Chrome profile, and Local Workflow Agent Bridge 4.1.0 reloaded. Use `IDM_PATH` for a nonstandard IDMan.exe location. The agent exposes `GET /api/idm/status` for installation/busy diagnostics. Internal `/idm/start` and `/idm/status` only accept the currently dispatched action and its run/profile identity. The dashboard and agent reject old bridges that lack `idm-download-v1`.
-
-### Opt-in real IDM verification
-
-`npm test` stays local and uses isolated fixture pages/native mocks. For a real video, run the separate opt-in command below. It always creates a fresh browser profile, copies the bridge and the installed `IDMGCExt.crx` to a temporary folder, preserves IDM's native-host extension identity, starts an isolated agent on a free port, and saves downloads/reports under `test-results/idm-live/<timestamp>`. It never loads the user's existing Chrome profile. All test browser/agent processes close in `finally`; an IDM transfer already submitted may continue as described above.
-
-```powershell
-$env:IDM_TEST_CHROME = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
-npm run test:idm-live -- --url 'https://www.youtube.com/watch?v=9qq_Fqp2rnM' --cdp-extensions --inspect-native --exercise-focus
-```
-
-`--cdp-extensions` uses Chrome's development-only extension API in the fresh profile; without it, use a Chrome-for-Testing binary with extension command-line loading support. `--inspect-native` saves a read-only snapshot of relevant native controls. `--exercise-focus` verifies native waits pause when a second empty test window is focused, then resume. `--diagnose-integration` records IDM's action tooltip and, only in its ERROR state, opens the module's own diagnostic action instead of running a download. A startup ERROR tooltip can be transient while the native host connects; the runner waits for initialization.
-
-For the supplied YouTube URL, initial playback was observed in an unsigned-in isolated profile, but no IDM panel/file completion has yet been confirmed. Some attempts later showed YouTube's “Something went wrong” player notice. This is not a successful download or proof of available 1080p/720p formats. The ready-to-edit `idm-youtube-sample` scenario contains this URL and a separate test-results destination; check that IDM's panel appears manually before testing the full transfer in the intended profile.
+Tùy chọn metadata, output template và after_move: https://github.com/yt-dlp/yt-dlp#readme

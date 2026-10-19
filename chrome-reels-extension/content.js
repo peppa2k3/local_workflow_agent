@@ -7,14 +7,6 @@
   let currentRunId = null;
   let cancelled = false;
   let actionAbort = new AbortController();
-  let idmTitle = null;
-  function releaseIdm(marker) {
-    if (idmTitle?.marker !== marker) return;
-    clearInterval(idmTitle.timer);
-    idmTitle.observer.disconnect();
-    if (document.title.startsWith(marker)) document.title = idmTitle.original;
-    idmTitle = null;
-  }
   const checkCancelled = () => { if (cancelled) throw new Error('Stopped'); };
   let lastMutation = Date.now();
   new MutationObserver(() => { lastMutation = Date.now(); }).observe(document.documentElement, { subtree: true, childList: true, attributes: true, characterData: true });
@@ -398,24 +390,6 @@
   }
 
   chrome.runtime.onMessage.addListener((message, sender, respond) => {
-    if (message.type === 'idmRelease') { releaseIdm(message.marker); respond({ ok: true }); return; }
-    if (message.type === 'idmPrepare') {
-      if (!/^Workflow-IDM-[a-f0-9-]{36}$/.test(message.marker)) { respond({ ok: false, error: 'Invalid IDM marker' }); return; }
-      if (idmTitle) releaseIdm(idmTitle.marker);
-      const original = document.title, marker = message.marker;
-      const update = () => { if (!document.title.startsWith(marker)) document.title = `${marker} ${original}`; };
-      update();
-      const observer = new MutationObserver(update);
-      observer.observe(document.head || document.documentElement, { childList: true, characterData: true, subtree: true });
-      idmTitle = { marker, original, observer, timer: setInterval(update, 500) };
-      // IDM captures media requests after playback. Custom/iframe players can
-      // use playSelector or a manual Play click during the panel wait.
-      if (message.playVideo) {
-        const videos = [...document.querySelectorAll('video')].filter(visible).sort((a, b) => b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight);
-        if (videos[0]) { videos[0].muted = true; videos[0].play().catch(() => {}); }
-      }
-      respond({ ok: true }); return;
-    }
     if (message.type === 'cancelPicker') { cancelPicker?.(); respond({ ok: true }); return; }
     if (message.type === 'conditionStatus') {
       try { respond({ ok: true, satisfied: conditionSatisfied(message.condition) }); }

@@ -41,8 +41,6 @@ const { spawn } = require('node:child_process');
     assert.equal(profiles.profiles[0].name, 'First test profile');
     assert.equal(typeof profiles.performance.memoryMb, 'number');
     assert(profiles.capabilities.includes('variables-v1'));
-    assert(profiles.capabilities.includes('idm-download-v1'));
-    assert.equal(typeof (await api('/api/idm/status')).installed, 'boolean');
     const clients = [{ profile: 'Profile 1', clientId: 'first' }, { profile: 'Profile 2', clientId: 'second' }];
     await api('/state', { clientId: 'legacy' }, 'POST', 400);
     for (const client of clients) await api('/state', client);

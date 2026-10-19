@@ -8,8 +8,6 @@ Chọn **Chrome profile** và **Kịch bản đã lưu** rồi bấm **Chạy k�
 
 Dashboard hiển thị CPU/RAM/event loop của agent cùng thời gian chạy theo profile để tìm bước chậm. Nút chọn file báo đang mở hộp thoại và chặn bấm lặp. Sau khi cập nhật, khởi động lại agent, Reload extension trong từng profile và tải lại dashboard/tab mục tiêu.
 
-**Tải video bằng IDM:** bấm **＋ Kịch bản tải video IDM** hoặc mở `idm-video`, điền URL video và thư mục lưu ở Danh sách biến, chọn profile đã cài **IDM Integration Module** rồi Chạy. Action `idmDownload` mở URL bằng profile đó, phát video HTML nếu có, chờ panel **Download this video / Tải video này**, ưu tiên 1080p rồi 720p, điền Save As và đợi file tải xong. Panel này là cửa sổ native nổi trên Chrome khi IDM phát hiện video; agent tìm và click bằng Win32 HWND, không dùng CSS/element của website. Có nút **Chọn thư mục…**, timeout riêng và thông tin file tải trong trạng thái. Chỉ chạy một kịch bản IDM cùng lúc; không chuyển tab/cửa sổ trong lúc chọn panel và thư mục. Xem [thiết lập IDM](docs/SETUP.md#tải-video-bằng-idm) và [cú pháp IDM](docs/SCENARIOS.md#idm-video-download).
-
 **Bắt đầu:** [Hướng dẫn cài đặt và chạy từng bước](docs/SETUP.md).
 
 ## Cấu trúc
@@ -27,3 +25,7 @@ Dashboard hiển thị CPU/RAM/event loop của agent cùng thời gian chạy t
 | `legacy/facebook-feed.js` | Thử nghiệm Playwright ban đầu; quy trình hiện tại dùng Local Agent + Extension. |
 
 Xem [cú pháp kịch bản](docs/SCENARIOS.md), [context dự án](docs/PROJECT_CONTEXT.md) và [tiến độ](docs/PROGRESS.md).
+
+## Tải video qua URL
+
+Chạy `npm run setup:video`, rồi `node local-agent.js`. Mở http://127.0.0.1:34719, chọn `video-download`, sửa URL/thư mục và chạy. Action **Tải video (yt-dlp + FFmpeg)** có nút phân tích URL lấy tên; file lưu theo tiêu đề và ID. Xem [SCENARIOS](docs/SCENARIOS.md).

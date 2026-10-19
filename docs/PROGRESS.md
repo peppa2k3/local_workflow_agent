@@ -4,12 +4,6 @@ Cập nhật: 2026-10-18 (Asia/Bangkok).
 
 ## Completed
 
-- Sửa panel IDM nổi ngoài DOM: dò Win32 HWND `IDM Download Button class`, kể cả DLL inject vào Chrome và control không có accessibility label; không còn bắt buộc PID IDMan cho panel. Kiểm tra process/bounds/hit-test, click vùng tải tránh help/close; hỗ trợ menu native Chrome và giữ focus guard. Bỏ quét sâu toàn bộ cây accessibility của trang để tìm child IDM. Test Windows fixture riêng kiểm tra panel không nhãn, visibility, PID/bounds và click hoặc từ chối khi không có focus. Bridge 4.1.2.
-
-- Thêm tính năng riêng `idmDownload` và mẫu `idm-video`: URL + thư mục + chất lượng, chọn profile từ dashboard, chọn thư mục Windows, chờ panel/menu IDM, chọn 1080p rồi 720p, điền Save As và xác nhận file cuối. Native helper định danh cửa sổ bằng marker, chống workflow IDM đồng thời, không ghi đè, timeout/cancel và start idempotent.
-- Test cục bộ policy/helper IPC/cancel/isolation, Chrome tách biệt cho dispatch IDM và cleanup marker, dashboard mẫu IDM/chọn thư mục/profile. Đã thử URL YouTube `9qq_Fqp2rnM` bằng profile tách biệt: phát được ban đầu, module IDM kết nối, chưa thấy panel/file tải hoàn tất; một số lượt player báo lỗi sau đó. Không ghi nhận thành công giả.
-- Sửa marker khi trang đổi title: MutationObserver khôi phục marker, helper bind HWND/PID và chờ cập nhật UIA ngắn hạn. Tìm cả panel IDMan là child của Chrome; chờ focus rồi tiếp tục thay vì hủy ngay khi cửa sổ khác được đưa lên trước. Kiểm chứng native pause/resume bằng cửa sổ thử tách biệt; thêm lệnh opt-in `test:idm-live` và kịch bản `idm-youtube-sample`.
-
 - Sửa `type` cho input/textarea/contenteditable và wrapper presentation: click, chờ editor, xác nhận focus/caret rồi mới nhập; xóa rich text bằng browser editing, append khi clear=false, lỗi rõ với readonly/vùng không nhập được.
 - Xác nhận nguyên nhân nhập nguyên token biến ở phiên chạy cũ: agent cũ vẫn đang chạy. Thêm kiểm tra capability trên dashboard và chặn token chưa resolve trong extension; test HTTP chứng minh lấy giá trị mới mỗi lần chạy và JSON luôn giữ tham chiếu.
 
@@ -34,7 +28,7 @@ Cập nhật: 2026-10-18 (Asia/Bangkok).
 
 ## Processing
 
-- Đối chiếu IDM với URL YouTube mẫu: đã sửa/kiểm thử marker và focus; chưa xác nhận tải file thực vì profile tách biệt không thấy panel, player sau đó báo lỗi. Người dùng xác nhận Chrome mở thủ công có panel; module cài trong Chrome và gói thử đều 6.43.1. Cần đối chiếu lần chạy từ dashboard với profile/thư mục người dùng chọn; xem `prompts/processing/idm-youtube-live.md`.
+- Chưa có mục đang triển khai tại thời điểm commit này. Lỗi thực tế mới sẽ được ghi trong `prompts/processing/` trước khi sửa.
 
 ## Planed
 
@@ -42,3 +36,12 @@ Cập nhật: 2026-10-18 (Asia/Bangkok).
 - Hỗ trợ tab mới, iframe và Shadow DOM khi có kịch bản cần chúng.
 - Thêm dấu hiệu hoàn tất upload theo từng website, thay cho chờ thời gian cố định.
 - Cân nhắc cấu hình cổng agent và extension đồng bộ nếu cần chạy nhiều phiên.
+
+## 2026-10-19: chuyển IDM sang yt-dlp + FFmpeg
+
+- Đảo ngược phần IDM về nền `44b8e0d`, giữ lịch sử Git.
+- Thêm tải video URL: metadata title/ID, giới hạn chất lượng, tên file an toàn, không ghi đè, xác nhận file hoàn tất, timeout và Stop cây tiến trình.
+- Cập nhật agent, extension, dashboard, scenario mẫu và hướng dẫn cài portable tools.
+- Kiểm chứng: npm test và node --check cho JavaScript thay đổi, script dashboard. Test video HTTP cục bộ dùng executable thật khi có tools; không dùng profile đăng nhập.
+
+Kiểm chứng thực tế 2026-10-19: tải video HTTP cục bộ, tải lại không ghi đè, ghép DASH hai luồng bằng FFmpeg; FFprobe xác nhận hình + tiếng. Dashboard kiểm tra phân tích URL với biến, tên Unicode và tải khi extension offline. URL YouTube 9qq_Fqp2rnM phân tích được title/ID/duration; chưa tải toàn bộ video YouTube (7768 giây).

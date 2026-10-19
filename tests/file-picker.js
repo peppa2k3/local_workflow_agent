@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
-const { chooseFile, chooseFolder } = require('../src/agent/file-picker');
+const { chooseFile } = require('../src/agent/file-picker');
 
 function fakeLaunch(output, code = 0) {
   return (command, args, options) => {
@@ -24,6 +24,5 @@ function fakeLaunch(output, code = 0) {
 (async () => {
   assert.equal(await chooseFile('C:\\Uploads', fakeLaunch('C:\\Uploads\\ảnh.jpg\n')), 'C:\\Uploads\\ảnh.jpg');
   assert.equal(await chooseFile('C:\\Uploads', fakeLaunch('')), null);
-  assert.equal(await chooseFolder('C:\\Uploads', (command, args, options) => { assert(args.includes('-Folder')); return fakeLaunch('C:\\Videos\n')(command, args, options); }), 'C:\\Videos');
   console.log('Windows file picker selection and cancellation: OK');
 })().catch(error => { console.error(error); process.exitCode = 1; });
