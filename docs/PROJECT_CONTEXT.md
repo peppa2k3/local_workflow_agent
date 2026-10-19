@@ -35,3 +35,9 @@ Người dùng xây dựng kịch bản tự động local và chạy chúng tr�
 ## Cập nhật 2026-10-19
 
 Đảo ngược ba commit IDM về nền `44b8e0d`, giữ lịch sử Git. Thay bằng `downloadVideo` chạy local qua yt-dlp và FFmpeg. Dashboard hỗ trợ URL/thư mục/chất lượng/timeout, phân tích metadata lấy tên và hiển thị file kết quả. Tải thuần local không cần extension; workflow có bước trình duyệt vẫn cần kết nối. Extension từ chối nếu nhận nhầm action local. Binary trong tools/ không theo dõi Git. Không đọc cookie/profile đăng nhập.
+
+## Kết quả runtime và quản lý kịch bản (2026-10-19)
+
+Biến thường resolve trước khi chạy. Bốn tên dành riêng download_title/download_file_name/download_file_path/download_id được giữ tới khi downloadVideo thành công rồi resolve một lần ngay trước mỗi bước; không expand đệ quy nội dung metadata. Kết quả thuộc run/profile, reset mỗi lần chạy. prepareStep validate lại, riêng upload tham chiếu clip không nhận upload override từ ô file tạm. downloadVideo phải trả verified=true sau exit/after_move/stat/FFprobe trước khi workflow tiến tiếp. Extension chặn upload đường dẫn tạm hoặc tham chiếu file chưa resolve.
+
+Step label tùy chọn, mặc định Bước N. DELETE scenario kiểm tra tên và khóa theo scenarioName của workflow từ API đang chạy. Mẫu download-upload-reels dừng ở bước điền mô tả, không xuất bản. Các locator Facebook cần đối chiếu trên profile người dùng; kiểm thử chỉ ở Chrome tách biệt/trang fixture.

@@ -68,3 +68,6 @@ Chạy `npm run setup:video` để tải yt-dlp chính thức và FFmpeg essenti
 Chạy lại `node local-agent.js`, mở dashboard và dùng `video-download`. Xem [SCENARIOS.md](SCENARIOS.md) cho cấu hình. Không cần IDM/Chrome cho tác vụ tải thuần local.
 
 Nguồn: https://github.com/yt-dlp/yt-dlp và https://ffmpeg.org/download.html
+
+
+Để nối tải và upload, chọn `download-upload-reels`, sửa biến URL/thư mục/trang Reels và chọn profile có extension kết nối. Khởi động lại agent, Reload bridge 4.0.1 rồi tải lại dashboard. Agent kiểm tra file cuối bằng FFprobe trước khi chạy tiếp; nếu dùng bộ công cụ tùy chỉnh, đặt FFprobe cạnh FFmpeg hoặc dùng `FFPROBE_PATH`. Xem phần runtime references trong [SCENARIOS](SCENARIOS.md).

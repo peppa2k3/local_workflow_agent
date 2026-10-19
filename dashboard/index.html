@@ -40,8 +40,9 @@
     .editor-head input { width: min(360px, 80vw); }
     .steps { display: grid; gap: 12px; }
     .step { border-radius: 13px; padding: 16px; }
-    .step-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .step-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
     .number { background: #243a6a; color: #b6c9ff; border-radius: 8px; min-width: 30px; height: 30px; display: grid; place-items: center; font-weight: 800; }
+    .step-title { max-width: 260px; overflow-wrap: anywhere; }
     .step-head select { min-width: 175px; }
     .spacer { flex: 1; }
     .icon { background: #25344e; color: #c6d2eb; width: 31px; height: 31px; border-radius: 7px; }
@@ -78,6 +79,7 @@
       <label>Kịch bản đã lưu<select id="scenarioSelect"></select></label>
       <button class="btn ghost" id="loadBtn">Mở</button>
       <button class="btn ghost" id="cloneBtn">Clone kịch bản</button>
+      <button class="btn danger" id="deleteBtn">Xóa kịch bản</button>
       <label>Tên file mới<input id="fileName" placeholder="vi-du: facebook-reels" spellcheck="false"></label>
       <button class="btn ghost" id="newBtn">Tạo mới</button>
       <label>File upload cho lần chạy<span class="file-path-control"><input id="uploadPath" placeholder="C:\\...\\anh.jpg (tùy chọn)" spellcheck="false"><button class="btn ghost" id="chooseRunFile" type="button">Chọn file…</button></span></label>
@@ -89,6 +91,7 @@
     <p>Cài extension trong từng profile, mở Extension options và chọn đúng thư mục profile. Mỗi profile có thể chạy một kịch bản riêng.</p>
     <div id="profilesSummary" class="profiles-summary" aria-live="polite"></div>
     <nav class="variables" aria-label="Biến kịch bản">
+      <p>Kết quả tải: {{download_title}} = tiêu đề / tên phim; {{download_file_name}} = tên file; {{download_file_path}} = đường dẫn clip; {{download_id}} = ID. Dùng trong các bước sau downloadVideo.</p>
       <strong>Danh sách biến</strong> <span>Tham chiếu bằng {{ten_bien}} trong các input. Khi chạy sẽ lấy giá trị hiện tại; JSON giữ tên tham chiếu.</span>
       <div id="variables"></div><button class="btn ghost" id="addVariableBtn">＋ Thêm biến</button>
     </nav>
@@ -146,11 +149,15 @@
     let variableDrafts = [];
     let filePicking = false, statusPending = false, editorBusy = false;
     let profileState = null;
-    let agentCompatible = false, videoCompatible = false;
+    let agentCompatible = false, videoCompatible = false, referencesCompatible = false, managementCompatible = false;
+    const runtimeVariables = ['download_title', 'download_file_name', 'download_file_path', 'download_id'];
+    const usesDownloadReferences = () => /\{\{\s*download_(title|file_name|file_path|id)\s*\}\}/.test(JSON.stringify(scenario));
 
     function updateButtons() {
-      for (const id of ['loadBtn', 'newBtn', 'saveBtn', 'cloneBtn', 'addBtn', 'addVariableBtn', 'scenarioSelect']) $(id).disabled = editorBusy;
+      for (const id of ['loadBtn', 'newBtn', 'saveBtn', 'cloneBtn', 'deleteBtn', 'addBtn', 'addVariableBtn', 'scenarioSelect']) $(id).disabled = editorBusy;
       $('runBtn').disabled = editorBusy || !agentCompatible || (!profileState?.extensionConnected && scenario.steps.some(step => !['wait', 'openFolder', 'downloadVideo'].includes(step.action))) || !profileState || profileState.running || (scenario.steps.some(step => step.action === 'downloadVideo') && !videoCompatible);
+      $('deleteBtn').disabled = editorBusy || !managementCompatible || !Array.from($('scenarioSelect').options).some(option => option.value === fileName);
+      if (usesDownloadReferences() && !referencesCompatible) $('runBtn').disabled = true;
       $('steps').inert = editorBusy;
       $('variables').inert = editorBusy;
       $('scenarioName').disabled = editorBusy;
@@ -164,6 +171,7 @@
       const entries = variableDrafts.map(item => [item.name.trim(), item.value]);
       const names = entries.map(([name]) => name);
       if (names.some(name => !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name))) throw new Error('Tên biến dùng chữ không dấu, số, _; bắt đầu bằng chữ hoặc _');
+      if (names.some(name => runtimeVariables.includes(name))) throw new Error('Tên biến download_* dành cho kết quả tải.');
       if (new Set(names).size !== names.length) throw new Error('Tên biến bị trùng');
       return Object.fromEntries(entries);
     }
@@ -233,6 +241,7 @@
         const fillOptions = () => {
           reference.replaceChildren(new Option('Chèn tham chiếu biến…', ''));
           if (['date', 'time'].includes(type)) reference.append(new Option('Nhập tham chiếu trực tiếp', '@manual'));
+          for (const name of runtimeVariables) reference.append(new Option('{{' + name + '}} · kết quả tải', name));
           for (const item of variableDrafts) if (/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(item.name.trim())) reference.append(new Option(`{{${item.name.trim()}}}`, item.name.trim()));
         };
         fillOptions(); reference.addEventListener('focus', fillOptions);
@@ -259,13 +268,14 @@
         const card = document.createElement('article'); card.className = 'step';
         const head = document.createElement('div'); head.className = 'step-head';
         const number = document.createElement('span'); number.className = 'number'; number.textContent = index + 1;
+        const stepTitle = document.createElement('strong'); stepTitle.className = 'step-title'; stepTitle.textContent = step.label?.trim() || `Bước ${index + 1}`;
         const select = document.createElement('select');
         for (const [key, value] of Object.entries(actions)) {
           const option = document.createElement('option'); option.value = key; option.textContent = value.label; select.append(option);
         }
         select.value = step.action;
         select.addEventListener('change', () => { scenario.steps[index] = { action: select.value, ...defaults[select.value] }; render(); });
-        head.append(number, select);
+        head.append(number, stepTitle, select);
         const spacer = document.createElement('span'); spacer.className = 'spacer'; head.append(spacer);
         for (const [label, offset] of [['↑', -1], ['↓', 1]]) {
           const button = document.createElement('button'); button.className = 'icon'; button.textContent = label;
@@ -298,6 +308,12 @@
           head.append(inspect);
         }
         const fields = document.createElement('div'); fields.className = 'fields';
+        const nameField = field('Tên bước (tùy chọn)', step.label || '', 'text', value => {
+          if (value.trim()) step.label = value; else delete step.label;
+          stepTitle.textContent = value.trim() || `Bước ${index + 1}`;
+        });
+        nameField.style.marginBottom = '12px';
+
         for (const [key, label, type] of actions[step.action].fields) {
           const [parent, child] = key.split('.');
           const value = child ? step[parent]?.[child] : step[parent];
@@ -306,7 +322,7 @@
             if (value === undefined) delete target[child || parent]; else target[child || parent] = value;
           }));
         }
-        card.append(head, fields); list.append(card);
+        card.append(head, nameField, fields); list.append(card);
       });
     }
     async function refreshNames() {
@@ -351,12 +367,27 @@
       if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(name)) throw new Error('Nhập tên file hợp lệ trước khi tạo');
       fileName = name; $('scenarioSelect').value = ''; scenario = { name, steps: [{ action: 'openUrl', ...defaults.openUrl }] }; variableDrafts = []; renderVariables(); render(); notice('Kịch bản mới chưa lưu.');
     }));
+    $('deleteBtn').onclick = () => handle(() => editTask(async () => {
+      const target = fileName;
+      if (!window.confirm(`Xóa kịch bản "${target}"? File JSON này sẽ bị xóa.`)) return;
+      await api(`/api/scenarios/${encodeURIComponent(target)}`, 'DELETE');
+      await refreshNames();
+      const next = $('scenarioSelect').options[0]?.value;
+      if (next) await load(next);
+      else {
+        fileName = 'my-workflow'; $('fileName').value = fileName;
+        scenario = { name: 'Kịch bản mới', steps: [{ action: 'openUrl', ...defaults.openUrl }] };
+        variableDrafts = []; renderVariables(); render();
+      }
+      notice(`Đã xóa ${target}.json`);
+    }));
     $('saveBtn').onclick = () => handle(() => editTask(save));
     $('runBtn').onclick = () => handle(() => editTask(async () => {
       const targetProfile = selectedProfile;
       const agent = await api('/api/profiles');
       if (!agent.capabilities?.includes('variables-v1')) throw new Error('Agent đang chạy bản cũ. Dừng và chạy lại node local-agent.js, rồi tải lại dashboard.');
       if (scenario.steps.some(step => step.action === 'downloadVideo') && !agent.capabilities?.includes('video-download-v1')) throw new Error('Khởi động lại agent để tải video.');
+      if (usesDownloadReferences() && !agent.capabilities?.includes('download-references-v1')) throw new Error('Khởi động lại agent để nối download với upload.');
       await save(); await api('/api/run', 'POST', { name: fileName, profile: targetProfile, uploadPath: $('uploadPath').value.trim() });
       notice(`Đã bắt đầu chạy trên ${targetProfile}.`);
     }));
@@ -376,6 +407,8 @@
       statusPending = true;
       try {
         const data = await api('/api/profiles');
+        referencesCompatible = data.capabilities?.includes('download-references-v1') === true;
+        managementCompatible = data.capabilities?.includes('scenario-management-v1') === true;
         videoCompatible = data.capabilities?.includes('video-download-v1') === true;
         agentCompatible = data.capabilities?.includes('variables-v1') === true;
         if (!data.profiles.some(item => item.directory === selectedProfile)) selectedProfile = data.defaultProfile;
@@ -389,13 +422,13 @@
           select.dataset.signature = signature;
         }
         select.value = selectedProfile;
-        $('profilesSummary').textContent = data.profiles.map(item => `${item.name} (${item.directory}): ${item.error || (item.running ? `bước ${item.index + 1}/${item.total} · ${item.action}` : item.extensionConnected ? 'sẵn sàng' : 'chưa kết nối')}`).join(' | ');
+        $('profilesSummary').textContent = data.profiles.map(item => `${item.name} (${item.directory}): ${item.error || (item.running ? `bước ${item.index + 1}/${item.total} · ${item.stepLabel || item.action}` : item.extensionConnected ? 'sẵn sàng' : 'chưa kết nối')}`).join(' | ');
         const state = data.profiles.find(item => item.directory === selectedProfile);
         profileState = state; updateButtons();
         $('stopBtn').disabled = !state.running;
         $('connectionDot').classList.toggle('ok', state.extensionConnected);
         $('connectionText').textContent = agentCompatible ? `${state.profile} · Extension ${state.extensionConnected ? 'đã kết nối' : 'chưa kết nối'}` : 'Agent cũ: dừng và chạy lại node local-agent.js';
-        $('progress').textContent = state.error || (state.running ? `Đang chạy bước ${state.index + 1}/${state.total}: ${state.action || 'đang chờ'}` : state.download ? `Đã lưu: ${state.download.filePath} (${state.download.title})` : 'Đang chờ lệnh');
+        $('progress').textContent = state.error || (state.running ? `Đang chạy bước ${state.index + 1}/${state.total}: ${state.stepLabel || state.action || 'đang chờ'}` : state.download ? `Đã lưu: ${state.download.filePath} (${state.download.title})` : 'Đang chờ lệnh');
         const perf = data.performance;
         $('performance').textContent = `${perf ? `Agent: CPU ${perf.cpuPercent}% · RAM ${perf.memoryMb} MB · Event loop p95 ${perf.eventLoopP95Ms} ms · ` : ''}Profile ${selectedProfile}: tổng ${((state.elapsedMs || 0) / 1000).toFixed(1)}s · bước hiện tại ${((state.stepElapsedMs || 0) / 1000).toFixed(1)}s${state.lastStepMs == null ? '' : ` · bước trước ${(state.lastStepMs / 1000).toFixed(1)}s`}`;
         if (pickId !== null) {

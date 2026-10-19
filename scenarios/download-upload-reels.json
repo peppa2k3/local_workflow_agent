@@ -1,0 +1,88 @@
+{
+  "name": "Tải clip → upload Reels và điền tên phim",
+  "variables": {
+    "video_url": "https://www.youtube.com/watch?v=BwV2BJ_yKVU",
+    "thu_muc_tai": "D:\\Videos",
+    "reels_url": "https://www.facebook.com/profile.php?id=61583720522404&sk=reels_tab",
+    "ten_phim": "{{download_title}}",
+    "ten_file": "{{download_file_name}}"
+  },
+  "steps": [
+    {
+      "action": "downloadVideo",
+      "label": "Tải clip và xác nhận file hoàn tất",
+      "url": "{{video_url}}",
+      "directory": "{{thu_muc_tai}}",
+      "quality": 1080,
+      "downloadTimeoutMs": 1800000
+    },
+    {
+      "action": "openUrl",
+      "label": "Mở trang Reels",
+      "url": "{{reels_url}}",
+      "completion": {
+        "locatorType": "text",
+        "locator": "Tạo thước phim",
+        "state": "visible"
+      },
+      "navigationTimeoutMs": 60000
+    },
+    {
+      "action": "click",
+      "label": "Tạo thước phim",
+      "locatorType": "text",
+      "locator": "Tạo thước phim",
+      "timeoutMs": 30000,
+      "completion": {
+        "locatorType": "text",
+        "locator": "Tải lên",
+        "state": "visible"
+      }
+    },
+    {
+      "action": "upload",
+      "label": "Upload chính clip vừa tải",
+      "locatorType": "text",
+      "locator": "Tải lên",
+      "filePath": "{{download_file_path}}",
+      "timeoutMs": 30000,
+      "navigationTimeoutMs": 300000,
+      "completion": {
+        "locatorType": "role",
+        "role": "button",
+        "locator": "Tiếp",
+        "state": "enabled"
+      }
+    },
+    {
+      "action": "click",
+      "label": "Tiếp sau khi upload",
+      "locatorType": "role",
+      "role": "button",
+      "locator": "Tiếp",
+      "timeoutMs": 30000
+    },
+    {
+      "action": "click",
+      "label": "Mở phần mô tả",
+      "locatorType": "role",
+      "role": "button",
+      "locator": "Tiếp",
+      "timeoutMs": 30000,
+      "completion": {
+        "locatorType": "label",
+        "locator": "Mô tả thước phim của bạn...",
+        "state": "visible"
+      }
+    },
+    {
+      "action": "type",
+      "label": "Điền tên phim lấy từ clip",
+      "locatorType": "label",
+      "locator": "Mô tả thước phim của bạn...",
+      "text": "{{ten_phim}}",
+      "clear": true,
+      "timeoutMs": 30000
+    }
+  ]
+}

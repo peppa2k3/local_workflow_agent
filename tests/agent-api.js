@@ -53,6 +53,11 @@ const { spawn } = require('node:child_process');
     await api('/api/scenarios/test/clone', { name: 'test-copy' }, 'POST', 400);
     await api('/api/scenarios/test/clone', { name: '../escape' }, 'POST', 400);
     for (const client of clients) await api('/api/run', { name: 'test', profile: client.profile });
+    await api('/api/scenarios/test', undefined, 'DELETE', 400);
+    await api('/api/scenarios/test-copy', undefined, 'DELETE');
+    assert(!(await api('/api/scenarios')).names.includes('test-copy'));
+    await api('/api/scenarios/test-copy', undefined, 'DELETE', 400);
+    await api('/api/scenarios/%2e%2e%2fescape', undefined, 'DELETE', 400);
     const first = await api('/next', clients[0]);
     const second = await api('/next', clients[1]);
     assert.equal(first.step.action, 'openUrl'); assert.equal(second.step.action, 'openUrl');
@@ -78,6 +83,8 @@ const { spawn } = require('node:child_process');
     delete updated.variables.tenphimn;
     await api('/api/scenarios/typing', updated, 'PUT');
     await api('/api/run', { name: 'typing', profile: 'Profile 1' }, 'POST', 400);
+    await api('/api/scenarios/typing', undefined, 'DELETE');
+    assert(!(await api('/api/scenarios')).names.includes('typing'));
     console.log('Agent HTTP profile discovery, registration, dispatch and scoped stop: OK');
   } finally {
     if (child && child.exitCode === null) {

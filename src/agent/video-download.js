@@ -70,6 +70,12 @@ async function downloadVideo(step, signal) {
   if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) throw new Error('Downloaded path is outside selected directory');
   const stat = await fs.promises.stat(filePath);
   if (!stat.isFile() || !stat.size) throw new Error('Downloaded file is missing or empty');
-  return { ...info, filePath, name: path.basename(filePath), bytes: stat.size };
+  if (/\.(part|ytdl|tmp)$/i.test(filePath)) throw new Error('Download did not produce a final media file');
+  const siblingProbe = path.isAbsolute(ffmpeg) ? path.join(path.dirname(ffmpeg), process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe') : '';
+  const probe = process.env.FFPROBE_PATH || (siblingProbe && fs.existsSync(siblingProbe) ? siblingProbe : binary('ffprobe', 'FFPROBE_PATH'));
+  const media = JSON.parse(await run(probe, ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', filePath], { signal: combined }));
+  if (!media.streams?.some(stream => stream.codec_type === 'video') || !(Number(media.format?.duration) > 0)) throw new Error('Downloaded file is not a complete readable video');
+  if (combined.aborted) throw new Error('Video operation cancelled or timed out');
+  return { ...info, verified: true, filePath, name: path.basename(filePath), bytes: stat.size };
 }
 module.exports = { validateVideo, inspectVideo, downloadVideo, run };

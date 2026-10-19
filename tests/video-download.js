@@ -23,7 +23,7 @@ const { createWorkflows } = require('../src/agent/workflows');
     workflows.start('Default', scenario);
     assert.equal(workflows.next(workflows.session()).step, null, 'local download must not leak to extension');
     assert.equal(workflows.status().running, true);
-    finish({ title: 'Sample', filePath: 'sample.mp4' });
+    finish({ title: 'Sample', filePath: 'sample.mp4', verified: true });
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(workflows.status().download.title, 'Sample');
     assert.equal(workflows.status().running, false);
@@ -41,15 +41,20 @@ const { createWorkflows } = require('../src/agent/workflows');
     const browser = await chromium.launch({ channel: 'chrome', headless: true });
     try {
       const page = await browser.newPage();
-      let inspected = false;
+      let inspected = false, deleted = false;
+      let saved = structuredClone(scenario);
       const title = 'Video ti\u1ebfng Vi\u1ec7t';
       await page.route('http://127.0.0.1:34719/**', async route => {
         const request = route.request(), pathname = new URL(request.url()).pathname;
         let data = {};
         if (pathname === '/') return route.fulfill({ contentType: 'text/html; charset=utf-8', body: fs.readFileSync(path.resolve(__dirname, '../dashboard/index.html'), 'utf8') });
-        if (pathname === '/api/profiles') data = { defaultProfile: 'Default', capabilities: ['variables-v1', 'video-download-v1'], profiles: [{ directory: 'Default', name: 'Test', extensionConnected: false, running: false, download: { title, filePath: 'D:/Videos/sample.mp4' } }] };
-        else if (pathname === '/api/scenarios') data = { names: ['video-download'] };
-        else if (pathname === '/api/scenarios/video-download') data = scenario;
+        if (pathname === '/api/profiles') data = { defaultProfile: 'Default', capabilities: ['variables-v1', 'video-download-v1', 'download-references-v1', 'scenario-management-v1'], profiles: [{ directory: 'Default', name: 'Test', extensionConnected: false, running: false, download: { title, filePath: 'D:/Videos/sample.mp4' } }] };
+        else if (pathname === '/api/scenarios') data = { names: deleted ? [] : ['video-download'] };
+        else if (pathname === '/api/scenarios/video-download') {
+          if (request.method() === 'DELETE') { deleted = true; data = { ok: true }; }
+          else if (request.method() === 'PUT') { saved = request.postDataJSON(); data = { ok: true }; }
+          else data = saved;
+        }
         else if (pathname === '/api/video/inspect') { assert.equal(request.postDataJSON().url, url); inspected = true; data = { title, id: 'sample' }; }
         return route.fulfill({ json: data });
       });
@@ -64,7 +69,30 @@ const { createWorkflows } = require('../src/agent/workflows');
       assert.equal(await page.locator('#runBtn').isEnabled(), true, 'download-only workflow runs without extension');
       await page.locator('.step-head select').selectOption('openUrl');
       assert.equal(await page.locator('#runBtn').isEnabled(), false, 'browser action still requires extension');
-      console.log('Dashboard metadata preview, variable expansion, Unicode result and offline download eligibility: OK');
+      const stepName = page.getByRole('textbox', { name: 'Tên bước (tùy chọn)', exact: true });
+      assert.equal(await page.locator('.step-title').textContent(), 'Bước 1');
+      await stepName.fill('Mở trang Reels');
+      await page.locator('#saveBtn').click();
+      await page.waitForFunction(() => document.getElementById('message').textContent.includes('Đã lưu'));
+      assert.equal(saved.steps[0].label, 'Mở trang Reels');
+      await page.locator('#loadBtn').click();
+      await page.waitForFunction(() => document.getElementById('message').textContent.includes('Đã mở'));
+      assert.equal(await page.locator('.step-title').textContent(), 'Mở trang Reels');
+      await stepName.fill('');
+      assert.equal(await page.locator('.step-title').textContent(), 'Bước 1');
+      const reference = page.getByLabel('Chèn biến: URL', { exact: true });
+      assert(await reference.locator('option[value="download_title"]').count());
+      page.once('dialog', dialog => dialog.dismiss());
+      await page.locator('#deleteBtn').click();
+      await page.waitForFunction(() => !document.getElementById('deleteBtn').disabled);
+      assert(!deleted);
+      page.once('dialog', dialog => dialog.accept());
+      await page.locator('#deleteBtn').click();
+      await page.waitForFunction(() => document.getElementById('message').textContent.includes('Đã xóa'));
+      assert(deleted);
+      assert.equal(await page.locator('#scenarioSelect option').count(), 0);
+      assert.equal(await page.locator('#fileName').inputValue(), 'my-workflow');
+      console.log('Dashboard preview, runtime reference picker, step label persistence/default and deletion/cancel: OK');
     } finally { await browser.close(); }
 
     const tools = path.resolve(__dirname, '../tools');
@@ -85,12 +113,16 @@ const { createWorkflows } = require('../src/agent/workflows');
       const result = await downloadVideo({ url: localUrl, directory: path.join(directory, 'saved'), quality: 720 });
       assert.equal(result.title, info.title);
       assert(result.bytes > 0);
+      assert.equal(result.verified, true, 'download completion must include FFprobe verification');
       assert(result.name.includes(info.id));
       const probe = JSON.parse(await run(path.join(tools, 'ffprobe.exe'), ['-v', 'quiet', '-show_streams', '-of', 'json', result.filePath]));
       assert(probe.streams.some(item => item.codec_type === 'video'));
       assert(probe.streams.some(item => item.codec_type === 'audio'));
       const again = await downloadVideo({ url: localUrl, directory: path.join(directory, 'saved'), quality: 720 });
       assert.equal(again.filePath, result.filePath);
+      fs.writeFileSync(result.filePath, 'not a video');
+      await assert.rejects(downloadVideo({ url: localUrl, directory: path.join(directory, 'saved'), quality: 720 }), /ffprobe|readable video/i);
+
       const merged = await downloadVideo({ url: localUrl.replace('.mp4', '.mpd'), directory: path.join(directory, 'merged'), quality: 720 });
       const streams = JSON.parse(await run(path.join(tools, 'ffprobe.exe'), ['-v', 'quiet', '-show_streams', '-of', 'json', merged.filePath])).streams;
       assert(streams.some(item => item.codec_type === 'video') && streams.some(item => item.codec_type === 'audio'), 'FFmpeg must merge separate DASH video/audio streams');

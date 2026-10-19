@@ -70,7 +70,7 @@ const server = http.createServer(async (request, response) => {
       const selected = url.searchParams.get('profile') || profile;
       if (request.method === 'GET' && route === '/api/status') return json(200, workflows.status(selected));
       if (request.method === 'GET' && route === '/api/profiles') {
-        return json(200, { defaultProfile: profile, capabilities: ['variables-v1', 'video-download-v1'], performance, profiles: profiles().map(item => ({ ...item, ...workflows.status(item.directory) })) });
+        return json(200, { defaultProfile: profile, capabilities: ['variables-v1', 'video-download-v1', 'download-references-v1', 'scenario-management-v1'], performance, profiles: profiles().map(item => ({ ...item, ...workflows.status(item.directory) })) });
       }
       if (request.method === 'POST' && route === '/api/profiles/open') {
         const body = await readBody(request);
@@ -103,6 +103,11 @@ const server = http.createServer(async (request, response) => {
       }
       const match = route.match(/^\/api\/scenarios\/([^/]+)$/);
       if (match && request.method === 'GET') return json(200, scenarios.load(match[1]));
+      if (match && request.method === 'DELETE') {
+        if (workflows.usesScenario(match[1])) throw new Error('Stop workflows using this scenario before deleting it');
+        scenarios.remove(match[1]);
+        return json(200, { ok: true });
+      }
       if (match && request.method === 'PUT') {
         scenarios.save(match[1], await readBody(request));
         return json(200, { ok: true });
@@ -113,7 +118,7 @@ const server = http.createServer(async (request, response) => {
       }
       if (request.method === 'POST' && route === '/api/run') {
         const body = await readBody(request);
-        workflows.start(body.profile || profile, scenarios.load(body.name), body.uploadPath || '');
+        workflows.start(body.profile || profile, scenarios.load(body.name), body.uploadPath || '', body.name);
         return json(200, { ok: true });
       }
       if (request.method === 'POST' && route === '/api/stop') {

@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "start": "node local-agent.js",
-    "test": "node tests/video-download.js && node tests/scenario-features.js && node tests/workflows.js && node tests/agent-api.js && node tests/overlay-flow.js && node tests/navigation-flow.js && node tests/file-picker.js",
+    "test": "node tests/pipeline.js && node tests/video-download.js && node tests/scenario-features.js && node tests/workflows.js && node tests/agent-api.js && node tests/overlay-flow.js && node tests/navigation-flow.js && node tests/file-picker.js",
     "setup:video": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-video.ps1"
   },
   "dependencies": {

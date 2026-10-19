@@ -17,8 +17,9 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
     return {
       profile: s.profile, running: s.running, runId: s.runId, index: s.index,
       total: s.workflow?.steps.length || 0, action: s.workflow?.steps[s.index]?.action || null,
+      stepLabel: s.currentStep?.label?.trim() || s.workflow?.steps[s.index]?.label?.trim() || `Bước ${s.index + 1}`,
       extensionConnected: Date.now() - s.lastContact < 10000, error: s.error,
-      tabId: s.tabId, waiting: s.inFlight,
+      tabId: s.tabId, waiting: s.inFlight || s.localPending,
       elapsedMs: s.startedAt ? (s.endedAt || Date.now()) - s.startedAt : 0,
       stepElapsedMs: s.running && s.stepStartedAt ? Date.now() - s.stepStartedAt : 0,
       lastStepMs: s.lastStepMs ?? null, download: s.download || null
@@ -38,12 +39,18 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
     s.localPending = true;
     try {
       while (s.running && s.runId === runId && s.index < s.workflow.steps.length) {
-        const step = s.workflow.steps[s.index];
+        const step = scenarios.prepareStep(s.workflow.steps[s.index], s.uploadPath, s.runtime);
+        s.currentStep = step;
         s.stepStartedAt = Date.now();
         if (step.action === 'wait') await delay(step.ms, undefined, { signal: s.controller.signal });
         else if (step.action === 'downloadVideo') {
           const download = await downloadVideo(step, s.controller.signal);
-          if (s.runId === runId) s.download = download;
+          if (s.runId !== runId || !s.running) return;
+          if (download.verified !== true || !download.filePath) throw new Error('Download must finish final-file verification before continuing');
+          if (s.runId === runId && s.running) {
+            s.download = download;
+            s.runtime = { download_title: download.title, download_file_name: download.name, download_file_path: download.filePath, download_id: download.id };
+          }
         }
         else if (step.action === 'openFolder') await openFolder(step.path);
         else break;
@@ -58,7 +65,7 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
       if (s.runId === runId) s.localPending = false;
     }
   }
-  function start(profile, scenario, uploadPath = '') {
+  function start(profile, scenario, uploadPath = '', scenarioName = null) {
     const s = session(profile);
     if (s.running) throw new Error('Stop this profile before starting another scenario');
     const workflow = scenarios.prepare(scenario, uploadPath);
@@ -66,7 +73,7 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
       throw new Error('Extension chưa kết nối profile này. Mở profile, cài/reload extension và chọn đúng profile trong Extension options.');
     }
     stop(profile);
-    Object.assign(s, { workflow, index: 0, download: null, error: '', tabId: null, running: true, startedAt: Date.now(), endedAt: null, lastStepMs: null });
+    Object.assign(s, { workflow, scenarioName, uploadPath, currentStep: null, runtime: {}, index: 0, download: null, error: '', tabId: null, running: true, startedAt: Date.now(), endedAt: null, lastStepMs: null });
     void advance(s, s.runId);
   }
   function connect(body) {
@@ -85,7 +92,7 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
     if (s.running && !s.localPending && !s.inFlight) {
       s.inFlight = true;
       s.stepStartedAt = Date.now();
-      const step = s.workflow.steps[s.index];
+      const step = s.currentStep;
       const budget = (step.timeoutMs || 10000) + (step.navigationTimeoutMs || 30000) +
         (step.waitAfterMs || 0) + (step.times || 1) * (step.intervalMs || 2500) + 30000;
       s.deadline = Date.now() + budget;
@@ -107,7 +114,10 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
       if (s.running && s.inFlight && Date.now() > s.deadline) fail(s, `Step ${s.index + 1}: extension action timed out`);
     }
   }
-  return { session, status, start, stop, connect, next, result, expire };
+  function usesScenario(name) {
+    return [...sessions.values()].some(s => s.running && s.scenarioName === name);
+  }
+  return { usesScenario, session, status, start, stop, connect, next, result, expire };
 }
 
 module.exports = { createWorkflows };

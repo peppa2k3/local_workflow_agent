@@ -5,6 +5,7 @@ const http = require('node:http');
 const vm = require('node:vm');
 const os = require('node:os');
 const { chromium } = require('playwright');
+const { createWorkflows } = require('../src/agent/workflows');
 const { createScenarioStore } = require('../src/agent/scenario-store');
 
 // Real isolated Chrome pages + CDP input exercise the production worker and
@@ -154,6 +155,31 @@ const { createScenarioStore } = require('../src/agent/scenario-store');
     assert.equal(await targetPage.locator('#file').evaluate(input => input.files[0].name), 'upload.txt');
     assert(Date.now() - started < 5000, 'upload chooser should complete without waiting for its full timeout');
     assert.equal(debuggerQueries, 1, 'reuse debugger connection across repeated input commands');
+    let completeDownload;
+    const pipeline = createWorkflows({ scenarios: store, defaultProfile: 'Profile 1', profiles: () => [{ directory: 'Profile 1' }], openFolder: async () => {}, downloadVideo: () => new Promise(resolve => { completeDownload = resolve; }) });
+    const session = pipeline.connect({ profile: 'Profile 1', clientId: 'pipeline' });
+    pipeline.start('Profile 1', { steps: [
+      { action: 'downloadVideo', url: base + '/video', directory: temp },
+      { action: 'openUrl', url: base + '/start' },
+      { action: 'upload', selector: '#upload', filePath: '{{download_file_path}}', waitAfterMs: 0 },
+      { action: 'type', selector: '#text', text: '{{download_title}}', clear: true }
+    ] });
+    assert.equal(pipeline.next(session).step, null);
+    completeDownload({ title: 'Tên clip mới tải', filePath: uploadFile, name: 'upload.txt', id: 'fixture', verified: true });
+    await new Promise(resolve => setImmediate(resolve));
+    while (pipeline.status('Profile 1').running) {
+      const dispatched = pipeline.next(session);
+      assert(dispatched.step);
+      await execute(job, dispatched.step);
+      pipeline.result(session, { runId: dispatched.runId, id: dispatched.step.id, ok: true, tabId: job.tabId });
+    }
+    assert.equal(await tabs.get(job.tabId).page.locator('#file').evaluate(input => input.files[0].name), 'upload.txt');
+    assert.equal(await tabs.get(job.tabId).page.locator('#text').inputValue(), 'Tên clip mới tải');
+    await assert.rejects(execute(job, { action: 'upload', selector: '#upload', filePath: '{{download_file_path}}' }), /resolved final/);
+    assert.equal(debuggerQueries, 2, 'one debugger lookup per tab, reused for upload and typing');
+    // Return to the original page for the remaining existing checks.
+    job.tabId = [...tabs.values()].find(tab => tab.page === targetPage).id;
+
     await execute(job, { action: 'upload', selector: '#file', filePath: uploadFile, waitAfterMs: 0 });
     await execute(job, { action: 'click', selector: '#noop', completion: { locator: '#spinner', state: 'hidden' }, navigationTimeoutMs: 1000 });
     await assert.rejects(execute(job, { action: 'click', selector: '#noop', completion: { locator: '#missing' }, navigationTimeoutMs: 250 }), /Completion condition timed out/);

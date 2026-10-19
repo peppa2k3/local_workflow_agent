@@ -134,3 +134,35 @@ Status trả `download` gồm title, id, name, filePath, bytes; chỉ báo thàn
 Dùng mẫu `scenarios/video-download.json`, sửa `video_url` và `thu_muc_tai`. Cài bằng `npm run setup:video`, xem [SETUP](SETUP.md). Không đọc cookies/profile Chrome. Website yêu cầu đăng nhập/chống bot có thể từ chối và lỗi được hiển thị.
 
 Tùy chọn metadata, output template và after_move: https://github.com/yt-dlp/yt-dlp#readme
+
+## Nối download → mở URL → upload Reels
+
+Mẫu hoàn chỉnh: `scenarios/download-upload-reels.json`. Chọn mẫu trong dashboard, sửa `video_url`, `thu_muc_tai`, `reels_url`, chọn Chrome profile đã kết nối và chạy. Mẫu tải clip, xác nhận file, mở Reels, tạo thước phim, upload chính clip đó, bấm Tiếp và điền mô tả bằng tiêu đề. Mẫu dừng ở màn hình soạn/xem lại, không tự bấm Đăng. Có thể thêm bước click Đăng và điều kiện hoàn tất phù hợp nếu muốn tự xuất bản.
+
+Các locator tiếng Việt lấy theo luồng hiện có trong dự án; nút/ô mô tả có thể khác theo tài khoản, phiên bản hoặc ngôn ngữ Facebook. Dùng “Chọn trên trang” để chỉnh. Bước upload mẫu chờ nút Tiếp enabled tối đa 300000 ms; đây là dấu hiệu tiếp tục của giao diện, không khẳng định máy chủ Facebook đã xử lý xong video. Nếu trang có dấu hiệu xử lý riêng, đổi completion hoặc thêm waitFor cho dấu hiệu đó.
+
+| Tham chiếu | Giá trị sau downloadVideo |
+| --- | --- |
+| `{{download_title}}` | Tiêu đề gốc / tên phim đọc từ metadata URL |
+| `{{download_file_name}}` | Tên file thực tế đã lưu, gồm ID và phần mở rộng |
+| `{{download_file_path}}` | Đường dẫn tuyệt đối đến chính clip vừa tải |
+| `{{download_id}}` | ID video |
+
+Có thể tạo alias như `"ten_phim": "{{download_title}}"`, rồi dùng `{{ten_phim}}` trong bước type. Dropdown “Chèn tham chiếu biến” có sẵn bốn giá trị này. Không tự khai báo lại biến có tên download_title/file_name/file_path/id.
+
+Ví dụ bước sau download:
+```json
+{ "action": "upload", "label": "Upload clip vừa tải", "selector": "#upload", "filePath": "{{download_file_path}}" }
+```
+
+Agent chỉ tạo các tham chiếu sau khi yt-dlp thoát thành công, in đường dẫn ở after_move (sau ghép/hậu xử lý), file cuối tồn tại và khác rỗng, không có đuôi .part/.ytdl/.tmp, FFprobe đọc được video stream và thời lượng dương. Status có `download.verified: true`. Chỉ lúc đó mới chuyển sang openUrl/upload; không suy ra xong từ phần trăm hoặc chờ số giây cố định. FFprobe kiểm tra cấu trúc/metadata media, không giải mã kiểm tra từng frame.
+
+Tham chiếu kết quả phải xuất hiện sau một downloadVideo trong kịch bản. Giá trị được giải quyết và validate ngay trước từng bước; upload kiểm tra lại file tồn tại/khác rỗng. Với filePath tham chiếu kết quả, ô “File upload cho lần chạy” không thay thế clip đã tải. Các upload tĩnh vẫn hỗ trợ đường dẫn override như trước. Mỗi lần chạy/profile có kết quả riêng, không tái sử dụng kết quả lần trước; download thất bại, kiểm tra lỗi hoặc Dừng sẽ chặn các bước tiếp theo. Nhiều downloadVideo: tham chiếu dùng kết quả gần nhất đã thành công.
+
+## Tên bước và xóa kịch bản
+
+Mỗi bước có trường `label` tùy chọn. Dashboard cho nhập “Tên bước (tùy chọn)”, giữ tên khi lưu/clone/đổi vị trí, hiển thị tên trong trạng thái chạy. Để trống thì hiển thị “Bước 1”, “Bước 2”… theo vị trí hiện tại. Kịch bản cũ không cần sửa.
+
+Nút “Xóa kịch bản” xóa file JSON đã lưu sau hộp xác nhận, cập nhật danh sách và mở kịch bản còn lại; nếu hết thì tạo editor mới chưa lưu. Không xóa video tải về. API: DELETE `/api/scenarios/<name>`, kiểm tra tên như GET/PUT. Agent từ chối xóa kịch bản đang được workflow từ dashboard/API sử dụng ở bất kỳ profile nào; dừng các workflow đó trước. CLI chạy bản sao kịch bản trong bộ nhớ, không khóa file theo tên dashboard.
+
+Khởi động lại `node local-agent.js`, tải lại dashboard và Reload extension sau cập nhật. Agent công bố capability `download-references-v1` và `scenario-management-v1`.

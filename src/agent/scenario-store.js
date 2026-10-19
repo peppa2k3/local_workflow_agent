@@ -1,7 +1,46 @@
 const fs = require('fs');
 const path = require('path');
 const { validateVideo } = require('./video-download');
-const { resolveVariables } = require('./variables');
+const { resolveVariables, hasRuntime, resolveRuntime } = require('./variables');
+
+function validateStep(step, uploadPath = '') {
+  if (!['downloadVideo', 'openUrl', 'openFolder', 'wait', 'waitFor', 'click', 'type', 'setDate', 'setTime', 'scroll', 'upload'].includes(step.action)) throw new Error(`Unsupported action: ${step.action}`);
+  for (const key of ['url', 'path', 'text', 'locator', 'selector', 'role', 'filePath', 'folder', 'filename', 'value', 'format']) {
+    if (step[key] !== undefined) step[key] = String(step[key]);
+  }
+  for (const key of ['timeoutMs', 'navigationTimeoutMs', 'settleMs', 'waitAfterMs', 'ms', 'times', 'intervalMs', 'index', 'pixels']) {
+    if (typeof step[key] === 'string' && step[key].trim() !== '') step[key] = Number(step[key]);
+    if (key === 'pixels') {
+      if (step[key] !== undefined && !Number.isFinite(step[key])) throw new Error(`Invalid ${key}`);
+      continue;
+    }
+    if (step[key] !== undefined && (!Number.isFinite(step[key]) || step[key] < 0 || step[key] > 300000)) throw new Error(`Invalid ${key}`);
+  }
+  if (step.clear === 'true' || step.clear === 'false') step.clear = step.clear === 'true';
+  if (step.action === 'setDate') {
+    const value = String(step.value ?? '');
+    const date = new Date(`${value}T00:00:00Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value) throw new Error('setDate requires a valid YYYY-MM-DD value');
+  }
+  if (step.action === 'setTime' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(step.value ?? ''))) throw new Error('setTime requires HH:mm (00:00–23:59)');
+  if (step.action === 'downloadVideo') {
+    validateVideo(step);
+    if (!step.directory) throw new Error('Video download requires directory');
+  }
+  if (step.action === 'openUrl') {
+    const url = new URL(step.url);
+    if (!['http:', 'https:'].includes(url.protocol)) throw new Error('openUrl requires http or https');
+  }
+  if (step.completion?.state && !['visible', 'hidden', 'enabled'].includes(step.completion.state)) throw new Error('Invalid completion state');
+  if (step.action !== 'upload') return step;
+  const inputPath = uploadPath || step.filePath ||
+    (step.folder && step.filename ? path.join(step.folder, step.filename) : '');
+  if (!inputPath) throw new Error('Upload step needs a file path, folder + filename, or a run-time upload path');
+  const resolved = path.resolve(inputPath);
+  if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) throw new Error(`Upload file does not exist: ${resolved}`);
+  step.filePath = resolved;
+  return step;
+}
 
 function createScenarioStore(scenariosDir) {
   function file(name) {
@@ -11,6 +50,14 @@ function createScenarioStore(scenariosDir) {
 
   return {
     file,
+    remove: name => fs.unlinkSync(file(name)),
+    prepareStep: (step, uploadPath = '', runtime = {}) => {
+      // Runtime file references must keep the downloaded clip even if a legacy run upload override is present.
+      const dynamicFile = hasRuntime({ filePath: step.filePath, folder: step.folder, filename: step.filename });
+      const resolved = validateStep(resolveRuntime(structuredClone(step), runtime), dynamicFile ? '' : uploadPath);
+      if (dynamicFile && step.action === 'upload' && (/\.(part|ytdl|tmp)$/i.test(resolved.filePath) || !fs.statSync(resolved.filePath).size)) throw new Error('Downloaded upload file must be final and nonempty');
+      return resolved;
+    },
     list: () => fs.readdirSync(scenariosDir).filter(name => name.endsWith('.json')).map(name => name.slice(0, -5)),
     load: name => JSON.parse(fs.readFileSync(file(name), 'utf8')),
     save: (name, scenario) => {
@@ -28,42 +75,14 @@ function createScenarioStore(scenariosDir) {
         throw new Error('Scenario needs a nonempty steps array');
       }
       const prepared = resolveVariables(scenario);
+      let downloaded = false;
       for (const step of prepared.steps) {
-        if (!['downloadVideo', 'openUrl', 'openFolder', 'wait', 'waitFor', 'click', 'type', 'setDate', 'setTime', 'scroll', 'upload'].includes(step.action)) throw new Error(`Unsupported action: ${step.action}`);
-        for (const key of ['url', 'path', 'text', 'locator', 'selector', 'role', 'filePath', 'folder', 'filename', 'value', 'format']) {
-          if (step[key] !== undefined) step[key] = String(step[key]);
-        }
-        for (const key of ['timeoutMs', 'navigationTimeoutMs', 'settleMs', 'waitAfterMs', 'ms', 'times', 'intervalMs', 'index', 'pixels']) {
-          if (typeof step[key] === 'string' && step[key].trim() !== '') step[key] = Number(step[key]);
-          if (key === 'pixels') {
-            if (step[key] !== undefined && !Number.isFinite(step[key])) throw new Error(`Invalid ${key}`);
-            continue;
-          }
-          if (step[key] !== undefined && (!Number.isFinite(step[key]) || step[key] < 0 || step[key] > 300000)) throw new Error(`Invalid ${key}`);
-        }
-        if (step.clear === 'true' || step.clear === 'false') step.clear = step.clear === 'true';
-        if (step.action === 'setDate') {
-          const value = String(step.value ?? '');
-          const date = new Date(`${value}T00:00:00Z`);
-          if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value) throw new Error('setDate requires a valid YYYY-MM-DD value');
-        }
-        if (step.action === 'setTime' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(step.value ?? ''))) throw new Error('setTime requires HH:mm (00:00–23:59)');
-        if (step.action === 'downloadVideo') {
-          validateVideo(step);
-          if (!step.directory) throw new Error('Video download requires directory');
-        }
-        if (step.action === 'openUrl') {
-          const url = new URL(step.url);
-          if (!['http:', 'https:'].includes(url.protocol)) throw new Error('openUrl requires http or https');
-        }
-        if (step.completion?.state && !['visible', 'hidden', 'enabled'].includes(step.completion.state)) throw new Error('Invalid completion state');
-        if (step.action !== 'upload') continue;
-        const inputPath = uploadPath || step.filePath ||
-          (step.folder && step.filename ? path.join(step.folder, step.filename) : '');
-        if (!inputPath) throw new Error('Upload step needs a file path, folder + filename, or a run-time upload path');
-        const resolved = path.resolve(inputPath);
-        if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) throw new Error(`Upload file does not exist: ${resolved}`);
-        step.filePath = resolved;
+        if (hasRuntime(step)) {
+          if (!downloaded) throw new Error('Runtime download references require an earlier downloadVideo step');
+          if (!['downloadVideo', 'openUrl', 'openFolder', 'wait', 'waitFor', 'click', 'type', 'setDate', 'setTime', 'scroll', 'upload'].includes(step.action)) throw new Error(`Unsupported action: ${step.action}`);
+        } else validateStep(step, uploadPath);
+        if (step.label !== undefined && typeof step.label !== 'string') throw new Error('Step label must be text');
+        if (step.action === 'downloadVideo') downloaded = true;
       }
       return prepared;
     }

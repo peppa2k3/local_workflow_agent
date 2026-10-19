@@ -1,6 +1,6 @@
 # Tiến độ phát triển
 
-Cập nhật: 2026-10-18 (Asia/Bangkok).
+Cập nhật: 2026-10-19 (Asia/Bangkok).
 
 ## Completed
 
@@ -45,3 +45,11 @@ Cập nhật: 2026-10-18 (Asia/Bangkok).
 - Kiểm chứng: npm test và node --check cho JavaScript thay đổi, script dashboard. Test video HTTP cục bộ dùng executable thật khi có tools; không dùng profile đăng nhập.
 
 Kiểm chứng thực tế 2026-10-19: tải video HTTP cục bộ, tải lại không ghi đè, ghép DASH hai luồng bằng FFmpeg; FFprobe xác nhận hình + tiếng. Dashboard kiểm tra phân tích URL với biến, tên Unicode và tải khi extension offline. URL YouTube 9qq_Fqp2rnM phân tích được title/ID/duration; chưa tải toàn bộ video YouTube (7768 giây).
+
+## 2026-10-19: nối tải clip và upload
+
+- Thêm runtime references title/file name/file path/id, alias tên phim, resolve và validate khi tới bước; giữ CSS selector cũ.
+- Gate tải hoàn tất bằng yt-dlp exit + after_move + file cuối khác rỗng + FFprobe video/duration, status verified; Stop/lỗi không chạy tiếp.
+- Mẫu download-upload-reels: tải → mở Reels → tạo/upload → Tiếp → điền tiêu đề, dừng trước Đăng.
+- Dashboard quản lý xóa kịch bản (xác nhận, khóa khi workflow API đang chạy), đặt tên bước, mặc định Bước N.
+- Kiểm thử: điều phối pending/success/failure/Stop, cách ly kết quả và alias; API xóa, UI lưu tên/xóa/hủy; extension upload CDP trên Chrome riêng, công cụ tải/FFprobe thật trên fixture. Chưa tự chạy Facebook/profile đăng nhập.
