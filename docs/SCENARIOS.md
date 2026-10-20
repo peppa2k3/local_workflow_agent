@@ -1,5 +1,7 @@
 # Local workflow agent
 
+For scripted integrations, see [CLI and authenticated API v1](AUTOMATION_API.md). Run `node local-agent.js run --scenario NAME --profile "Profile 1" --var "caption=value" --wait` against a running agent configured with `LOCAL_AGENT_API_TOKEN`. API v1 requires an explicit profile and only accepts saved scenario names. Overrides merge with saved variables for this run without modifying the scenario; runtime download variables remain reserved. `GET /api/v1/runs/:runId` reports a stable execution ID and terminal outcome. Legacy `POST /api/run` also accepts `variables` and returns the run object. The dashboard and extension use the same action engine, including legacy CSS `selector` steps. Workflows now have a default one-hour execution budget, checked each second; API v1 can set `timeoutMs` up to 24 hours.
+
 Run `node local-agent.js`, then open **http://127.0.0.1:34719** in your browser. The dashboard lets you create, reorder, edit, save, run, and stop scenarios. You can still enter `run scenarios/facebook-reels.json` in the terminal.
 Choose **Chrome profile** in the dashboard, then Run or Stop for that profile. Each profile has its own workflow, target tab, progress, and error state; different profiles can run concurrently. **Mở profile** opens the selected Chrome profile. The list reads profile names/directories from Chrome's `Local State` metadata; it does not read cookies or login data. `Profile 2` remains the default for CLI and API requests that omit a profile. To change that default in PowerShell:
 

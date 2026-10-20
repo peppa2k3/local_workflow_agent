@@ -1,8 +1,27 @@
 const { randomUUID } = require('crypto');
 const { setTimeout: delay } = require('timers/promises');
+const { overrideVariables } = require('./variables');
 
 function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, downloadVideo }) {
   const sessions = new Map();
+  const completed = new Map();
+  function runStatus(s) {
+    return { ...status(s.profile), runId: s.executionId, scenario: s.scenarioName, state: s.running ? 'running' : s.outcome,
+      waiting: s.running && (s.inFlight || s.localPending), startedAt: s.startedAt, endedAt: s.endedAt || null };
+  }
+  function finish(s, outcome) {
+    s.running = false; s.endedAt = Date.now(); s.outcome = outcome;
+    if (s.executionId) completed.set(s.executionId, runStatus(s));
+    while (completed.size > 200) completed.delete(completed.keys().next().value);
+  }
+  function getRun(id) {
+    for (const s of sessions.values()) if (s.running && s.executionId === id) return runStatus(s);
+    return completed.has(id) ? structuredClone(completed.get(id)) : null;
+  }
+  function stopRun(id) {
+    for (const s of sessions.values()) if (s.running && s.executionId === id) { stop(s.profile); return getRun(id); }
+    return getRun(id);
+  }
   function session(profile = defaultProfile) {
     if (!profiles().some(item => item.directory === profile)) throw new Error('Unknown Chrome profile');
     if (!sessions.has(profile)) sessions.set(profile, {
@@ -16,6 +35,7 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
     const s = session(profile);
     return {
       profile: s.profile, running: s.running, runId: s.runId, index: s.index,
+      executionId: s.executionId || null, state: s.running ? 'running' : s.outcome || 'idle', scenario: s.scenarioName || null,
       total: s.workflow?.steps.length || 0, action: s.workflow?.steps[s.index]?.action || null,
       stepLabel: s.currentStep?.label?.trim() || s.workflow?.steps[s.index]?.label?.trim() || `Bước ${s.index + 1}`,
       extensionConnected: Date.now() - s.lastContact < 10000, error: s.error,
@@ -28,7 +48,7 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
   function stop(profile) {
     const s = session(profile);
     s.controller.abort(); s.controller = new AbortController();
-    if (s.running) s.endedAt = Date.now();
+    if (s.running) finish(s, s.error ? 'failed' : 'cancelled');
     s.running = false; s.inFlight = false; s.localPending = false;
     s.picker.active = false; s.runId = randomUUID();
   }
@@ -58,23 +78,26 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
         s.lastStepMs = Date.now() - s.stepStartedAt;
         s.index++;
       }
-      if (s.runId === runId && s.index === s.workflow.steps.length) { s.running = false; s.endedAt = Date.now(); }
+      if (s.runId === runId && s.index === s.workflow.steps.length) finish(s, 'succeeded');
     } catch (error) {
       if (s.runId === runId) fail(s, error);
     } finally {
       if (s.runId === runId) s.localPending = false;
     }
   }
-  function start(profile, scenario, uploadPath = '', scenarioName = null) {
+  function start(profile, scenario, uploadPath = '', scenarioName = null, variables = {}, timeoutMs = 3600000) {
     const s = session(profile);
     if (s.running) throw new Error('Stop this profile before starting another scenario');
-    const workflow = scenarios.prepare(scenario, uploadPath);
+    const workflow = scenarios.prepare(overrideVariables(scenario, variables), uploadPath);
     if (!status(profile).extensionConnected && workflow.steps.some(step => !['wait', 'openFolder', 'downloadVideo'].includes(step.action))) {
       throw new Error('Extension chưa kết nối profile này. Mở profile, cài/reload extension và chọn đúng profile trong Extension options.');
     }
     stop(profile);
     Object.assign(s, { workflow, scenarioName, uploadPath, currentStep: null, runtime: {}, index: 0, download: null, error: '', tabId: null, running: true, startedAt: Date.now(), endedAt: null, lastStepMs: null });
+    s.executionId = s.runId; s.outcome = 'running';
+    s.runDeadline = Date.now() + timeoutMs;
     void advance(s, s.runId);
+    return getRun(s.executionId);
   }
   function connect(body) {
     if (!body.profile || typeof body.clientId !== 'string' || !body.clientId) {
@@ -111,13 +134,14 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
   }
   function expire() {
     for (const s of sessions.values()) {
+      if (s.running && Date.now() > s.runDeadline) { fail(s, 'Workflow execution timed out'); continue; }
       if (s.running && s.inFlight && Date.now() > s.deadline) fail(s, `Step ${s.index + 1}: extension action timed out`);
     }
   }
   function usesScenario(name) {
     return [...sessions.values()].some(s => s.running && s.scenarioName === name);
   }
-  return { usesScenario, session, status, start, stop, connect, next, result, expire };
+  return { usesScenario, session, status, start, stop, connect, next, result, expire, getRun, stopRun };
 }
 
 module.exports = { createWorkflows };

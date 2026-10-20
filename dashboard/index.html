@@ -89,6 +89,7 @@
       <button class="btn danger" id="stopBtn">Dừng</button>
     </section>
     <p>Cài extension trong từng profile, mở Extension options và chọn đúng thư mục profile. Mỗi profile có thể chạy một kịch bản riêng.</p>
+    <p id="automationStatus">CLI/API: node local-agent.js --help. Hướng dẫn cấu hình token trong docs/SETUP.md.</p>
     <div id="profilesSummary" class="profiles-summary" aria-live="polite"></div>
     <nav class="variables" aria-label="Biến kịch bản">
       <p>Kết quả tải: {{download_title}} = tiêu đề / tên phim; {{download_file_name}} = tên file; {{download_file_path}} = đường dẫn clip; {{download_id}} = ID. Dùng trong các bước sau downloadVideo.</p>
@@ -189,7 +190,7 @@
     }
 
     async function api(route, method = 'GET', body) {
-      const response = await fetch(route, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined, ...(route === '/api/choose-file' ? {} : { signal: AbortSignal.timeout(route === '/api/video/inspect' ? 70000 : 10000) }) });
+      const response = await fetch(route, { method, headers: { 'Content-Type': 'application/json', 'X-Local-Agent-Session': '__LOCAL_AGENT_DASHBOARD_TOKEN__' }, body: body ? JSON.stringify(body) : undefined, ...(route === '/api/choose-file' ? {} : { signal: AbortSignal.timeout(route === '/api/video/inspect' ? 70000 : 10000) }) });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Request failed');
       return data;
@@ -407,6 +408,7 @@
       statusPending = true;
       try {
         const data = await api('/api/profiles');
+        $('automationStatus').textContent = `CLI/API ${data.automationEnabled ? 'đã bật' : 'chưa bật (đặt LOCAL_AGENT_API_TOKEN rồi khởi động lại agent)'}. Chạy node local-agent.js --help; xem docs/SETUP.md. Biến truyền qua API chỉ áp dụng cho lượt chạy đó.`;
         referencesCompatible = data.capabilities?.includes('download-references-v1') === true;
         managementCompatible = data.capabilities?.includes('scenario-management-v1') === true;
         videoCompatible = data.capabilities?.includes('video-download-v1') === true;
@@ -429,6 +431,7 @@
         $('connectionDot').classList.toggle('ok', state.extensionConnected);
         $('connectionText').textContent = agentCompatible ? `${state.profile} · Extension ${state.extensionConnected ? 'đã kết nối' : 'chưa kết nối'}` : 'Agent cũ: dừng và chạy lại node local-agent.js';
         $('progress').textContent = state.error || (state.running ? `Đang chạy bước ${state.index + 1}/${state.total}: ${state.stepLabel || state.action || 'đang chờ'}` : state.download ? `Đã lưu: ${state.download.filePath} (${state.download.title})` : 'Đang chờ lệnh');
+        if (state.executionId) $('progress').textContent += ` · ${state.state} · runId: ${state.executionId}`;
         const perf = data.performance;
         $('performance').textContent = `${perf ? `Agent: CPU ${perf.cpuPercent}% · RAM ${perf.memoryMb} MB · Event loop p95 ${perf.eventLoopP95Ms} ms · ` : ''}Profile ${selectedProfile}: tổng ${((state.elapsedMs || 0) / 1000).toFixed(1)}s · bước hiện tại ${((state.stepElapsedMs || 0) / 1000).toFixed(1)}s${state.lastStepMs == null ? '' : ` · bước trước ${(state.lastStepMs / 1000).toFixed(1)}s`}`;
         if (pickId !== null) {

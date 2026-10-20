@@ -36,6 +36,19 @@ Không dùng `legacy/facebook-feed.js` cho quy trình này: nó là thử nghi�
 5. Chọn profile, bấm **Lưu**, rồi **▶ Chạy kịch bản**. Thanh **Trạng thái** hiển thị bước hiện tại hoặc lỗi. **Dừng** chỉ dừng profile đang chọn. Có thể chuyển profile và chạy kịch bản khác đồng thời.
 6. Có thể chạy bằng terminal agent: `run scenarios/facebook-reels.json --profile "Profile 1"`, kiểm tra `status`, dừng bằng `stop "Profile 1"`, thoát tất cả bằng `exit`.
 
+## Chạy tự động bằng CLI/API
+
+Đặt `LOCAL_AGENT_API_TOKEN` (token ngẫu nhiên ít nhất 32 ký tự) trong môi trường agent và client, rồi khởi động lại `node local-agent.js`. Trong terminal khác:
+
+```powershell
+node local-agent.js profiles
+node local-agent.js scenarios
+node local-agent.js describe --scenario my-workflow
+node local-agent.js run --scenario my-workflow --profile "Profile 1" --variables-file .\run-values.json --wait
+```
+
+`run-values.json` là object giá trị biến, ví dụ `{"caption":"Tiêu đề mới"}`. Có thể thêm `--var "caption=Giá trị khác"`, `--upload`, `--timeout-ms`, `--request-id`. Biến chỉ áp dụng cho lượt đó; không sửa JSON đã lưu. API tương ứng: `POST /api/v1/runs`, theo dõi/dừng bằng `runId`. Xem [hướng dẫn CLI, API, mã thoát và bảo mật](AUTOMATION_API.md) để cấu hình đầy đủ, ví dụ PowerShell và giới hạn chống gửi trùng.
+
 ## 5. Upload file
 
 1. Thêm action **Upload file** vào vị trí sau bước mở dialog upload, nếu trang cần bước đó.

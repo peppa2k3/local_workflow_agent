@@ -42,5 +42,17 @@ const { createScenarioStore } = require('../src/agent/scenario-store');
   workflows.expire();
   assert.equal(second.running, false);
   assert.match(second.error, /timed out/);
+  const history = createWorkflows({ scenarios: createScenarioStore('.'), defaultProfile: 'A', profiles: () => [{ directory: 'A' }], openFolder: async () => {} });
+  let oldest, latest;
+  for (let i = 0; i < 205; i++) {
+    const run = history.start('A', { steps: [{ action: 'openFolder', path: '.' }] });
+    oldest ||= run.runId; latest = run.runId;
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  assert.equal(history.getRun(oldest), null, 'history evicts completed runs beyond its bound');
+  const snapshot = history.getRun(latest);
+  assert.equal(snapshot.state, 'succeeded');
+  snapshot.state = 'corrupted';
+  assert.equal(history.getRun(latest).state, 'succeeded', 'callers cannot mutate saved outcomes');
   console.log('Profile isolation, sequential acknowledgement, cancellation and timeout: OK');
 })().catch(error => { console.error(error); process.exitCode = 1; });

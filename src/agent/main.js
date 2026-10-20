@@ -4,12 +4,14 @@ const path = require('path');
 const readline = require('readline');
 const { spawn } = require('child_process');
 const { monitorEventLoopDelay } = require('perf_hooks');
+const { randomBytes, timingSafeEqual } = require('crypto');
 const { port, scenariosDir, dashboardPath, chromePath, profile, userDataDir } = require('./config');
 const { createScenarioStore } = require('./scenario-store');
 const { chooseFile } = require('./file-picker');
 const { listProfiles } = require('./profiles');
 const { inspectVideo, downloadVideo } = require('./video-download');
 const { createWorkflows } = require('./workflows');
+const { createAutomationApi } = require('./automation-api');
 
 const scenarios = createScenarioStore(scenariosDir);
 const eventLoop = monitorEventLoopDelay({ resolution: 20 });
@@ -38,39 +40,55 @@ function launch(command, args) {
 }
 function readBody(request) {
   return new Promise((resolve, reject) => {
-    let body = '';
+    let chunks = [], size = 0, tooLarge = false;
     request.on('data', chunk => {
-      body += chunk;
-      if (body.length > 100000) reject(new Error('Request too large'));
+      size += chunk.length;
+      if (size > 100000) { tooLarge = true; chunks = []; reject(Object.assign(new Error('Request too large'), { status: 413 })); }
+      if (!tooLarge) chunks.push(chunk);
     });
     request.on('end', () => {
-      try { resolve(JSON.parse(body)); } catch (error) { reject(error); }
+      if (tooLarge) return;
+      try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8'))); } catch { reject(new Error('Invalid JSON body')); }
     });
     request.on('error', reject);
   });
 }
+const automation = createAutomationApi({ workflows, scenarios, profiles, readBody });
+const dashboardToken = randomBytes(32).toString('hex');
+function dashboardAuthorized(request) {
+  const candidate = request.headers['x-local-agent-session'];
+  return typeof candidate === 'string' && /^[a-f0-9]{64}$/.test(candidate)
+    && timingSafeEqual(Buffer.from(candidate), Buffer.from(dashboardToken));
+}
 
 const server = http.createServer(async (request, response) => {
-  const url = new URL(request.url, `http://127.0.0.1:${port}`);
-  const route = url.pathname;
   const json = (code, data) => {
     response.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
     response.end(JSON.stringify(data));
   };
+  let url;
+  try { url = new URL(request.url, `http://127.0.0.1:${port}`); }
+  catch { return json(400, { error: 'Invalid request URL' }); }
+  const route = url.pathname;
+  if (request.headers.host !== `127.0.0.1:${port}` && request.headers.host !== `localhost:${port}`) return json(403, { error: 'Host not allowed' });
+  const origin = request.headers.origin;
+  if (origin && origin !== `http://127.0.0.1:${port}` && !/^chrome-extension:\/\/[a-z]+$/.test(origin)) return json(403, { error: 'Origin not allowed' });
   if (request.method === 'GET' && route === '/') {
     response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-    fs.createReadStream(dashboardPath).pipe(response);
+    response.end(fs.readFileSync(dashboardPath, 'utf8').replace('__LOCAL_AGENT_DASHBOARD_TOKEN__', dashboardToken));
     return;
   }
   try {
+    if (route.startsWith('/api/v1/')) return await automation.handle(request, url, json);
     if (route.startsWith('/api/')) {
       const origin = request.headers.origin;
       const extensionRead = request.method === 'GET' && route === '/api/profiles' && /^chrome-extension:\/\/[a-z]+$/.test(origin || '');
       if (origin && origin !== `http://127.0.0.1:${port}` && !extensionRead) throw new Error('Origin not allowed');
+      if (automation.enabled && !extensionRead && !dashboardAuthorized(request) && !automation.authorized(request)) return json(401, { error: 'Valid Bearer token or dashboard session required' });
       const selected = url.searchParams.get('profile') || profile;
       if (request.method === 'GET' && route === '/api/status') return json(200, workflows.status(selected));
       if (request.method === 'GET' && route === '/api/profiles') {
-        return json(200, { defaultProfile: profile, capabilities: ['variables-v1', 'video-download-v1', 'download-references-v1', 'scenario-management-v1'], performance, profiles: profiles().map(item => ({ ...item, ...workflows.status(item.directory) })) });
+        return json(200, { defaultProfile: profile, automationEnabled: automation.enabled, capabilities: ['automation-api-v1', 'variables-v1', 'video-download-v1', 'download-references-v1', 'scenario-management-v1'], performance, profiles: profiles().map(item => ({ ...item, ...workflows.status(item.directory) })) });
       }
       if (request.method === 'POST' && route === '/api/profiles/open') {
         const body = await readBody(request);
@@ -118,8 +136,8 @@ const server = http.createServer(async (request, response) => {
       }
       if (request.method === 'POST' && route === '/api/run') {
         const body = await readBody(request);
-        workflows.start(body.profile || profile, scenarios.load(body.name), body.uploadPath || '', body.name);
-        return json(200, { ok: true });
+        const run = workflows.start(body.profile || profile, scenarios.load(body.name), body.uploadPath || '', body.name, body.variables);
+        return json(200, { ok: true, ...run });
       }
       if (request.method === 'POST' && route === '/api/stop') {
         const body = await readBody(request);
@@ -141,9 +159,11 @@ const server = http.createServer(async (request, response) => {
     }
     return json(200, { running: s.running, runId: s.runId, ok: true });
   } catch (error) {
-    return json(400, { error: String(error.message || error) });
+    return json(error.status || 400, { error: String(error.message || error) });
   }
 });
+server.requestTimeout = 15000;
+server.headersTimeout = 10000;
 const expiry = setInterval(workflows.expire, 1000);
 expiry.unref();
 const performanceTimer = setInterval(() => {

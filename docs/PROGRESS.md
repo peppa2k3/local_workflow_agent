@@ -1,6 +1,15 @@
 # Tiến độ phát triển
 
-Cập nhật: 2026-10-19 (Asia/Bangkok).
+Cập nhật: 2026-10-20 (Asia/Bangkok).
+
+## 2026-10-20: CLI và API chạy tự động
+
+- CLI độc lập qua `node local-agent.js <command>`, chọn profile/kịch bản, biến inline/file, upload override, JSON output, wait/exit codes và hai loại timeout.
+- API v1 Bearer token, kiểm tra Host/Origin/body/kiểu dữ liệu, chỉ chạy kịch bản đã lưu; idempotency có giới hạn trong RAM.
+- Lượt chạy có ID ổn định, trạng thái cuối, lịch sử 200 lượt; dừng theo ID tránh dừng nhầm lượt mới. Biến riêng từng lượt không sửa file; giới hạn mở rộng biến.
+- Dashboard hiển thị trạng thái API và execution ID; extension options giải thích profile cho CLI. Tài liệu tại AUTOMATION_API.md và SETUP.md.
+- Kiểm thử fixture HTTP/CLI: auth, input sai, UTF-8, isolation, idempotency, lịch sử, failure/Stop/timeout và tương thích bridge/dashboard; không dùng profile đăng nhập.
+- Xác minh cuối: `npm test` đạt toàn bộ (kể cả công cụ video thật và Chrome riêng), `node --check` cho mọi JavaScript thay đổi, kiểm tra script dashboard bằng vm.Script và `git diff --check` đạt.
 
 ## Completed
 
