@@ -28,6 +28,9 @@ Xem [cú pháp kịch bản](docs/SCENARIOS.md), [context dự án](docs/PROJECT
 
 ## Tải video qua URL
 
-Chạy `npm run setup:video`, rồi `node local-agent.js`. Mở http://127.0.0.1:34719, chọn `video-download`, sửa URL/thư mục và chạy. Action **Tải video (yt-dlp + FFmpeg)** có nút phân tích URL lấy tên; file lưu theo tiêu đề và ID. Xem [SCENARIOS](docs/SCENARIOS.md).
+Chạy `npm run setup:video`, rồi `node local-agent.js`. Mở http://127.0.0.1:34719, chọn `video-download`, sửa URL/thư mục và chạy. Action **Tải video (yt-dlp + FFmpeg)** có nút phân tích URL lấy tên; file lưu theo tiêu đề, không gắn ID. Xem [SCENARIOS](docs/SCENARIOS.md).
 
 Mẫu nối toàn bộ luồng: chọn `download-upload-reels` để tải clip → upload Reels → điền tên phim từ URL. Sửa URL/thư mục/trang Reels và locator theo giao diện của bạn. Dùng `{{download_file_path}}` cho upload, `{{download_title}}` cho mô tả; agent chờ file hoàn tất và FFprobe xác nhận trước khi chạy bước sau. Mẫu dừng trước Đăng. Dashboard có tên riêng cho từng bước và nút xóa kịch bản.
+
+
+Tải video hiện ưu tiên FPS → độ phân giải → bitrate, không giới hạn 1080p. Tên file hoàn tất là `tiêu đề.mp4` (hoặc định dạng nguồn), trùng tên thêm `(2)`, `(3)`…; không ghi đè clip cũ. JSON có quality số vẫn chạy theo chính sách cao nhất mới.

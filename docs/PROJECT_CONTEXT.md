@@ -45,3 +45,8 @@ Người dùng xây dựng kịch bản tự động local và chạy chúng tr�
 Biến thường resolve trước khi chạy. Bốn tên dành riêng download_title/download_file_name/download_file_path/download_id được giữ tới khi downloadVideo thành công rồi resolve một lần ngay trước mỗi bước; không expand đệ quy nội dung metadata. Kết quả thuộc run/profile, reset mỗi lần chạy. prepareStep validate lại, riêng upload tham chiếu clip không nhận upload override từ ô file tạm. downloadVideo phải trả verified=true sau exit/after_move/stat/FFprobe trước khi workflow tiến tiếp. Extension chặn upload đường dẫn tạm hoặc tham chiếu file chưa resolve.
 
 Step label tùy chọn, mặc định Bước N. DELETE scenario kiểm tra tên và khóa theo scenarioName của workflow từ API đang chạy. Mẫu download-upload-reels dừng ở bước điền mô tả, không xuất bản. Các locator Facebook cần đối chiếu trên profile người dùng; kiểm thử chỉ ở Chrome tách biệt/trang fixture.
+
+
+## Chất lượng cao nhất và tên sạch (2026-10-20)
+
+downloadVideo mặc định best với sort-force FPS → res (cạnh ngắn, hỗ trợ dọc/ngang) → bitrate → codec, không cap height. Numeric quality cũ chỉ được chấp nhận về cú pháp, không còn cap. Tải mới trong mkdtemp dưới output directory, xác nhận after_move/stat/FFprobe rồi publish hard link độc quyền tên tiêu đề.ext; collision tăng số, không dùng lại file có sẵn. Chỉ dọn đúng staging của lượt chạy sau kiểm tra parent/prefix. Runtime file references lấy đường dẫn cuối, giữ gate verified. Dashboard thêm thông số media; video-quality-best-v1 chặn agent cũ.

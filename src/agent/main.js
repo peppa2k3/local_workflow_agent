@@ -88,7 +88,7 @@ const server = http.createServer(async (request, response) => {
       const selected = url.searchParams.get('profile') || profile;
       if (request.method === 'GET' && route === '/api/status') return json(200, workflows.status(selected));
       if (request.method === 'GET' && route === '/api/profiles') {
-        return json(200, { defaultProfile: profile, automationEnabled: automation.enabled, capabilities: ['automation-api-v1', 'variables-v1', 'video-download-v1', 'download-references-v1', 'scenario-management-v1'], performance, profiles: profiles().map(item => ({ ...item, ...workflows.status(item.directory) })) });
+        return json(200, { defaultProfile: profile, automationEnabled: automation.enabled, capabilities: ['automation-api-v1', 'variables-v1', 'video-download-v1', 'video-quality-best-v1', 'download-references-v1', 'scenario-management-v1'], performance, profiles: profiles().map(item => ({ ...item, ...workflows.status(item.directory) })) });
       }
       if (request.method === 'POST' && route === '/api/profiles/open') {
         const body = await readBody(request);

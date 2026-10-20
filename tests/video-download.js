@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
-const { validateVideo, inspectVideo, downloadVideo, run } = require('../src/agent/video-download');
+const { validateVideo, inspectVideo, downloadVideo, run, selectionArgs, publishVideo } = require('../src/agent/video-download');
 const { createScenarioStore } = require('../src/agent/scenario-store');
 const { createWorkflows } = require('../src/agent/workflows');
 (async () => {
@@ -37,6 +37,13 @@ const { createWorkflows } = require('../src/agent/workflows');
     await assert.rejects(run(process.execPath, ['-e', 'console.error("fixture failure");process.exit(3)']), /fixture failure/);
     await assert.rejects(run(process.execPath, ['-e', 'console.log("x".repeat(1000))'], { limit: 10 }), /too large/);
 
+    const staging = path.join(directory, 'publish-source.mp4'); fs.writeFileSync(staging, 'complete');
+    const target = path.join(directory, 'names'); fs.mkdirSync(target);
+    const titledSource = path.join(directory, 'Tên phim.mp4'); fs.copyFileSync(staging, titledSource);
+    const published = await Promise.all([publishVideo(titledSource, target), publishVideo(titledSource, target)]);
+    assert.equal(new Set(published).size, 2);
+    assert.deepEqual(published.map(file => path.basename(file)).sort(), ['Tên phim (2).mp4', 'Tên phim.mp4'].sort());
+    assert.equal(fs.readFileSync(published[0], 'utf8'), 'complete');
     const { chromium } = require('playwright');
     const browser = await chromium.launch({ channel: 'chrome', headless: true });
     try {
@@ -48,7 +55,7 @@ const { createWorkflows } = require('../src/agent/workflows');
         const request = route.request(), pathname = new URL(request.url()).pathname;
         let data = {};
         if (pathname === '/') return route.fulfill({ contentType: 'text/html; charset=utf-8', body: fs.readFileSync(path.resolve(__dirname, '../dashboard/index.html'), 'utf8') });
-        if (pathname === '/api/profiles') data = { defaultProfile: 'Default', capabilities: ['variables-v1', 'video-download-v1', 'download-references-v1', 'scenario-management-v1'], profiles: [{ directory: 'Default', name: 'Test', extensionConnected: false, running: false, download: { title, filePath: 'D:/Videos/sample.mp4' } }] };
+        if (pathname === '/api/profiles') data = { defaultProfile: 'Default', capabilities: ['variables-v1', 'video-download-v1', 'video-quality-best-v1', 'download-references-v1', 'scenario-management-v1'], profiles: [{ directory: 'Default', name: 'Test', extensionConnected: false, running: false, download: { title, filePath: 'D:/Videos/sample.mp4', width: 1440, height: 1920, fps: 60, videoCodec: 'vp9' } }] };
         else if (pathname === '/api/scenarios') data = { names: deleted ? [] : ['video-download'] };
         else if (pathname === '/api/scenarios/video-download') {
           if (request.method() === 'DELETE') { deleted = true; data = { ok: true }; }
@@ -66,6 +73,8 @@ const { createWorkflows } = require('../src/agent/workflows');
       await page.waitForFunction(() => document.getElementById('message').textContent.includes('Video ti\u1ebfng Vi\u1ec7t'));
       assert(inspected);
       assert.match(await page.locator('#progress').textContent(), /sample.mp4/);
+      assert.match(await page.locator('#progress').textContent(), /1440×1920.*60 fps.*vp9/);
+      assert(await page.getByText('Chất lượng cao nhất:', { exact: false }).isVisible());
       assert.equal(await page.locator('#runBtn').isEnabled(), true, 'download-only workflow runs without extension');
       await page.locator('.step-head select').selectOption('openUrl');
       assert.equal(await page.locator('#runBtn').isEnabled(), false, 'browser action still requires extension');
@@ -97,6 +106,23 @@ const { createWorkflows } = require('../src/agent/workflows');
 
     const tools = path.resolve(__dirname, '../tools');
     if (fs.existsSync(path.join(tools, 'yt-dlp.exe')) && fs.existsSync(path.join(tools, 'ffmpeg.exe'))) {
+
+      const format = (id, width, height, fps, bitrate) => ({ format_id: id, url: 'http://127.0.0.1/unused-' + id + '.mp4', ext: 'mp4', vcodec: 'avc1.640028', acodec: 'none', width, height, fps, vbr: bitrate, tbr: bitrate });
+      const formats = [
+        format('4k30', 2160, 3840, 30, 9000),
+        format('1080p60', 1080, 1920, 60, 4000),
+        format('1440p60', 1440, 1920, 60, 5000),
+        format('1440p60-high', 1440, 1920, 60, 6000),
+        { format_id: 'audio', url: 'http://127.0.0.1/unused.m4a', ext: 'm4a', vcodec: 'none', acodec: 'mp4a.40.2', abr: 128, tbr: 128 }
+      ];
+      const metadataFile = path.join(directory, 'formats.json');
+      const writeFormats = list => fs.writeFileSync(metadataFile, JSON.stringify({ id: 'test', title: 'Fixture', extractor: 'generic', webpage_url: url, formats: list }));
+      writeFormats(formats);
+      const choose = () => run(path.join(tools, 'yt-dlp.exe'), ['--ignore-config', '--no-warnings', ...selectionArgs, '--load-info-json', metadataFile, '--simulate', '--print', '%(format_id)s']);
+      assert.equal(await choose(), '1440p60-high+audio', 'FPS must outrank 4K30, then portrait resolution and bitrate');
+      writeFormats(formats.filter(item => !item.fps || item.fps === 30));
+      assert.equal(await choose(), '4k30+audio', 'fallback to lower FPS when high FPS is absent, without a 1080 height cap');
+      console.log('Real yt-dlp sorting: FPS, portrait resolution, bitrate and fallback: OK');
       const fixture = path.join(directory, 'fixture.mp4');
       await run(path.join(tools, 'ffmpeg.exe'), ['-v', 'error', '-f', 'lavfi', '-i', 'color=c=blue:s=128x128:d=1', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1', '-c:v', 'libx264', '-c:a', 'aac', '-shortest', fixture]);
       await run(path.join(tools, 'ffmpeg.exe'), ['-v', 'error', '-i', fixture, '-map', '0:v', '-map', '0:a', '-c', 'copy', '-f', 'dash', '-adaptation_sets', 'id=0,streams=v id=1,streams=a', 'fixture.mpd'], { cwd: directory });
@@ -114,18 +140,27 @@ const { createWorkflows } = require('../src/agent/workflows');
       assert.equal(result.title, info.title);
       assert(result.bytes > 0);
       assert.equal(result.verified, true, 'download completion must include FFprobe verification');
-      assert(result.name.includes(info.id));
+      assert.equal(result.name, 'fixture.mp4');
+      assert.equal(result.width, 128); assert.equal(result.height, 128);
       const probe = JSON.parse(await run(path.join(tools, 'ffprobe.exe'), ['-v', 'quiet', '-show_streams', '-of', 'json', result.filePath]));
       assert(probe.streams.some(item => item.codec_type === 'video'));
       assert(probe.streams.some(item => item.codec_type === 'audio'));
       const again = await downloadVideo({ url: localUrl, directory: path.join(directory, 'saved'), quality: 720 });
-      assert.equal(again.filePath, result.filePath);
-      fs.writeFileSync(result.filePath, 'not a video');
-      await assert.rejects(downloadVideo({ url: localUrl, directory: path.join(directory, 'saved'), quality: 720 }), /ffprobe|readable video/i);
+      assert.equal(again.name, 'fixture (2).mp4');
+      assert.notEqual(again.filePath, result.filePath);
+      assert(fs.existsSync(result.filePath), 'must preserve previous video');
+      const sourceBytes = fs.readFileSync(fixture);
+      fs.writeFileSync(fixture, 'not a video');
+      try {
+        await assert.rejects(downloadVideo({ url: localUrl, directory: path.join(directory, 'saved'), quality: 'best' }), /ffprobe|readable video/i);
+        assert.equal(fs.readdirSync(path.join(directory, 'saved')).length, 2, 'invalid downloads must not publish or leave staging files');
+      } finally { fs.writeFileSync(fixture, sourceBytes); }
 
       const merged = await downloadVideo({ url: localUrl.replace('.mp4', '.mpd'), directory: path.join(directory, 'merged'), quality: 720 });
       const streams = JSON.parse(await run(path.join(tools, 'ffprobe.exe'), ['-v', 'quiet', '-show_streams', '-of', 'json', merged.filePath])).streams;
       assert(streams.some(item => item.codec_type === 'video') && streams.some(item => item.codec_type === 'audio'), 'FFmpeg must merge separate DASH video/audio streams');
+      assert.equal(merged.name, 'fixture.mp4');
+      assert(!fs.readdirSync(path.join(directory, 'merged')).some(name => name.startsWith('.video-download-')));
       console.log('Real yt-dlp + FFmpeg local video download, title, no-overwrite and audio/video verification: OK');
     } else console.log('Portable tools absent: real download check skipped (npm run setup:video to enable)');
   } finally {

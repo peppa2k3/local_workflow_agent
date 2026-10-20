@@ -123,15 +123,15 @@ The Windows file picker runs asynchronously with its console hidden and a foregr
 
 Action `downloadVideo` chạy trong agent, không cần mở Chrome. Dashboard có nút **Phân tích URL / lấy tên** để đọc title/ID trước khi tải, hỗ trợ biến. Chọn profile để theo dõi tác vụ; workflow có bước trình duyệt vẫn cần extension.
 
-Ví dụ: `{"action":"downloadVideo","url":"https://www.youtube.com/watch?v=9qq_Fqp2rnM","directory":"D:\\Videos","quality":1080,"downloadTimeoutMs":1800000}`.
+Ví dụ: `{"action":"downloadVideo","url":"https://www.youtube.com/watch?v=9qq_Fqp2rnM","directory":"D:\\Videos","quality":"best","downloadTimeoutMs":1800000}`.
 
 - `url`: HTTP/HTTPS của một video; không playlist/live, không credentials trong URL.
 - `directory`: đường dẫn tuyệt đối, được tạo nếu chưa có.
-- `quality`: độ cao tối đa 360/480/720/1080/1440/2160; mặc định 1080. Chọn luồng tốt nhất trong giới hạn, FFmpeg ghép hình/tiếng khi cần. Container ghép ưu tiên MP4; video một luồng giữ định dạng nguồn, không ép chuyển mã. URL trực tiếp không cung cấp độ cao trong metadata vẫn tải định dạng có sẵn; giới hạn độ cao chỉ áp dụng khi nguồn có thông tin này. Thiếu định dạng phù hợp sẽ báo lỗi.
-- Tên file: `tiêu đề [ID].ext`, lấy metadata thật, xử lý ký tự Windows, giới hạn tiêu đề 150 byte. Không ghi đè file đã có cùng tên.
+- `quality`: mặc định `"best"`. Luôn chọn từ cao xuống thấp theo FPS → độ phân giải cạnh ngắn → bitrate → codec, không giới hạn 1080p/4K. Cùng FPS mới so độ phân giải; vì vậy 1080p60 được ưu tiên trước 4K30 theo chính sách FPS trước. Giá trị số 360/480/720/1080/1440/2160 trong JSON cũ vẫn được đọc nhưng không còn giới hạn chất lượng. Không cần sửa các kịch bản cũ. FFmpeg ghép hình/tiếng, không ép nén hoặc tăng FPS. Container ghép ưu tiên MP4; một luồng giữ định dạng nguồn.
+- Tên cuối: `tiêu đề.ext`, không tự gắn `[ID]`. Lấy metadata thật, xử lý ký tự Windows, giới hạn phần tiêu đề theo template 150B của yt-dlp. Trùng tên: `tiêu đề (2).ext`, `(3)`…; không ghi đè hoặc tái sử dụng bản cũ có thể chất lượng thấp. Mỗi lần chạy tải mới. ID vẫn có trong metadata và `{{download_id}}`.
 - Timeout tổng phân tích + tải: mặc định 30 phút, 1000–7200000 ms. Nút Dừng hủy cây tiến trình yt-dlp/FFmpeg; file .part hoặc file đã xong trước lúc dừng có thể còn lại.
 
-Status trả `download` gồm title, id, name, filePath, bytes; chỉ báo thành công sau hậu xử lý và xác nhận file tồn tại, khác rỗng. API phân tích: POST `/api/video/inspect` với `{"url":"https://..."}`, trả title/id/url/duration, timeout 60 giây.
+Status trả `download` gồm title, id, name, filePath, bytes, width, height, fps, videoCodec, audioCodec, bitrate; chỉ báo thành công sau hậu xử lý và xác nhận file tồn tại, khác rỗng. API phân tích: POST `/api/video/inspect` với `{"url":"https://..."}`, trả title/id/url/duration, timeout 60 giây.
 
 Dùng mẫu `scenarios/video-download.json`, sửa `video_url` và `thu_muc_tai`. Cài bằng `npm run setup:video`, xem [SETUP](SETUP.md). Không đọc cookies/profile Chrome. Website yêu cầu đăng nhập/chống bot có thể từ chối và lỗi được hiển thị.
 
@@ -168,3 +168,14 @@ Mỗi bước có trường `label` tùy chọn. Dashboard cho nhập “Tên b�
 Nút “Xóa kịch bản” xóa file JSON đã lưu sau hộp xác nhận, cập nhật danh sách và mở kịch bản còn lại; nếu hết thì tạo editor mới chưa lưu. Không xóa video tải về. API: DELETE `/api/scenarios/<name>`, kiểm tra tên như GET/PUT. Agent từ chối xóa kịch bản đang được workflow từ dashboard/API sử dụng ở bất kỳ profile nào; dừng các workflow đó trước. CLI chạy bản sao kịch bản trong bộ nhớ, không khóa file theo tên dashboard.
 
 Khởi động lại `node local-agent.js`, tải lại dashboard và Reload extension sau cập nhật. Agent công bố capability `download-references-v1` và `scenario-management-v1`.
+
+
+## Chất lượng và công bố file cuối (2026-10-20)
+
+yt-dlp dùng `bv*+ba/b` và `--format-sort-force --format-sort fps,res,vbr,abr,tbr,vcodec,acodec`. `res` là cạnh ngắn nên video dọc 1440×1920 không bị loại bởi bộ lọc height<=1080 cũ. Ưu tiên được áp dụng trong các định dạng nguồn trả về; URL trực tiếp chỉ có một định dạng thì giữ nguyên. Không thể tạo thêm chi tiết hoặc FPS thật ngoài nguồn. Bitrate giữa các codec khác nhau không là thước đo chất lượng tuyệt đối.
+
+Tải/ghép/FFprobe trong thư mục riêng `.video-download-…` dưới thư mục đã chọn. Chỉ sau khi xác nhận file cuối, agent mới công bố tên sạch bằng hard link độc quyền trên cùng filesystem (cần filesystem hỗ trợ hard link, ví dụ NTFS); trùng tên tăng số, kể cả hai profile chạy đồng thời. Thư mục làm việc riêng được dọn sau khi hoàn thành/lỗi/dừng. File hoàn chỉnh đã công bố có thể còn lại nếu dừng ngay sau công bố. Không tự đổi tên/xóa các clip cũ.
+
+Các tham chiếu download_file_path/download_file_name trỏ tới file đã công bố với tên sạch, sau đó mới mở URL/upload. Dashboard hiển thị độ phân giải, FPS và codec từ FFprobe khi hoàn tất. Nếu đổi bộ công cụ, FFprobe vẫn phải có sẵn. Khởi động lại agent để dùng capability `video-quality-best-v1`; Reload bridge 4.0.2 và dashboard.
+
+Tài liệu tùy chọn chính thức: https://github.com/yt-dlp/yt-dlp#sorting-formats

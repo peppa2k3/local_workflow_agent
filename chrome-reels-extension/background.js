@@ -95,6 +95,7 @@ async function waitForCompletion(job, step) {
 }
 
 async function execute(job, step) {
+  // The agent supplies the verified final title-only path after download publication.
   if (step.action === 'upload' && (!step.filePath || /\.(part|ytdl|tmp)$/i.test(step.filePath) || /\{\{\s*download_[a-z_]+\s*\}\}/.test(step.filePath))) throw new Error('Upload requires a resolved final video path from the agent');
   if (step.action === 'downloadVideo') throw new Error('downloadVideo runs in the local agent. Restart node local-agent.js.');
   if (step.action === 'openUrl') {

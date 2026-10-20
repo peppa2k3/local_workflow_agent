@@ -62,3 +62,10 @@ Kiểm chứng thực tế 2026-10-19: tải video HTTP cục bộ, tải lại 
 - Mẫu download-upload-reels: tải → mở Reels → tạo/upload → Tiếp → điền tiêu đề, dừng trước Đăng.
 - Dashboard quản lý xóa kịch bản (xác nhận, khóa khi workflow API đang chạy), đặt tên bước, mặc định Bước N.
 - Kiểm thử: điều phối pending/success/failure/Stop, cách ly kết quả và alias; API xóa, UI lưu tên/xóa/hủy; extension upload CDP trên Chrome riêng, công cụ tải/FFprobe thật trên fixture. Chưa tự chạy Facebook/profile đăng nhập.
+
+
+## 2026-10-20: chất lượng cao nhất, bỏ ID khỏi tên file
+
+- FPS cao trước, rồi độ phân giải theo cạnh ngắn, bitrate và codec; không cap 1080, cả với JSON numeric quality cũ.
+- Tên cuối chỉ tiêu đề và extension, trùng tên thêm số. Tải mới vào staging riêng, xác nhận media rồi publish độc quyền; không ghi đè bản cũ hoặc chạm dữ liệu Chrome.
+- Dashboard thể hiện chính sách và thông số media, bridge 4.0.2; cập nhật docs và test chọn format bằng yt-dlp thật cùng fixture download/merge/file hỏng/collision.

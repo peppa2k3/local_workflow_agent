@@ -47,7 +47,7 @@
     .spacer { flex: 1; }
     .icon { background: #25344e; color: #c6d2eb; width: 31px; height: 31px; border-radius: 7px; }
     .fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-    .fields label:first-child { grid-column: span 2; }
+    .fields label:first-of-type { grid-column: span 2; }
     .fields input { width: 100%; }
     .fields label { align-content: start; }
     .add { width: 100%; margin-top: 14px; border: 1px dashed #536b9a; background: #172541; color: #bed0ff; min-height: 46px; border-radius: 10px; font-weight: 700; }
@@ -63,7 +63,7 @@
     .variable-row label { flex: 1; min-width: 160px; }
     .variable-ref { width: 100%; margin-top: 3px; font-size: 12px; min-height: 30px; padding: 4px 8px; }
     .performance { margin: 12px 0; color: #acbbd6; font-size: 13px; }
-    @media (max-width: 700px) { .top { flex-direction: column; } .fields { grid-template-columns: 1fr; } .fields label:first-child { grid-column: auto; } .toolbar select, .toolbar input { width: 100%; } .toolbar label { flex: 1 1 100%; } }
+    @media (max-width: 700px) { .top { flex-direction: column; } .fields { grid-template-columns: 1fr; } .fields label:first-of-type { grid-column: auto; } .toolbar select, .toolbar input { width: 100%; } .toolbar label { flex: 1 1 100%; } }
   </style>
 </head>
 <body>
@@ -108,7 +108,7 @@
   </main>
   <script>
     const actions = {
-      downloadVideo: { label: 'Tải video (yt-dlp + FFmpeg)', fields: [['url', 'URL video (tự lấy tiêu đề làm tên file)', 'text'], ['directory', 'Thư mục lưu (đường dẫn tuyệt đối)', 'text'], ['quality', 'Độ cao tối đa (360/480/720/1080/1440/2160)', 'number'], ['downloadTimeoutMs', 'Timeout tải (ms)', 'number']] },
+      downloadVideo: { label: 'Tải video (yt-dlp + FFmpeg)', fields: [['url', 'URL video (tự lấy tiêu đề làm tên file)', 'text'], ['directory', 'Thư mục lưu (đường dẫn tuyệt đối)', 'text'], ['downloadTimeoutMs', 'Timeout tải (ms)', 'number']] },
       openUrl: { label: 'Mở URL', fields: [['url', 'URL', 'text']] },
       openFolder: { label: 'Mở thư mục', fields: [['path', 'Đường dẫn thư mục', 'text']] },
       wait: { label: 'Chờ thời gian', fields: [['ms', 'Mili giây', 'number']] },
@@ -131,7 +131,7 @@
     }
     for (const action of ['openUrl', 'click']) actions[action].fields.push(['settleMs', 'DOM ổn định (ms, mặc định 350; 0 để bỏ qua)', 'number']);
     const defaults = {
-      downloadVideo: { url: '', directory: 'D:\\Videos', quality: 1080, downloadTimeoutMs: 1800000 },
+      downloadVideo: { url: '', directory: 'D:\\Videos', quality: 'best', downloadTimeoutMs: 1800000 },
       openUrl: { url: 'https://www.facebook.com/' }, openFolder: { path: 'C:\\Users\\Administrator\\Downloads' },
       wait: { ms: 1000 }, waitFor: { locatorType: 'text', locator: 'Tiếp', timeoutMs: 5000 },
       click: { locatorType: 'role', role: 'button', locator: 'Tiếp', timeoutMs: 5000 },
@@ -304,11 +304,17 @@
               return expand(variables[key], [...seen, key]);
             });
             const info = await api('/api/video/inspect', 'POST', { url: expand(step.url) });
-            notice(`Tên video: ${info.title} · ID: ${info.id} · File: tiêu đề [ID].ext`);
+            notice(`Tên video: ${info.title} · ID: ${info.id} · File: tiêu đề.ext`);
           })));
           head.append(inspect);
         }
         const fields = document.createElement('div'); fields.className = 'fields';
+        if (step.action === 'downloadVideo') {
+          const hint = document.createElement('p');
+          hint.style.gridColumn = '1 / -1';
+          hint.textContent = 'Chất lượng cao nhất: ưu tiên FPS → độ phân giải → bitrate. Không giới hạn 1080p. Tên file chỉ gồm tiêu đề; trùng tên thêm (2), (3)…';
+          fields.append(hint);
+        }
         const nameField = field('Tên bước (tùy chọn)', step.label || '', 'text', value => {
           if (value.trim()) step.label = value; else delete step.label;
           stepTitle.textContent = value.trim() || `Bước ${index + 1}`;
@@ -387,7 +393,7 @@
       const targetProfile = selectedProfile;
       const agent = await api('/api/profiles');
       if (!agent.capabilities?.includes('variables-v1')) throw new Error('Agent đang chạy bản cũ. Dừng và chạy lại node local-agent.js, rồi tải lại dashboard.');
-      if (scenario.steps.some(step => step.action === 'downloadVideo') && !agent.capabilities?.includes('video-download-v1')) throw new Error('Khởi động lại agent để tải video.');
+      if (scenario.steps.some(step => step.action === 'downloadVideo') && !agent.capabilities?.includes('video-quality-best-v1')) throw new Error('Khởi động lại agent để tải video.');
       if (usesDownloadReferences() && !agent.capabilities?.includes('download-references-v1')) throw new Error('Khởi động lại agent để nối download với upload.');
       await save(); await api('/api/run', 'POST', { name: fileName, profile: targetProfile, uploadPath: $('uploadPath').value.trim() });
       notice(`Đã bắt đầu chạy trên ${targetProfile}.`);
@@ -411,7 +417,7 @@
         $('automationStatus').textContent = `CLI/API ${data.automationEnabled ? 'đã bật' : 'chưa bật (đặt LOCAL_AGENT_API_TOKEN rồi khởi động lại agent)'}. Chạy node local-agent.js --help; xem docs/SETUP.md. Biến truyền qua API chỉ áp dụng cho lượt chạy đó.`;
         referencesCompatible = data.capabilities?.includes('download-references-v1') === true;
         managementCompatible = data.capabilities?.includes('scenario-management-v1') === true;
-        videoCompatible = data.capabilities?.includes('video-download-v1') === true;
+        videoCompatible = data.capabilities?.includes('video-quality-best-v1') === true;
         agentCompatible = data.capabilities?.includes('variables-v1') === true;
         if (!data.profiles.some(item => item.directory === selectedProfile)) selectedProfile = data.defaultProfile;
         const select = $('profileSelect');
@@ -430,7 +436,7 @@
         $('stopBtn').disabled = !state.running;
         $('connectionDot').classList.toggle('ok', state.extensionConnected);
         $('connectionText').textContent = agentCompatible ? `${state.profile} · Extension ${state.extensionConnected ? 'đã kết nối' : 'chưa kết nối'}` : 'Agent cũ: dừng và chạy lại node local-agent.js';
-        $('progress').textContent = state.error || (state.running ? `Đang chạy bước ${state.index + 1}/${state.total}: ${state.stepLabel || state.action || 'đang chờ'}` : state.download ? `Đã lưu: ${state.download.filePath} (${state.download.title})` : 'Đang chờ lệnh');
+        $('progress').textContent = state.error || (state.running ? `Đang chạy bước ${state.index + 1}/${state.total}: ${state.stepLabel || state.action || 'đang chờ'}` : state.download ? `Đã lưu: ${state.download.filePath} · ${state.download.width || '?'}×${state.download.height || '?'} · ${Math.round(state.download.fps || 0)} fps · ${state.download.videoCodec || ''}` : 'Đang chờ lệnh');
         if (state.executionId) $('progress').textContent += ` · ${state.state} · runId: ${state.executionId}`;
         const perf = data.performance;
         $('performance').textContent = `${perf ? `Agent: CPU ${perf.cpuPercent}% · RAM ${perf.memoryMb} MB · Event loop p95 ${perf.eventLoopP95Ms} ms · ` : ''}Profile ${selectedProfile}: tổng ${((state.elapsedMs || 0) / 1000).toFixed(1)}s · bước hiện tại ${((state.stepElapsedMs || 0) / 1000).toFixed(1)}s${state.lastStepMs == null ? '' : ` · bước trước ${(state.lastStepMs / 1000).toFixed(1)}s`}`;
