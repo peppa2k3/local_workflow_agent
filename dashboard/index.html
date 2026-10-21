@@ -142,6 +142,23 @@
       scroll: { pixels: 650, times: 3, intervalMs: 2500 }
     };
     const $ = id => document.getElementById(id);
+    function setProperty(node, key, value) { if (node[key] !== value) node[key] = value; }
+    function setText(id, value) { setProperty($(id), 'textContent', value); }
+    let statusTimer, profilesRequest, statusFailures = 0, anyWorkflowRunning = false, statusClosed = false;
+    function fetchProfiles() {
+      if (!profilesRequest) profilesRequest = api('/api/profiles').finally(() => { profilesRequest = null; });
+      return profilesRequest;
+    }
+    function scheduleStatus(delay) {
+      clearTimeout(statusTimer);
+      if (document.hidden || statusClosed) return;
+      const next = delay ?? (statusFailures ? Math.min(60000, 5000 * 2 ** (statusFailures - 1)) : pickId !== null ? 1000 : anyWorkflowRunning ? 1500 : 10000);
+      statusTimer = setTimeout(() => { void updateStatus(); }, next);
+    }
+    function refreshStatus() {
+      clearTimeout(statusTimer);
+      if (!document.hidden && !statusClosed) void updateStatus();
+    }
     let fileName = 'facebook-reels';
     let scenario = { name: 'Mở và cuộn Facebook Reels', steps: [] };
     let pickTargetIndex = null;
@@ -155,13 +172,12 @@
     const usesDownloadReferences = () => /\{\{\s*download_(title|file_name|file_path|id)\s*\}\}/.test(JSON.stringify(scenario));
 
     function updateButtons() {
-      for (const id of ['loadBtn', 'newBtn', 'saveBtn', 'cloneBtn', 'deleteBtn', 'addBtn', 'addVariableBtn', 'scenarioSelect']) $(id).disabled = editorBusy;
-      $('runBtn').disabled = editorBusy || !agentCompatible || (!profileState?.extensionConnected && scenario.steps.some(step => !['wait', 'openFolder', 'downloadVideo'].includes(step.action))) || !profileState || profileState.running || (scenario.steps.some(step => step.action === 'downloadVideo') && !videoCompatible);
-      $('deleteBtn').disabled = editorBusy || !managementCompatible || !Array.from($('scenarioSelect').options).some(option => option.value === fileName);
-      if (usesDownloadReferences() && !referencesCompatible) $('runBtn').disabled = true;
-      $('steps').inert = editorBusy;
-      $('variables').inert = editorBusy;
-      $('scenarioName').disabled = editorBusy;
+      for (const id of ['loadBtn', 'newBtn', 'saveBtn', 'cloneBtn', 'addBtn', 'addVariableBtn', 'scenarioSelect']) setProperty($(id), 'disabled', editorBusy);
+      setProperty($('runBtn'), 'disabled', editorBusy || !agentCompatible || (!profileState?.extensionConnected && scenario.steps.some(step => !['wait', 'openFolder', 'downloadVideo'].includes(step.action))) || !profileState || profileState.running || (scenario.steps.some(step => step.action === 'downloadVideo') && !videoCompatible) || (usesDownloadReferences() && !referencesCompatible));
+      setProperty($('deleteBtn'), 'disabled', editorBusy || !managementCompatible || !Array.from($('scenarioSelect').options).some(option => option.value === fileName));
+      setProperty($('steps'), 'inert', editorBusy);
+      setProperty($('variables'), 'inert', editorBusy);
+      setProperty($('scenarioName'), 'disabled', editorBusy);
     }
     async function editTask(task) {
       if (editorBusy) return;
@@ -290,7 +306,7 @@
           const pick = document.createElement('button'); pick.className = 'btn ghost'; pick.textContent = '◎ Chọn trên trang';
           pick.addEventListener('click', () => handle(async () => {
             const result = await api('/api/pick/start', 'POST', { profile: selectedProfile });
-            pickTargetIndex = index; pickId = result.id;
+            pickTargetIndex = index; pickId = result.id; scheduleStatus(0);
             notice('Chuyển sang tab cần thao tác, đưa chuột lên phần tử và click. Nhấn Esc để hủy.');
           }));
           head.append(pick);
@@ -391,55 +407,63 @@
     $('saveBtn').onclick = () => handle(() => editTask(save));
     $('runBtn').onclick = () => handle(() => editTask(async () => {
       const targetProfile = selectedProfile;
-      const agent = await api('/api/profiles');
+      const agent = await fetchProfiles();
       if (!agent.capabilities?.includes('variables-v1')) throw new Error('Agent đang chạy bản cũ. Dừng và chạy lại node local-agent.js, rồi tải lại dashboard.');
       if (scenario.steps.some(step => step.action === 'downloadVideo') && !agent.capabilities?.includes('video-quality-best-v1')) throw new Error('Khởi động lại agent để tải video.');
       if (usesDownloadReferences() && !agent.capabilities?.includes('download-references-v1')) throw new Error('Khởi động lại agent để nối download với upload.');
       await save(); await api('/api/run', 'POST', { name: fileName, profile: targetProfile, uploadPath: $('uploadPath').value.trim() });
-      notice(`Đã bắt đầu chạy trên ${targetProfile}.`);
+      notice(`Đã bắt đầu chạy trên ${targetProfile}.`); refreshStatus();
     }));
     $('chooseRunFile').onclick = () => handle(() => chooseFile($('uploadPath')));
-    $('stopBtn').onclick = () => handle(async () => { await api('/api/stop', 'POST', { profile: selectedProfile }); notice(`Đã dừng ${selectedProfile}.`); });
-    $('openProfileBtn').onclick = () => handle(async () => { await api('/api/profiles/open', 'POST', { profile: selectedProfile }); notice(`Đã mở ${selectedProfile}.`); });
+    $('stopBtn').onclick = () => handle(async () => { await api('/api/stop', 'POST', { profile: selectedProfile }); notice(`Đã dừng ${selectedProfile}.`); refreshStatus(); });
+    $('openProfileBtn').onclick = () => handle(async () => { await api('/api/profiles/open', 'POST', { profile: selectedProfile }); notice(`Đã mở ${selectedProfile}.`); refreshStatus(); });
     $('profileSelect').onchange = () => {
       selectedProfile = $('profileSelect').value; localStorage.setItem('workflowProfile', selectedProfile);
       profileState = null; updateButtons();
-      pickId = null; pickTargetIndex = null; void updateStatus();
+      pickId = null; pickTargetIndex = null; refreshStatus();
     };
     $('addBtn').onclick = () => { scenario.steps.push({ action: 'click', ...defaults.click }); render(); };
     $('addVariableBtn').onclick = () => { variableDrafts.push({ name: '', value: '' }); renderVariables(); };
     $('scenarioName').oninput = event => { scenario.name = event.target.value; };
     async function updateStatus() {
-      if (statusPending) return;
-      statusPending = true;
+      if (statusPending || document.hidden || statusClosed) return;
+      clearTimeout(statusTimer); statusPending = true;
       try {
-        const data = await api('/api/profiles');
-        $('automationStatus').textContent = `CLI/API ${data.automationEnabled ? 'đã bật' : 'chưa bật (đặt LOCAL_AGENT_API_TOKEN rồi khởi động lại agent)'}. Chạy node local-agent.js --help; xem docs/SETUP.md. Biến truyền qua API chỉ áp dụng cho lượt chạy đó.`;
+        const data = await fetchProfiles();
+        statusFailures = 0;
+        anyWorkflowRunning = data.profiles.some(item => item.running);
+        setText('automationStatus', `CLI/API ${data.automationEnabled ? 'đã bật' : 'chưa bật (đặt LOCAL_AGENT_API_TOKEN rồi khởi động lại agent)'}. Chạy node local-agent.js --help; xem docs/SETUP.md. Biến truyền qua API chỉ áp dụng cho lượt chạy đó.`);
         referencesCompatible = data.capabilities?.includes('download-references-v1') === true;
         managementCompatible = data.capabilities?.includes('scenario-management-v1') === true;
         videoCompatible = data.capabilities?.includes('video-quality-best-v1') === true;
         agentCompatible = data.capabilities?.includes('variables-v1') === true;
         if (!data.profiles.some(item => item.directory === selectedProfile)) selectedProfile = data.defaultProfile;
         const select = $('profileSelect');
+        const profileMenuEmpty = !select.options.length;
         const signature = JSON.stringify(data.profiles.map(item => [item.directory, item.name, item.extensionConnected]));
-        if (select.dataset.signature !== signature) {
-          select.replaceChildren(...data.profiles.map(item => {
-            const option = document.createElement('option'); option.value = item.directory;
-            option.textContent = `${item.name} (${item.directory}) · ${item.extensionConnected ? 'đã kết nối' : 'offline'}`; return option;
-          }));
+        if (select.dataset.signature !== signature && (document.activeElement !== select || profileMenuEmpty)) {
+          const existing = new Map(Array.from(select.options, option => [option.value, option]));
+          const options = data.profiles.map(item => {
+            const option = existing.get(item.directory) || document.createElement('option');
+            setProperty(option, 'value', item.directory);
+            setProperty(option, 'textContent', `${item.name} (${item.directory}) · ${item.extensionConnected ? 'đã kết nối' : 'offline'}`);
+            return option;
+          });
+          if (options.length !== select.options.length || options.some((option, index) => select.options[index] !== option)) select.replaceChildren(...options);
           select.dataset.signature = signature;
         }
-        select.value = selectedProfile;
-        $('profilesSummary').textContent = data.profiles.map(item => `${item.name} (${item.directory}): ${item.error || (item.running ? `bước ${item.index + 1}/${item.total} · ${item.stepLabel || item.action}` : item.extensionConnected ? 'sẵn sàng' : 'chưa kết nối')}`).join(' | ');
+        if (document.activeElement !== select || profileMenuEmpty) setProperty(select, 'value', selectedProfile);
+        setText('profilesSummary', data.profiles.map(item => `${item.name} (${item.directory}): ${item.error || (item.running ? `bước ${item.index + 1}/${item.total} · ${item.stepLabel || item.action}` : item.extensionConnected ? 'sẵn sàng' : 'chưa kết nối')}`).join(' | '));
         const state = data.profiles.find(item => item.directory === selectedProfile);
         profileState = state; updateButtons();
-        $('stopBtn').disabled = !state.running;
-        $('connectionDot').classList.toggle('ok', state.extensionConnected);
-        $('connectionText').textContent = agentCompatible ? `${state.profile} · Extension ${state.extensionConnected ? 'đã kết nối' : 'chưa kết nối'}` : 'Agent cũ: dừng và chạy lại node local-agent.js';
-        $('progress').textContent = state.error || (state.running ? `Đang chạy bước ${state.index + 1}/${state.total}: ${state.stepLabel || state.action || 'đang chờ'}` : state.download ? `Đã lưu: ${state.download.filePath} · ${state.download.width || '?'}×${state.download.height || '?'} · ${Math.round(state.download.fps || 0)} fps · ${state.download.videoCodec || ''}` : 'Đang chờ lệnh');
-        if (state.executionId) $('progress').textContent += ` · ${state.state} · runId: ${state.executionId}`;
+        setProperty($('stopBtn'), 'disabled', !state.running);
+        if ($('connectionDot').classList.contains('ok') !== !!state.extensionConnected) $('connectionDot').classList.toggle('ok', !!state.extensionConnected);
+        setText('connectionText', agentCompatible ? `${state.profile} · Extension ${state.extensionConnected ? 'đã kết nối' : 'chưa kết nối'}` : 'Agent cũ: dừng và chạy lại node local-agent.js');
+        let progress = state.error || (state.running ? `Đang chạy bước ${state.index + 1}/${state.total}: ${state.stepLabel || state.action || 'đang chờ'}` : state.download ? `Đã lưu: ${state.download.filePath} · ${state.download.width || '?'}×${state.download.height || '?'} · ${Math.round(state.download.fps || 0)} fps · ${state.download.videoCodec || ''}` : 'Đang chờ lệnh');
+        if (state.executionId) progress += ` · ${state.state} · runId: ${state.executionId}`;
+        setText('progress', progress);
         const perf = data.performance;
-        $('performance').textContent = `${perf ? `Agent: CPU ${perf.cpuPercent}% · RAM ${perf.memoryMb} MB · Event loop p95 ${perf.eventLoopP95Ms} ms · ` : ''}Profile ${selectedProfile}: tổng ${((state.elapsedMs || 0) / 1000).toFixed(1)}s · bước hiện tại ${((state.stepElapsedMs || 0) / 1000).toFixed(1)}s${state.lastStepMs == null ? '' : ` · bước trước ${(state.lastStepMs / 1000).toFixed(1)}s`}`;
+        setText('performance', `${perf ? `Agent: CPU ${perf.cpuPercent}% · RAM ${perf.memoryMb} MB · Event loop p95 ${perf.eventLoopP95Ms} ms · ` : ''}Profile ${selectedProfile}: tổng ${((state.elapsedMs || 0) / 1000).toFixed(1)}s · bước hiện tại ${((state.stepElapsedMs || 0) / 1000).toFixed(1)}s${state.lastStepMs == null ? '' : ` · bước trước ${(state.lastStepMs / 1000).toFixed(1)}s`}`);
         if (pickId !== null) {
           const picked = await api(`/api/pick/status?profile=${encodeURIComponent(selectedProfile)}`);
           if (picked.id === pickId && !picked.active) {
@@ -450,8 +474,10 @@
             pickId = null; pickTargetIndex = null;
           }
         }
-      } catch { $('connectionText').textContent = 'Agent chưa chạy'; profileState = null; updateButtons(); }
-      finally { statusPending = false; }
+      } catch {
+        statusFailures++; setText('connectionText', 'Agent chưa chạy'); profileState = null; updateButtons();
+      }
+      finally { statusPending = false; scheduleStatus(); }
     }
     handle(() => editTask(async () => {
       await refreshNames();
@@ -459,7 +485,13 @@
       if (names.length) await load(names.includes(fileName) ? fileName : names[0]);
       else { fileName = 'my-workflow'; scenario = { name: 'Kịch bản mới', steps: [{ action: 'openUrl', ...defaults.openUrl }] }; $('fileName').value = fileName; render(); }
     }));
-    updateStatus(); setInterval(updateStatus, 1500);
+    document.addEventListener('visibilitychange', () => {
+      clearTimeout(statusTimer);
+      if (!document.hidden) refreshStatus();
+    });
+    window.addEventListener('pagehide', () => { statusClosed = true; clearTimeout(statusTimer); });
+    window.addEventListener('pageshow', event => { if (event.persisted) { statusClosed = false; refreshStatus(); } });
+    refreshStatus();
   </script>
 </body>
 </html>

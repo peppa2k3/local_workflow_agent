@@ -179,3 +179,16 @@ Tải/ghép/FFprobe trong thư mục riêng `.video-download-…` dưới thư m
 Các tham chiếu download_file_path/download_file_name trỏ tới file đã công bố với tên sạch, sau đó mới mở URL/upload. Dashboard hiển thị độ phân giải, FPS và codec từ FFprobe khi hoàn tất. Nếu đổi bộ công cụ, FFprobe vẫn phải có sẵn. Khởi động lại agent để dùng capability `video-quality-best-v1`; Reload bridge 4.0.2 và dashboard.
 
 Tài liệu tùy chọn chính thức: https://github.com/yt-dlp/yt-dlp#sorting-formats
+
+
+## Cập nhật trạng thái dashboard và hiệu suất (2026-10-21)
+
+Dashboard dùng một timer nối tiếp sau khi request hoàn tất, không dùng interval gọi liên tục. Khi không chạy workflow: thăm dò mỗi 10 giây (khoảng 6 lần/phút, trước đây 40); có workflow đang chạy: 1,5 giây; đang chọn phần tử: 1 giây. Tab nền dừng timer; trở lại tab cập nhật ngay. Chuyển profile, Chạy/Dừng hoặc mở profile yêu cầu cập nhật ngay. Các tab dashboard khác không hiển thị sẽ không tiếp tục thăm dò.
+
+Request profiles đang chờ được dùng chung cho thăm dò và kiểm tra trước Chạy. Mỗi tab chỉ có một request profiles đang chờ. Agent lỗi: thử lại sau 5, 10, 20, 40 rồi tối đa 60 giây; thành công trở về nhịp bình thường. Request đã bắt đầu trước khi tab bị ẩn có thể hoàn tất; không tạo chuỗi mới khi còn ẩn.
+
+Chỉ cập nhật text/thuộc tính DOM khi giá trị đổi. Không dựng lại editor trong vòng thăm dò. Profile options được tái sử dụng và không sửa dropdown profile đang focus. CPU/RAM/event loop vẫn hiển thị theo lần cập nhật, không cần request riêng.
+
+Agent nạp metadata Chrome Local State bất đồng bộ trước khi lắng nghe; sau đó handler dùng cache RAM, làm mới bất đồng bộ khi cache hết hạn 30 giây. Các yêu cầu đồng thời dùng chung một lượt đọc. Lỗi đọc tạm trong lúc Chrome ghi metadata giữ snapshot hợp lệ trước đó. Profile mới/đổi tên có thể xuất hiện sau lượt làm mới tiếp theo. Không đọc cookie hoặc sử dụng profile đăng nhập để kiểm thử.
+
+Áp dụng: khởi động lại `node local-agent.js` và tải lại dashboard. Endpoint `/api/profiles`, schema và extension vẫn tương thích.

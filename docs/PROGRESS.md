@@ -1,6 +1,6 @@
 # Tiến độ phát triển
 
-Cập nhật: 2026-10-20 (Asia/Bangkok).
+Cập nhật: 2026-10-21 (Asia/Bangkok).
 
 ## 2026-10-20: CLI và API chạy tự động
 
@@ -69,3 +69,11 @@ Kiểm chứng thực tế 2026-10-19: tải video HTTP cục bộ, tải lại 
 - FPS cao trước, rồi độ phân giải theo cạnh ngắn, bitrate và codec; không cap 1080, cả với JSON numeric quality cũ.
 - Tên cuối chỉ tiêu đề và extension, trùng tên thêm số. Tải mới vào staging riêng, xác nhận media rồi publish độc quyền; không ghi đè bản cũ hoặc chạm dữ liệu Chrome.
 - Dashboard thể hiện chính sách và thông số media, bridge 4.0.2; cập nhật docs và test chọn format bằng yt-dlp thật cùng fixture download/merge/file hỏng/collision.
+
+
+## 2026-10-21: hiệu suất dashboard và profiles
+
+- Giảm request idle từ 40 xuống 6/phút, dừng khi tab nền; giữ nhịp nhanh khi workflow/picker chạy. Một request profiles đang chờ, dùng chung với preflight Chạy, backoff khi mất agent.
+- DOM cập nhật có so sánh, không ghi lại text không đổi hoặc dựng lại profile dropdown đang focus; giữ input/editor.
+- Metadata Chrome được đọc bất đồng bộ với cache 30s, dedupe refresh, giữ dữ liệu khi Chrome đang ghi. Chặn khởi động server tới khi lượt nạp đầu hoàn tất để giữ profile discovery đúng.
+- Test mới mô phỏng thời gian trên Chrome tách biệt: budget request, hidden/resume, request chậm, Chạy/Dừng, focus/DOM, backoff và cache async.

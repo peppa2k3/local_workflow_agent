@@ -84,3 +84,6 @@ Nguồn: https://github.com/yt-dlp/yt-dlp và https://ffmpeg.org/download.html
 
 
 Để nối tải và upload, chọn `download-upload-reels`, sửa biến URL/thư mục/trang Reels và chọn profile có extension kết nối. Khởi động lại agent, Reload bridge 4.0.1 rồi tải lại dashboard. Agent kiểm tra file cuối bằng FFprobe trước khi chạy tiếp; nếu dùng bộ công cụ tùy chỉnh, đặt FFprobe cạnh FFmpeg hoặc dùng `FFPROBE_PATH`. Xem phần runtime references trong [SCENARIOS](SCENARIOS.md).
+
+
+Bản sửa hiệu suất dashboard 2026-10-21: chạy lại agent và tải lại dashboard. Khi rảnh, `/api/profiles` cập nhật mỗi 10 giây; tab nền tạm ngừng, trở lại sẽ cập nhật ngay. Khi chạy workflow vẫn cập nhật 1,5 giây. Chi tiết tại [SCENARIOS](SCENARIOS.md).

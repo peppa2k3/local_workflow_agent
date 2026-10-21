@@ -50,3 +50,10 @@ Step label tùy chọn, mặc định Bước N. DELETE scenario kiểm tra tên
 ## Chất lượng cao nhất và tên sạch (2026-10-20)
 
 downloadVideo mặc định best với sort-force FPS → res (cạnh ngắn, hỗ trợ dọc/ngang) → bitrate → codec, không cap height. Numeric quality cũ chỉ được chấp nhận về cú pháp, không còn cap. Tải mới trong mkdtemp dưới output directory, xác nhận after_move/stat/FFprobe rồi publish hard link độc quyền tên tiêu đề.ext; collision tăng số, không dùng lại file có sẵn. Chỉ dọn đúng staging của lượt chạy sau kiểm tra parent/prefix. Runtime file references lấy đường dẫn cuối, giữ gate verified. Dashboard thêm thông số media; video-quality-best-v1 chặn agent cũ.
+
+
+## Giảm polling và cập nhật DOM (2026-10-21)
+
+Dashboard adaptive polling: idle 10s, running 1500ms, picker 1000ms; hidden/pagehide pause, visibility resume, request chung cho Run preflight và status, lỗi backoff tối đa 60s. Chỉ ghi DOM khi đổi, giữ editor/focus và tái dùng profile options. Chạy/Dừng/switch cập nhật ngay, không đổi protocol hành động.
+
+Server createProfileCache khởi tạo bằng readFile async rồi listen; get trả snapshot RAM, stale 30s trigger một async refresh dùng chung. Giữ snapshot cũ khi metadata tạm lỗi. listProfiles sync vẫn dành cho caller cũ, không dùng trong hot path server. Test dashboard-performance dùng fake clock trên Chrome riêng để đo request/DOM/focus/backoff và test cache đọc chậm.

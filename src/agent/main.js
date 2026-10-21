@@ -8,7 +8,7 @@ const { randomBytes, timingSafeEqual } = require('crypto');
 const { port, scenariosDir, dashboardPath, chromePath, profile, userDataDir } = require('./config');
 const { createScenarioStore } = require('./scenario-store');
 const { chooseFile } = require('./file-picker');
-const { listProfiles } = require('./profiles');
+const { createProfileCache } = require('./profiles');
 const { inspectVideo, downloadVideo } = require('./video-download');
 const { createWorkflows } = require('./workflows');
 const { createAutomationApi } = require('./automation-api');
@@ -19,13 +19,9 @@ eventLoop.enable();
 let previousCpu = process.cpuUsage(), previousCpuAt = process.hrtime.bigint();
 let performance = { cpuPercent: 0, eventLoopP95Ms: 0, memoryMb: 0 };
 let filePickerPending = false;
-let profileCache, profileCacheAt = 0;
-const profiles = () => {
-  if (!profileCache || Date.now() - profileCacheAt > 2000) {
-    profileCache = listProfiles(userDataDir, profile); profileCacheAt = Date.now();
-  }
-  return profileCache;
-};
+// Request handlers only read an in-memory snapshot; metadata I/O is asynchronous.
+const profileCache = createProfileCache(userDataDir, profile);
+const profiles = profileCache.get;
 const workflows = createWorkflows({ scenarios, defaultProfile: profile, profiles, downloadVideo, openFolder(folderPath) {
   const folder = path.resolve(folderPath);
   if (!fs.existsSync(folder) || !fs.statSync(folder).isDirectory()) throw new Error(`Folder does not exist: ${folder}`);
@@ -176,12 +172,12 @@ const performanceTimer = setInterval(() => {
   previousCpu = cpu; previousCpuAt = now; eventLoop.reset();
 }, 2000);
 performanceTimer.unref();
-server.listen(port, '127.0.0.1', () => {
+profileCache.ready.then(() => server.listen(port, '127.0.0.1', () => {
   console.log(`Local agent ready. Default Chrome profile: ${profile}.`);
   console.log(`Dashboard: http://127.0.0.1:${port}`);
   console.log('Commands: run <scenario.json> [--profile "Profile 1"] [--upload "path"] | stop [profile] | status | exit');
   terminal.prompt();
-});
+}));
 server.on('error', error => {
   console.error(error.code === 'EADDRINUSE' ? `Port ${port} is already in use. Exit the previous local agent, then run this version again.` : error);
   process.exitCode = 1; terminal.close();
