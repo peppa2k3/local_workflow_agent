@@ -2,6 +2,13 @@
 
 Cập nhật: 2026-10-22 (Asia/Bangkok).
 
+## 2026-10-22: khôi phục agent đang chạy còn giữ lỗi DNS cũ
+
+- Check:mongo thành công nhưng tiến trình dashboard chưa nhận bản sửa DNS, vẫn ECONNREFUSED với 13 metadata đang chờ; có workflow download đang chạy.
+- Áp dụng DNS đã kiểm chứng cho riêng process hiện tại và reconnect qua API, giữ nguyên workflow. Phiên debug tạm đã đóng.
+- Xác minh trực tiếp status và summary HTTP 200: connected=true, database team_content, pending=0, error rỗng; workflow tiếp tục running. Không thay URI/mật khẩu hay tạo dữ liệu thử.
+- Không thay đổi JavaScript; cấu hình và bản sửa cho lần khởi động tiếp theo đã có ở .env và commit 17b9161.
+
 ## 2026-10-22: xác minh Atlas thật và sửa DNS SRV
 
 - Sau khi người dùng điền .env, xác nhận cấu hình được nạp đúng nhưng Node dùng DNS loopback gây querySrv ECONNREFUSED. Windows vẫn giải được SRV/TXT.
