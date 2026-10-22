@@ -12,14 +12,14 @@ const envModule = path.resolve(__dirname, '../src/agent/env.js');
   try {
     const file = path.join(temp, '.env'), env = { ...process.env };
     for (const key of Object.keys(env)) if (/^(MONGODB_|LOCAL_AGENT_|CHROME_)/i.test(key)) delete env[key];
-    fs.writeFileSync(file, 'MONGODB_URI="mongodb+srv://fixture:encoded%23password@cluster.example/?retryWrites=true&w=majority"\nMONGODB_DATABASE=team_content\nENV_FIXTURE="Tiếng Việt # quoted"\n');
+    fs.writeFileSync(file, 'MONGODB_URI="mongodb+srv://fixture:encoded%23password@cluster.example/?retryWrites=true&w=majority"\nMONGODB_DATABASE=team_content\nMONGODB_DNS_SERVERS=192.0.2.53\nENV_FIXTURE="Tiếng Việt # quoted"\n');
     const parseScript = `const assert=require('node:assert/strict'),fs=require('node:fs');
       const {loadProjectEnv,mongoSettings}=require(process.argv[2]);
       assert.equal(loadProjectEnv(process.argv[1]),true);
       assert.equal(process.env.ENV_FIXTURE,'Tiếng Việt # quoted');
-      let config=mongoSettings(); assert.equal(config.database,'team_content'); assert(config.uri.includes('encoded%23password'));
+      let config=mongoSettings(); assert.equal(config.database,'team_content'); assert(config.uri.includes('encoded%23password')); assert.equal(config.dnsServers,'192.0.2.53');
       fs.writeFileSync(process.argv[1],'MONGODB_URI="mongodb://fixture.example:27017"\\nMONGODB_DATABASE=changed_database\\n');
-      config=mongoSettings(); assert.equal(config.database,'changed_database'); assert.equal(config.uri,'mongodb://fixture.example:27017');
+      config=mongoSettings(); assert.equal(config.database,'changed_database'); assert.equal(config.uri,'mongodb://fixture.example:27017'); assert.equal(config.dnsServers,'');
       console.log('Environment file load and reread OK');`;
     let result = spawnSync(process.execPath, ['-e', parseScript, file, envModule], { env, cwd: os.tmpdir(), encoding: 'utf8' });
     assert.equal(result.status, 0, result.stderr);

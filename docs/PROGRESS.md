@@ -2,6 +2,13 @@
 
 Cập nhật: 2026-10-22 (Asia/Bangkok).
 
+## 2026-10-22: xác minh Atlas thật và sửa DNS SRV
+
+- Sau khi người dùng điền .env, xác nhận cấu hình được nạp đúng nhưng Node dùng DNS loopback gây querySrv ECONNREFUSED. Windows vẫn giải được SRV/TXT.
+- Thêm MONGODB_DNS_SERVERS cho resolver của process, dùng chung agent và check:mongo; không thay đổi network Windows. Đã lưu DNS hoạt động từ cấu hình máy vào .env local, giữ nguyên URI/mật khẩu.
+- Check:mongo đã kết nối thật team_content; đọc pages/assets và xác nhận quyền insert/update qua connectionStatus, không tạo dữ liệu thử. URI và credentials không được in ra hoặc commit.
+- Test DNS apply/restore/validation/error classification và .env reload; npm test và node --check.
+
 ## 2026-10-22: .env, MongoDB Atlas và giao diện nội dung dùng chung
 
 - Nạp .env trước server/CLI, giữ ưu tiên biến shell; đọc lại URI/database qua giao diện. Thêm .env.example, ignore file cấu hình thật, script check:mongo chỉ ping và báo lỗi an toàn.

@@ -1,4 +1,5 @@
 const { MongoClient } = require('mongodb');
+const { configureMongoDns } = require('./mongo-dns');
 
 function bsonDates(value, key = '') {
   if (value === null) return null;
@@ -10,13 +11,15 @@ function bsonDates(value, key = '') {
 }
 function safeMongoError(error) {
   const code = String(error.code || error.name || 'unavailable').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 64);
-  const help = ['18', '8000'].includes(code) ? 'Kiểm tra database user và mật khẩu Atlas.'
+  const help = /query(?:Srv|Txt)/i.test(error.syscall || '') ? 'Lỗi DNS SRV/TXT. Kiểm tra MONGODB_DNS_SERVERS trong .env; agent chưa tới bước xác thực Atlas.'
+    : code === 'INVALID_DNS_SERVERS' ? 'MONGODB_DNS_SERVERS phải là các IP DNS, phân cách bằng dấu phẩy.'
+    : code === '18' || (code === '8000' && /auth|password|credentials/i.test(error.message || '')) ? 'Kiểm tra database user và mật khẩu Atlas.'
     : /ServerSelection|ENOTFOUND|ETIME|ECONN|EAI_/.test(code) ? 'Kiểm tra URI, mạng và IP Access List trên Atlas.'
     : code === '11000' ? 'Tên/nền tảng page đã tồn tại. Làm mới và chọn page có sẵn.' : 'Dữ liệu local được giữ để đồng bộ lại.';
   return `MongoDB: ${code}. ${help}`;
 }
 function createMongoSync(store, options = {}) {
-  const settings = options.settings || (() => ({ uri: options.uri ?? process.env.MONGODB_URI, database: options.database || process.env.MONGODB_DATABASE || 'team_content' }));
+  const settings = options.settings || (() => ({ uri: options.uri ?? process.env.MONGODB_URI, database: options.database || process.env.MONGODB_DATABASE || 'team_content', dnsServers: options.dnsServers ?? process.env.MONGODB_DNS_SERVERS ?? '' }));
   let config, client = options.client, pending, indexed = false, resetting = false, closed = false;
   let state = { enabled: false, connected: false, database: 'team_content', error: '', lastCheckedAt: null, lastSyncedAt: null };
   const runVersions = new Map();
@@ -32,8 +35,11 @@ function createMongoSync(store, options = {}) {
   function database() {
     if (resetting || closed) throw Object.assign(new Error('MongoDB connection is restarting'), { status: 503 });
     if (!config || !state.enabled) throw Object.assign(new Error(state.error || 'Chưa có MONGODB_URI. Điền .env rồi bấm Kết nối lại.'), { status: 503 });
-    client ||= new MongoClient(config.uri, { appName: 'local-workflow-agent', serverSelectionTimeoutMS: 5000,
-      connectTimeoutMS: 5000, socketTimeoutMS: 10000, maxPoolSize: 10 });
+    if (!client) {
+      update(configureMongoDns(config.dnsServers || ''));
+      client = new MongoClient(config.uri, { appName: 'local-workflow-agent', serverSelectionTimeoutMS: 5000,
+        connectTimeoutMS: 5000, socketTimeoutMS: 10000, maxPoolSize: 10 });
+    }
     return client.db(config.database);
   }
   async function request(operation) {

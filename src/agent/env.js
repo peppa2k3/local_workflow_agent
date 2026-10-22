@@ -17,9 +17,9 @@ function mongoSettings() {
   try { values = parseEnv(fs.readFileSync(envFile, 'utf8')); }
   catch (error) { if (error.code !== 'ENOENT') throw new Error('Cannot read .env MongoDB settings'); }
   // Re-read only Mongo settings; values inherited from the shell retain priority.
-  for (const key of ['MONGODB_URI', 'MONGODB_DATABASE']) if (!inherited.has(key)) {
+  for (const key of ['MONGODB_URI', 'MONGODB_DATABASE', 'MONGODB_DNS_SERVERS']) if (!inherited.has(key)) {
     if (Object.hasOwn(values, key)) process.env[key] = values[key]; else delete process.env[key];
   }
-  return { uri: process.env.MONGODB_URI || '', database: process.env.MONGODB_DATABASE || 'team_content' };
+  return { uri: process.env.MONGODB_URI || '', database: process.env.MONGODB_DATABASE || 'team_content', dnsServers: process.env.MONGODB_DNS_SERVERS || '' };
 }
 module.exports = { loadProjectEnv, mongoSettings };

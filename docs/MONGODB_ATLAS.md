@@ -19,7 +19,9 @@ node local-agent.js
 
 `check:mongo` chỉ ping database bằng kết nối thật, không tạo dữ liệu thử. Thành công in `connected: true` và tên database; thiếu URI hoặc lỗi kết nối báo chưa thành công với thông báo đã bỏ thông tin nhạy cảm.
 
-Biến đã được đặt trong PowerShell/process có ưu tiên cao hơn `.env`, kể cả `MONGODB_URI` đang là chuỗi rỗng. Nếu đổi URI trong `.env`, bấm **Đọc lại .env / kết nối** trên trang quản lý để nạp lại hai biến MongoDB và mở kết nối mới. Các cấu hình khác như token/cổng vẫn cần restart agent. Có thể chọn file cấu hình khác bằng `LOCAL_AGENT_ENV_FILE`.
+Biến đã được đặt trong PowerShell/process có ưu tiên cao hơn `.env`, kể cả `MONGODB_URI` đang là chuỗi rỗng. Nếu đổi URI/database/DNS trong `.env`, bấm **Đọc lại .env / kết nối** trên trang quản lý để nạp lại cấu hình MongoDB và mở kết nối mới. Các cấu hình khác như token/cổng vẫn cần restart agent. Có thể chọn file cấu hình khác bằng `LOCAL_AGENT_ENV_FILE`.
+
+Nếu Node.js báo `querySrv ECONNREFUSED` trong khi Windows vẫn tra SRV thành công, có thể đặt `MONGODB_DNS_SERVERS` thành IP DNS đang hoạt động của máy, phân cách bằng dấu phẩy nếu có nhiều IP. Agent và check:mongo áp dụng cấu hình này cho resolver của process Node; không đổi DNS Windows và không đổi URI/mật khẩu. Giá trị rỗng dùng DNS mặc định ban đầu của process. Chỉ nhận IP (IPv4/IPv6), không nhận URI/hostname. Chi tiết về [DNS SRV Atlas](https://www.mongodb.com/docs/atlas/troubleshoot-connection/#connection-refused-using-srv-connection-string) và [dns.setServers của Node](https://nodejs.org/api/dns.html#dnssetserversservers).
 
 ## Giao diện web
 

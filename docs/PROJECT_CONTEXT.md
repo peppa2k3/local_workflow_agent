@@ -2,7 +2,9 @@
 
 ## MongoDB Atlas và kho nội dung web (2026-10-22)
 
-Entry local-agent.js nạp .env tại project root trước CLI/server; biến shell có ưu tiên cao hơn file. MongoDB mặc định team_content; mongoSettings chỉ nạp lại URI/database khi người dùng bấm reconnect. Không đưa URI vào HTTP/log. npm run check:mongo ping thật, không tạo dữ liệu thử. .env bị ignore Git; chỉ commit .env.example.
+Entry local-agent.js nạp .env tại project root trước CLI/server; biến shell có ưu tiên cao hơn file. MongoDB mặc định team_content; mongoSettings chỉ nạp lại URI/database/DNS khi người dùng bấm reconnect. Không đưa URI vào HTTP/log. npm run check:mongo ping thật, không tạo dữ liệu thử. .env bị ignore Git; chỉ commit .env.example.
+
+Kiểm chứng Atlas thật sau khi người dùng điền URI: Node mặc định dùng DNS loopback và lỗi querySrv ECONNREFUSED, Windows DNS tra SRV/TXT thành công. Thêm MONGODB_DNS_SERVERS tùy chọn, chỉ đổi resolver của process Node (không đổi Windows), dùng chung cho agent và check:mongo. .env local đã điền DNS hoạt động lấy từ cấu hình Windows; URI/mật khẩu giữ nguyên. Kết nối team_content, đọc dữ liệu và quyền insert/update đã xác nhận bằng server, không ghi dữ liệu thử.
 
 Trang /content và /api/content/* dùng cùng token/session dashboard, truy vấn live catalog có projection/tìm kiếm/phân trang. Quản lý page và sửa publication giữ nguyên ID, patch trường đã biết, kiểm tra updated_at để tránh đè cập nhật service khác. Hiển thị ngày giờ Asia/Bangkok; BSON Date UTC trong database. Không upload video bytes vào Atlas. Extension 4.2.0 kiểm tra metadata page đã resolve; dashboard chọn page active từ MongoDB, agent xác minh lại trước upload. Page local trùng key được nhận UUID chung và remap publication/event/run trước đồng bộ. Downloads cũng đồng bộ machine/source/hash/path/time để các service đọc chung. Xem docs/MONGODB_ATLAS.md.
 
