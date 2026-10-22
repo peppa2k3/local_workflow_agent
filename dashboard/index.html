@@ -105,6 +105,10 @@
       <div class="bottom"><div class="message" id="message" role="status"></div><span id="stepCount"></span></div>
     </section>
     <div class="progress"><strong>Trạng thái:</strong> <span id="progress">Chưa chạy</span></div>
+    <div id="runSteps" class="profiles-summary" style="white-space: pre-wrap" aria-live="polite"></div>
+    <p id="storageStatus"></p>
+    <button class="btn ghost" id="historyBtn" type="button">Xem / làm mới lịch sử profile</button>
+    <div id="runHistory" class="profiles-summary"></div>
   </main>
   <script>
     const actions = {
@@ -130,6 +134,14 @@
       );
     }
     for (const action of ['openUrl', 'click']) actions[action].fields.push(['settleMs', 'DOM ổn định (ms, mặc định 350; 0 để bỏ qua)', 'number']);
+    actions.upload.fields.push(
+      ['pageId', 'UUID page trong Content Manager (nếu có)', 'text'],
+      ['pageName', 'Tên page đích (khuyến nghị)', 'text'],
+      ['pageUrl', 'URL page đích (nên dùng biến)', 'text'],
+      ['platform', 'Nền tảng (ví dụ Facebook)', 'text'],
+      ['publicationDesc', 'Mô tả lưu trong kho nội dung', 'text'],
+      ['folderTag', 'Tag thư mục (mặc định automation)', 'text']
+    );
     const defaults = {
       downloadVideo: { url: '', directory: 'D:\\Videos', quality: 'best', downloadTimeoutMs: 1800000 },
       openUrl: { url: 'https://www.facebook.com/' }, openFolder: { path: 'C:\\Users\\Administrator\\Downloads' },
@@ -144,6 +156,24 @@
     const $ = id => document.getElementById(id);
     function setProperty(node, key, value) { if (node[key] !== value) node[key] = value; }
     function setText(id, value) { setProperty($(id), 'textContent', value); }
+    const stepStates = { pending: 'Chưa chạy', running: 'Đang chạy', succeeded: 'Thành công', failed: 'Thất bại', cancelled: 'Đã dừng', interrupted: 'Gián đoạn' };
+    function stepSummary(step) {
+      const upload = step.upload;
+      return `${step.number}. ${step.label} · ${stepStates[step.state] || step.state}${step.reused ? ' · Đã tải trước đó, dùng file đã lưu' : ''}${step.file_path ? ' · ' + step.file_path : ''}${upload ? ' · Upload: ' + (upload.page_url || 'chưa rõ page') + ' · ' + new Date(upload.uploaded_at).toLocaleString('vi-VN') : ''}${step.error ? ' · ' + step.error : ''}`;
+    }
+    $('historyBtn').onclick = () => handle(async () => {
+      const profile = selectedProfile;
+      const data = await api('/api/history?profile=' + encodeURIComponent(profile));
+      if (profile !== selectedProfile) return;
+      const rows = (data.runs || []).map(run => {
+        const details = document.createElement('details'), summary = document.createElement('summary'), body = document.createElement('div');
+        summary.textContent = `${run.scenario || 'Kịch bản'} · ${run.state} · ${new Date(run.startedAt).toLocaleString('vi-VN')} · ${run.total} bước${run.stoppedAtStep ? ' · Dừng tại bước ' + run.stoppedAtStep : ''} · ${run.runId}`;
+        body.style.whiteSpace = 'pre-wrap'; body.textContent = (run.steps || []).map(stepSummary).join('\n') + (run.error ? '\n' + run.error : '');
+        details.append(summary, body); return details;
+      });
+      $('runHistory').replaceChildren(...rows);
+      if (!rows.length) $('runHistory').textContent = 'Chưa có lịch sử cho profile này.';
+    });
     let statusTimer, profilesRequest, statusFailures = 0, anyWorkflowRunning = false, statusClosed = false;
     function fetchProfiles() {
       if (!profilesRequest) profilesRequest = api('/api/profiles').finally(() => { profilesRequest = null; });
@@ -331,6 +361,11 @@
           hint.textContent = 'Chất lượng cao nhất: ưu tiên FPS → độ phân giải → bitrate. Không giới hạn 1080p. Tên file chỉ gồm tiêu đề; trùng tên thêm (2), (3)…';
           fields.append(hint);
         }
+        if (step.action === 'upload') {
+          const hint = document.createElement('p'); hint.style.gridColumn = '1 / -1';
+          hint.textContent = 'Điền tên/URL page đích để lưu đúng page khi website mở màn hình soạn bài. UUID là ID trong Content Manager. Thời gian upload được lưu riêng; chọn file xong chưa xác nhận đã Đăng.';
+          fields.append(hint);
+        }
         const nameField = field('Tên bước (tùy chọn)', step.label || '', 'text', value => {
           if (value.trim()) step.label = value; else delete step.label;
           stepTitle.textContent = value.trim() || `Bước ${index + 1}`;
@@ -419,6 +454,7 @@
     $('openProfileBtn').onclick = () => handle(async () => { await api('/api/profiles/open', 'POST', { profile: selectedProfile }); notice(`Đã mở ${selectedProfile}.`); refreshStatus(); });
     $('profileSelect').onchange = () => {
       selectedProfile = $('profileSelect').value; localStorage.setItem('workflowProfile', selectedProfile);
+      $('runHistory').replaceChildren();
       profileState = null; updateButtons();
       pickId = null; pickTargetIndex = null; refreshStatus();
     };
@@ -461,7 +497,10 @@
         setText('connectionText', agentCompatible ? `${state.profile} · Extension ${state.extensionConnected ? 'đã kết nối' : 'chưa kết nối'}` : 'Agent cũ: dừng và chạy lại node local-agent.js');
         let progress = state.error || (state.running ? `Đang chạy bước ${state.index + 1}/${state.total}: ${state.stepLabel || state.action || 'đang chờ'}` : state.download ? `Đã lưu: ${state.download.filePath} · ${state.download.width || '?'}×${state.download.height || '?'} · ${Math.round(state.download.fps || 0)} fps · ${state.download.videoCodec || ''}` : 'Đang chờ lệnh');
         if (state.executionId) progress += ` · ${state.state} · runId: ${state.executionId}`;
+        if (state.download?.reused) progress += ' · Đã tải URL này, dùng file đã lưu';
         setText('progress', progress);
+        setText('runSteps', (state.steps || []).map(stepSummary).join('\n'));
+        setText('storageStatus', data.storage ? `Lịch sử lưu trên máy. ${data.storage.enabled ? `MongoDB: ${data.storage.error || 'đang đồng bộ'} · ${data.storage.pending} bản ghi chờ` : 'MongoDB chưa cấu hình (MONGODB_URI).'} ` : '');
         const perf = data.performance;
         setText('performance', `${perf ? `Agent: CPU ${perf.cpuPercent}% · RAM ${perf.memoryMb} MB · Event loop p95 ${perf.eventLoopP95Ms} ms · ` : ''}Profile ${selectedProfile}: tổng ${((state.elapsedMs || 0) / 1000).toFixed(1)}s · bước hiện tại ${((state.stepElapsedMs || 0) / 1000).toFixed(1)}s${state.lastStepMs == null ? '' : ` · bước trước ${(state.lastStepMs / 1000).toFixed(1)}s`}`);
         if (pickId !== null) {

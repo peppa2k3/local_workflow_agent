@@ -1,8 +1,14 @@
 # Project context
 
+## Lưu trữ tác vụ và cache download (2026-10-22)
+
+Kho local `data/agent` (override LOCAL_AGENT_DATA_DIR, không theo dõi Git) lưu machine UUID, catalog metadata/outbox và từng execution trong runs/*.json bằng ghi temp + fsync + rename. Workflow persist trước thao tác/sau kết quả, giữ chi tiết step và stoppedAtStep; startup đánh dấu lượt còn chạy interrupted, không tự thực hiện lại. API/dashboard tra lịch sử sau restart. Cache URL dùng hash toàn file để tái sử dụng đúng file đã verified, khóa theo URL trong một process để hai profile không tải trùng. File mất/đổi thì tải mới; không suy đoán theo title.
+
+Upload nhập file trước khi dispatch, lưu page/publication/upload event sau acknowledgement; pageId là UUID Content Manager, pageName/pageUrl/platform/publicationDesc nhận biến. Không gán ngày upload cho published_at (giữ null). Assets/folders/file_instances/pages/publications theo hợp đồng Content Manager (UUID v5 dùng Python JSON separators, Unicode casefold). MongoDB tùy chọn đồng bộ outbox, BSON Date, insert-only asset/publication; mất mạng giữ local để retry. Không có storage S3/copy file gốc. Xem docs/ACTIVITY_STORAGE.md. Reload extension 4.1.0 và restart agent/dashboard; user scenarios không bị migrate/ghi đè tự động.
+
 ## CLI/API automation (2026-10-20)
 
-`node local-agent.js` vẫn khởi động server; có argv thì chạy CLI client (`--help`, profiles/scenarios/describe/run/status/stop). `/api/v1/*` yêu cầu `LOCAL_AGENT_API_TOKEN`, profile tường minh, kịch bản đã lưu và Bearer token. Overrides biến được merge trên bản sao trước prepare; runtime names không được override. `executionId` ổn định tách khỏi runId giao thức extension (vẫn đổi để vô hiệu kết quả cũ khi Stop). Lưu tối đa 200 lượt hoàn tất/200 khóa idempotency trong RAM, không bền qua restart. Timeout workflow mặc định một giờ, tối đa 24 giờ qua API; timeout chờ CLI độc lập. Dashboard same-origin/bridge extension vẫn là local trust boundary. Xem docs/AUTOMATION_API.md.
+`node local-agent.js` vẫn khởi động server; có argv thì chạy CLI client (`--help`, profiles/scenarios/describe/run/status/stop). `/api/v1/*` yêu cầu `LOCAL_AGENT_API_TOKEN`, profile tường minh, kịch bản đã lưu và Bearer token. Overrides biến được merge trên bản sao trước prepare; runtime names không được override. `executionId` ổn định tách khỏi runId giao thức extension (vẫn đổi để vô hiệu kết quả cũ khi Stop). RAM giữ 200 lượt hoàn tất/200 khóa idempotency; từ 2026-10-22 lịch sử lượt còn lưu bền vững ở data/agent, khóa idempotency vẫn mất qua restart. Timeout workflow mặc định một giờ, tối đa 24 giờ qua API; timeout chờ CLI độc lập. Dashboard same-origin/bridge extension vẫn là local trust boundary. Xem docs/AUTOMATION_API.md.
 
 ## Mục tiêu
 

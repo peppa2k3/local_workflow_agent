@@ -12,6 +12,9 @@ const { createProfileCache } = require('./profiles');
 const { inspectVideo, downloadVideo } = require('./video-download');
 const { createWorkflows } = require('./workflows');
 const { createAutomationApi } = require('./automation-api');
+const { createActivityStore } = require('./activity-store');
+const { createCachedDownloader } = require('./download-cache');
+const { createMongoSync } = require('./mongo-sync');
 
 const scenarios = createScenarioStore(scenariosDir);
 const eventLoop = monitorEventLoopDelay({ resolution: 20 });
@@ -22,7 +25,9 @@ let filePickerPending = false;
 // Request handlers only read an in-memory snapshot; metadata I/O is asynchronous.
 const profileCache = createProfileCache(userDataDir, profile);
 const profiles = profileCache.get;
-const workflows = createWorkflows({ scenarios, defaultProfile: profile, profiles, downloadVideo, openFolder(folderPath) {
+const activity = createActivityStore(process.env.LOCAL_AGENT_DATA_DIR || path.resolve(__dirname, '../../data/agent'));
+const mongoSync = createMongoSync(activity);
+const workflows = createWorkflows({ scenarios, defaultProfile: profile, profiles, activity, downloadVideo: createCachedDownloader(activity, downloadVideo), openFolder(folderPath) {
   const folder = path.resolve(folderPath);
   if (!fs.existsSync(folder) || !fs.statSync(folder).isDirectory()) throw new Error(`Folder does not exist: ${folder}`);
   return launch('explorer.exe', [folder]);
@@ -83,8 +88,14 @@ const server = http.createServer(async (request, response) => {
       if (automation.enabled && !extensionRead && !dashboardAuthorized(request) && !automation.authorized(request)) return json(401, { error: 'Valid Bearer token or dashboard session required' });
       const selected = url.searchParams.get('profile') || profile;
       if (request.method === 'GET' && route === '/api/status') return json(200, workflows.status(selected));
+      if (request.method === 'GET' && route === '/api/history') return json(200, { runs: workflows.listRuns(selected), storage: activity.syncStatus() });
+      const historyMatch = route.match(/^\/api\/history\/([0-9a-f-]{36})$/);
+      if (request.method === 'GET' && historyMatch) {
+        const run = workflows.getRun(historyMatch[1]);
+        return json(run ? 200 : 404, run || { error: 'Run not found' });
+      }
       if (request.method === 'GET' && route === '/api/profiles') {
-        return json(200, { defaultProfile: profile, automationEnabled: automation.enabled, capabilities: ['automation-api-v1', 'variables-v1', 'video-download-v1', 'video-quality-best-v1', 'download-references-v1', 'scenario-management-v1'], performance, profiles: profiles().map(item => ({ ...item, ...workflows.status(item.directory) })) });
+        return json(200, { defaultProfile: profile, automationEnabled: automation.enabled, storage: activity.syncStatus(), capabilities: ['activity-history-v1', 'download-cache-v1', 'automation-api-v1', 'variables-v1', 'video-download-v1', 'video-quality-best-v1', 'download-references-v1', 'scenario-management-v1'], performance, profiles: profiles().map(item => ({ ...item, ...workflows.status(item.directory) })) });
       }
       if (request.method === 'POST' && route === '/api/profiles/open') {
         const body = await readBody(request);
@@ -202,4 +213,4 @@ terminal.on('line', line => {
   } catch (error) { console.error(error.message); }
   terminal.prompt();
 });
-terminal.on('close', () => { profiles().forEach(item => workflows.stop(item.directory)); server.close(); });
+terminal.on('close', () => { profiles().forEach(item => workflows.stop(item.directory)); server.close(); void mongoSync.close(); });

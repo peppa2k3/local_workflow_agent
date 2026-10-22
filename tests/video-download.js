@@ -6,6 +6,8 @@ const http = require('node:http');
 const { validateVideo, inspectVideo, downloadVideo, run, selectionArgs, publishVideo } = require('../src/agent/video-download');
 const { createScenarioStore } = require('../src/agent/scenario-store');
 const { createWorkflows } = require('../src/agent/workflows');
+const { createActivityStore } = require('../src/agent/activity-store');
+const { createCachedDownloader } = require('../src/agent/download-cache');
 (async () => {
   for (const url of ['file:///C:/a.mp4', 'ftp://example.test/a', 'https://user:secret@example.test/']) assert.throws(() => validateVideo({ url }));
   const url = 'https://example.test/video';
@@ -57,12 +59,15 @@ const { createWorkflows } = require('../src/agent/workflows');
         if (pathname === '/') return route.fulfill({ contentType: 'text/html; charset=utf-8', body: fs.readFileSync(path.resolve(__dirname, '../dashboard/index.html'), 'utf8') });
         if (pathname === '/api/profiles') data = { defaultProfile: 'Default', capabilities: ['variables-v1', 'video-download-v1', 'video-quality-best-v1', 'download-references-v1', 'scenario-management-v1'], profiles: [{ directory: 'Default', name: 'Test', extensionConnected: false, running: false, download: { title, filePath: 'D:/Videos/sample.mp4', width: 1440, height: 1920, fps: 60, videoCodec: 'vp9' } }] };
         else if (pathname === '/api/scenarios') data = { names: deleted ? [] : ['video-download'] };
+        else if (pathname === '/api/scenarios/my-workflow' && request.method() === 'PUT') { saved = request.postDataJSON(); data = { ok: true }; }
         else if (pathname === '/api/scenarios/video-download') {
           if (request.method() === 'DELETE') { deleted = true; data = { ok: true }; }
           else if (request.method() === 'PUT') { saved = request.postDataJSON(); data = { ok: true }; }
           else data = saved;
         }
         else if (pathname === '/api/video/inspect') { assert.equal(request.postDataJSON().url, url); inspected = true; data = { title, id: 'sample' }; }
+        else if (pathname === '/api/history') data = { runs: [{ runId: 'fixture-run', scenario: 'download-upload-reels-lili', state: 'failed', startedAt: Date.now(), total: 6, stoppedAtStep: 6,
+          steps: [{ number: 1, label: 'Tải clip', state: 'succeeded', reused: true, file_path: 'D:/Videos/sample.mp4' }, { number: 6, label: 'Bước cuối', state: 'failed', error: 'Target not found' }] }] };
         return route.fulfill({ json: data });
       });
       await page.goto('http://127.0.0.1:34719');
@@ -101,6 +106,18 @@ const { createWorkflows } = require('../src/agent/workflows');
       assert(deleted);
       assert.equal(await page.locator('#scenarioSelect option').count(), 0);
       assert.equal(await page.locator('#fileName').inputValue(), 'my-workflow');
+      await page.locator('.step-head select').selectOption('upload');
+      await page.getByRole('textbox', { name: 'Tên page đích (khuyến nghị)', exact: true }).fill('Lili');
+      await page.getByRole('textbox', { name: 'URL page đích (nên dùng biến)', exact: true }).fill('https://example.test/lili');
+      await page.locator('#saveBtn').click();
+      await page.waitForFunction(() => document.getElementById('message').textContent.includes('Đã lưu'));
+      assert.equal(saved.steps[0].pageName, 'Lili'); assert.equal(saved.steps[0].pageUrl, 'https://example.test/lili');
+      await page.locator('#historyBtn').click();
+      await page.locator('#runHistory summary').waitFor();
+      assert.match(await page.locator('#runHistory summary').textContent(), /download-upload-reels-lili.*Dừng tại bước 6/);
+      await page.locator('#runHistory summary').click();
+      assert.match(await page.locator('#runHistory').textContent(), /Đã tải trước đó.*sample.mp4/);
+      assert.match(await page.locator('#runHistory').textContent(), /Thất bại.*Target not found/);
       console.log('Dashboard preview, runtime reference picker, step label persistence/default and deletion/cancel: OK');
     } finally { await browser.close(); }
 
@@ -126,7 +143,9 @@ const { createWorkflows } = require('../src/agent/workflows');
       const fixture = path.join(directory, 'fixture.mp4');
       await run(path.join(tools, 'ffmpeg.exe'), ['-v', 'error', '-f', 'lavfi', '-i', 'color=c=blue:s=128x128:d=1', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1', '-c:v', 'libx264', '-c:a', 'aac', '-shortest', fixture]);
       await run(path.join(tools, 'ffmpeg.exe'), ['-v', 'error', '-i', fixture, '-map', '0:v', '-map', '0:a', '-c', 'copy', '-f', 'dash', '-adaptation_sets', 'id=0,streams=v id=1,streams=a', 'fixture.mpd'], { cwd: directory });
+      let requests = 0;
       server = http.createServer((req, res) => {
+        requests++;
         const file = path.join(directory, path.basename(new URL(req.url, 'http://localhost').pathname));
         if (!fs.existsSync(file) || !fs.statSync(file).isFile()) { res.writeHead(404); res.end(); return; }
         res.writeHead(200, { 'Content-Type': file.endsWith('.mpd') ? 'application/dash+xml' : 'video/mp4', 'Content-Length': fs.statSync(file).size });
@@ -161,6 +180,12 @@ const { createWorkflows } = require('../src/agent/workflows');
       assert(streams.some(item => item.codec_type === 'video') && streams.some(item => item.codec_type === 'audio'), 'FFmpeg must merge separate DASH video/audio streams');
       assert.equal(merged.name, 'fixture.mp4');
       assert(!fs.readdirSync(path.join(directory, 'merged')).some(name => name.startsWith('.video-download-')));
+      const cachedDownloader = createCachedDownloader(createActivityStore(path.join(directory, 'activity')), downloadVideo);
+      const firstCached = await cachedDownloader({ url: localUrl, directory: path.join(directory, 'cached') });
+      const requestsAfterDownload = requests;
+      const secondCached = await cachedDownloader({ url: localUrl, directory: path.join(directory, 'different-directory') });
+      assert.equal(secondCached.reused, true); assert.equal(secondCached.filePath, firstCached.filePath);
+      assert.equal(requests, requestsAfterDownload, 'verified URL reuse must not contact source or redownload');
       console.log('Real yt-dlp + FFmpeg local video download, title, no-overwrite and audio/video verification: OK');
     } else console.log('Portable tools absent: real download check skipped (npm run setup:video to enable)');
   } finally {

@@ -1,6 +1,14 @@
 # Tiến độ phát triển
 
-Cập nhật: 2026-10-21 (Asia/Bangkok).
+Cập nhật: 2026-10-22 (Asia/Bangkok).
+
+## 2026-10-22: lịch sử tác vụ, metadata nội dung và dùng lại download
+
+- Lưu từng execution/step, thời gian, trạng thái, lỗi và vị trí dừng trên đĩa; khôi phục lượt bị ngắt thành interrupted. API/CLI đọc lịch sử sau restart, dashboard xem theo profile.
+- Cache URL → path/asset, xác minh size/SHA-256 trước khi dùng lại; cùng URL qua restart/profile không tải lại nếu file còn đúng. File mất/đổi thì tải mới, giữ nguyên gate FFprobe; khóa tải đồng thời theo URL.
+- Upload lưu file/asset/page/publication theo hợp đồng Content Manager, thêm biến page và uploaded_at riêng với published_at (null khi chưa xác nhận xuất bản). Extension báo URL trước/sau thao tác, giữ CSS selector legacy.
+- Kho local không theo dõi Git; MongoDB tùy chọn, outbox bền vững, retry, BSON Date và insert-only asset/publication. Chưa chạy ghi vào MongoDB thật vì máy chưa cấu hình URI; đã kiểm tra adapter lỗi/retry/Date/upsert.
+- Kiểm chứng: npm test gồm fixture lịch sử 6 bước lỗi tại bước 6, cache/hash/file mất/đổi, khóa đồng thời/hủy, restart HTTP/CLI, UI metadata/lịch sử và yt-dlp/FFmpeg/FFprobe thật; Chrome test tách biệt. JavaScript node --check, dashboard vm.Script và git diff --check.
 
 ## 2026-10-20: CLI và API chạy tự động
 

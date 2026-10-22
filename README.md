@@ -8,6 +8,8 @@ Chọn **Chrome profile** và **Kịch bản đã lưu** rồi bấm **Chạy k�
 
 Dashboard hiển thị CPU/RAM/event loop của agent cùng thời gian chạy theo profile để tìm bước chậm. Nút chọn file báo đang mở hộp thoại và chặn bấm lặp. Sau khi cập nhật, khởi động lại agent, Reload extension trong từng profile và tải lại dashboard/tab mục tiêu.
 
+Lịch sử từng bước được lưu qua restart tại `data/agent/`. URL đã tải dùng lại file nếu kích thước/SHA-256 còn đúng, rồi tiếp tục các bước upload. Bước upload có tên/URL/UUID page và thời gian upload; metadata có thể đồng bộ MongoDB qua `MONGODB_URI`. Xem [cấu hình lưu trữ và ví dụ biến page](docs/ACTIVITY_STORAGE.md).
+
 **Bắt đầu:** [Hướng dẫn cài đặt và chạy từng bước](docs/SETUP.md).
 
 ## Cấu trúc

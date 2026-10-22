@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { validateVideo } = require('./video-download');
 const { resolveVariables, hasRuntime, resolveRuntime } = require('./variables');
+const { validateUploadMetadata } = require('./activity-store');
 
 function validateStep(step, uploadPath = '') {
   if (!['downloadVideo', 'openUrl', 'openFolder', 'wait', 'waitFor', 'click', 'type', 'setDate', 'setTime', 'scroll', 'upload'].includes(step.action)) throw new Error(`Unsupported action: ${step.action}`);
@@ -33,6 +34,7 @@ function validateStep(step, uploadPath = '') {
   }
   if (step.completion?.state && !['visible', 'hidden', 'enabled'].includes(step.completion.state)) throw new Error('Invalid completion state');
   if (step.action !== 'upload') return step;
+  validateUploadMetadata(step);
   const inputPath = uploadPath || step.filePath ||
     (step.folder && step.filename ? path.join(step.folder, step.filename) : '');
   if (!inputPath) throw new Error('Upload step needs a file path, folder + filename, or a run-time upload path');

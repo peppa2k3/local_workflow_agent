@@ -112,6 +112,7 @@ async function execute(job, step) {
     }
     await waitForPage(job, { navigationTimeoutMs: step.navigationTimeoutMs, settleMs: 0 });
     await checkRunning(job);
+    job.actionUrl = (await chrome.tabs.get(job.tabId)).url || '';
     if (step.action === 'click') {
       const point = await pageMessage(job.tabId, { type: 'clickPoint', step, runId: job.runId });
       await checkRunning(job);
@@ -164,8 +165,8 @@ async function poll() {
     let result;
     try {
       await execute(job, next.step);
-      result = { ok: true };
-    } catch (error) { result = { ok: false, error: String(error.message || error) }; }
+      result = { ok: true, actionUrl: job.actionUrl || '', pageUrl: (await chrome.tabs.get(job.tabId)).url || '' };
+    } catch (error) { result = { ok: false, actionUrl: job.actionUrl || '', error: String(error.message || error) }; }
     finally { clearInterval(keepAlive); }
     // Retry acknowledgement without repeating a potentially destructive action.
     for (let attempt = 0; attempt < 3; attempt++) {

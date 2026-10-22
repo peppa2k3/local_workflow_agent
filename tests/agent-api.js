@@ -18,7 +18,7 @@ const { spawn } = require('node:child_process');
     } } }));
     child = spawn(process.execPath, ['local-agent.js'], {
       cwd: path.join(__dirname, '..'),
-      env: { ...process.env, LOCAL_AGENT_PORT: String(port), CHROME_PROFILE: 'Profile 1', CHROME_USER_DATA_DIR: temp, LOCAL_AGENT_SCENARIOS_DIR: temp },
+      env: { ...process.env, MONGODB_URI: '', LOCAL_AGENT_DATA_DIR: path.join(temp, 'activity'), LOCAL_AGENT_PORT: String(port), CHROME_PROFILE: 'Profile 1', CHROME_USER_DATA_DIR: temp, LOCAL_AGENT_SCENARIOS_DIR: temp },
       stdio: ['pipe', 'pipe', 'pipe']
     });
     let log = '';
@@ -66,6 +66,11 @@ const { spawn } = require('node:child_process');
     const next = await api('/next', clients[0]);
     assert.equal(next.step.action, 'click'); assert.equal(next.tabId, 11);
     await api('/api/stop', { profile: 'Profile 1' });
+    const history = await api('/api/history?profile=Profile%201');
+    assert.equal(history.runs.length, 1);
+    assert.equal(history.runs[0].state, 'cancelled');
+    assert.deepEqual(history.runs[0].steps.map(step => step.state), ['succeeded', 'cancelled']);
+    assert.equal((await api('/api/history/' + first.runId)).stoppedAtStep, 2);
     assert.equal((await api('/api/status?profile=Profile%201')).running, false);
     assert.equal((await api('/api/status?profile=Profile%202')).running, true);
     await api('/api/profiles/open', { profile: '../invalid' }, 'POST', 400);

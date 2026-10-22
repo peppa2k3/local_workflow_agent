@@ -71,6 +71,7 @@ Base URL: `http://127.0.0.1:34719/api/v1`. Mọi request cần header `Authoriza
 | GET | `/scenarios` | Tên kịch bản đã lưu |
 | GET | `/scenarios/:name` | Tên, biến mặc định và số bước |
 | POST | `/runs` | 202 và lượt chạy mới; 409 nếu profile đang bận |
+| GET | `/runs?profile=Profile%202` | Tối đa 50 lượt gần nhất, lọc theo profile; bỏ profile để xem tất cả |
 | GET | `/runs/:runId` | Trạng thái lượt, tiến độ, lỗi và kết quả tải |
 | POST | `/runs/:runId/stop` | Dừng đúng lượt; gọi lại an toàn, không dừng lượt mới của profile |
 
@@ -96,9 +97,11 @@ Invoke-RestMethod -Uri "http://127.0.0.1:34719/api/v1/runs/$($run.runId)/stop" -
 
 Body `/runs` chỉ nhận `scenario`, `profile` (bắt buộc), `variables` (object tùy chọn), `uploadPath` (chuỗi tùy chọn), `timeoutMs` (số nguyên 1–86400000, mặc định một giờ). Không nhận lệnh shell, đường dẫn file kịch bản tùy ý hoặc steps gửi trực tiếp. Profile không tồn tại/tham số sai trả 400; scenario/run không tồn tại trả 404; sai content type trả 415; body quá lớn trả 413. Mỗi profile chạy một lượt, các profile khác nhau chạy đồng thời; không có hàng đợi.
 
-Response là object có `runId` ổn định, `scenario`, `profile`, `state` (`running`, `succeeded`, `failed`, `cancelled`), `index` từ 0, `total`, `error`, `startedAt`, `endedAt` (Unix milliseconds), cùng trạng thái/kết quả workflow. HTTP 202 chỉ xác nhận đã nhận; phải poll `GET /runs/:runId` tới trạng thái cuối để biết thành công. Lỗi runtime sau khi nhận vẫn trả trong kết quả lượt (`state: failed`), không đổi HTTP status của GET.
+Response là object có `runId` ổn định, `scenario`, `profile`, `state` (`running`, `succeeded`, `failed`, `cancelled`, `interrupted`), `index` từ 0, `total`, `error`, `startedAt`, `endedAt` (Unix milliseconds), cùng trạng thái/kết quả workflow. `steps` lưu kết quả/thời gian từng bước; `stoppedAtStep` từ 1 chỉ vị trí dừng. `interrupted` là lượt đang chạy khi tiến trình agent bị ngắt, được khôi phục khi restart. HTTP 202 chỉ xác nhận đã nhận; phải poll `GET /runs/:runId` tới trạng thái cuối để biết thành công. Lỗi runtime sau khi nhận vẫn trả trong kết quả lượt (`state: failed`), không đổi HTTP status của GET.
 
-`Idempotency-Key` tùy chọn, 1–128 ký tự chữ/số/`_`/`-`. Cùng khóa/cùng body trả 200 với lượt cũ; cùng khóa/body khác trả 409. Dùng lại khóa không tự chạy lại sau thất bại; lượt mới cần khóa mới. Agent chỉ giữ tối đa 200 lượt hoàn tất và 200 khóa gần nhất trong RAM; khởi động lại mất toàn bộ. Run đang chạy vẫn truy vấn được. Run đã bị loại khỏi lịch sử trả 404; nếu khóa còn nhưng run hết lịch sử, gửi lại trả 410. Khóa đã bị loại khỏi bộ nhớ có thể tạo lượt mới, nên đây không phải bảo đảm chống trùng bền vững qua restart; hệ thống gọi cần quản lý job của mình nếu cần bảo đảm đó.
+`Idempotency-Key` tùy chọn, 1–128 ký tự chữ/số/`_`/`-`. Cùng khóa/cùng body trả 200 với lượt cũ; cùng khóa/body khác trả 409. Dùng lại khóa không tự chạy lại sau thất bại; lượt mới cần khóa mới. Agent giữ tối đa 200 lượt hoàn tất và 200 khóa gần nhất trong RAM. Lịch sử lượt còn trong kho local sau khi bị loại khỏi RAM hoặc restart và vẫn đọc được theo ID; khóa idempotency vẫn chỉ ở RAM, mất khi restart. Run không có trong kho trả 404; nếu khóa còn nhưng run đã mất, gửi lại trả 410. Khóa đã bị loại khỏi bộ nhớ có thể tạo lượt mới, nên đây không phải bảo đảm chống tạo job trùng bền vững qua restart. Cache download chống tải lại cùng URL khi file vẫn còn đúng hash; không tự bỏ qua bước upload vì có lần trước đã upload.
+
+Chi tiết schema `steps`, cache URL, sự kiện upload/page và MongoDB: [ACTIVITY_STORAGE.md](ACTIVITY_STORAGE.md).
 
 ## Phạm vi bảo mật
 

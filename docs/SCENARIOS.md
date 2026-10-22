@@ -128,7 +128,7 @@ Ví dụ: `{"action":"downloadVideo","url":"https://www.youtube.com/watch?v=9qq_
 - `url`: HTTP/HTTPS của một video; không playlist/live, không credentials trong URL.
 - `directory`: đường dẫn tuyệt đối, được tạo nếu chưa có.
 - `quality`: mặc định `"best"`. Luôn chọn từ cao xuống thấp theo FPS → độ phân giải cạnh ngắn → bitrate → codec, không giới hạn 1080p/4K. Cùng FPS mới so độ phân giải; vì vậy 1080p60 được ưu tiên trước 4K30 theo chính sách FPS trước. Giá trị số 360/480/720/1080/1440/2160 trong JSON cũ vẫn được đọc nhưng không còn giới hạn chất lượng. Không cần sửa các kịch bản cũ. FFmpeg ghép hình/tiếng, không ép nén hoặc tăng FPS. Container ghép ưu tiên MP4; một luồng giữ định dạng nguồn.
-- Tên cuối: `tiêu đề.ext`, không tự gắn `[ID]`. Lấy metadata thật, xử lý ký tự Windows, giới hạn phần tiêu đề theo template 150B của yt-dlp. Trùng tên: `tiêu đề (2).ext`, `(3)`…; không ghi đè hoặc tái sử dụng bản cũ có thể chất lượng thấp. Mỗi lần chạy tải mới. ID vẫn có trong metadata và `{{download_id}}`.
+- Tên cuối: `tiêu đề.ext`, không tự gắn `[ID]`. Lấy metadata thật, xử lý ký tự Windows, giới hạn phần tiêu đề theo template 150B của yt-dlp. URL đã tải và còn đúng file/hash thì dùng lại file; trường hợp cần tải mới, trùng tên tạo `tiêu đề (2).ext`, `(3)`… và không ghi đè. ID vẫn có trong metadata và `{{download_id}}`.
 - Timeout tổng phân tích + tải: mặc định 30 phút, 1000–7200000 ms. Nút Dừng hủy cây tiến trình yt-dlp/FFmpeg; file .part hoặc file đã xong trước lúc dừng có thể còn lại.
 
 Status trả `download` gồm title, id, name, filePath, bytes, width, height, fps, videoCodec, audioCodec, bitrate; chỉ báo thành công sau hậu xử lý và xác nhận file tồn tại, khác rỗng. API phân tích: POST `/api/video/inspect` với `{"url":"https://..."}`, trả title/id/url/duration, timeout 60 giây.
@@ -146,7 +146,7 @@ Các locator tiếng Việt lấy theo luồng hiện có trong dự án; nút/�
 | Tham chiếu | Giá trị sau downloadVideo |
 | --- | --- |
 | `{{download_title}}` | Tiêu đề gốc / tên phim đọc từ metadata URL |
-| `{{download_file_name}}` | Tên file thực tế đã lưu, gồm ID và phần mở rộng |
+| `{{download_file_name}}` | Tên file thực tế đã lưu, gồm phần mở rộng |
 | `{{download_file_path}}` | Đường dẫn tuyệt đối đến chính clip vừa tải |
 | `{{download_id}}` | ID video |
 
@@ -159,7 +159,7 @@ Ví dụ bước sau download:
 
 Agent chỉ tạo các tham chiếu sau khi yt-dlp thoát thành công, in đường dẫn ở after_move (sau ghép/hậu xử lý), file cuối tồn tại và khác rỗng, không có đuôi .part/.ytdl/.tmp, FFprobe đọc được video stream và thời lượng dương. Status có `download.verified: true`. Chỉ lúc đó mới chuyển sang openUrl/upload; không suy ra xong từ phần trăm hoặc chờ số giây cố định. FFprobe kiểm tra cấu trúc/metadata media, không giải mã kiểm tra từng frame.
 
-Tham chiếu kết quả phải xuất hiện sau một downloadVideo trong kịch bản. Giá trị được giải quyết và validate ngay trước từng bước; upload kiểm tra lại file tồn tại/khác rỗng. Với filePath tham chiếu kết quả, ô “File upload cho lần chạy” không thay thế clip đã tải. Các upload tĩnh vẫn hỗ trợ đường dẫn override như trước. Mỗi lần chạy/profile có kết quả riêng, không tái sử dụng kết quả lần trước; download thất bại, kiểm tra lỗi hoặc Dừng sẽ chặn các bước tiếp theo. Nhiều downloadVideo: tham chiếu dùng kết quả gần nhất đã thành công.
+Tham chiếu kết quả phải xuất hiện sau một downloadVideo trong kịch bản. Giá trị được giải quyết và validate ngay trước từng bước; upload kiểm tra lại file tồn tại/khác rỗng. Với filePath tham chiếu kết quả, ô “File upload cho lần chạy” không thay thế clip đã tải. Các upload tĩnh vẫn hỗ trợ đường dẫn override như trước. Mỗi lần chạy/profile có kết quả runtime riêng; downloadVideo có thể tạo kết quả từ cache URL đã xác minh. Download thất bại, kiểm tra lỗi hoặc Dừng sẽ chặn các bước tiếp theo. Nhiều downloadVideo: tham chiếu dùng kết quả gần nhất đã thành công.
 
 ## Tên bước và xóa kịch bản
 
@@ -192,3 +192,11 @@ Chỉ cập nhật text/thuộc tính DOM khi giá trị đổi. Không dựng l
 Agent nạp metadata Chrome Local State bất đồng bộ trước khi lắng nghe; sau đó handler dùng cache RAM, làm mới bất đồng bộ khi cache hết hạn 30 giây. Các yêu cầu đồng thời dùng chung một lượt đọc. Lỗi đọc tạm trong lúc Chrome ghi metadata giữ snapshot hợp lệ trước đó. Profile mới/đổi tên có thể xuất hiện sau lượt làm mới tiếp theo. Không đọc cookie hoặc sử dụng profile đăng nhập để kiểm thử.
 
 Áp dụng: khởi động lại `node local-agent.js` và tải lại dashboard. Endpoint `/api/profiles`, schema và extension vẫn tương thích.
+
+## Lịch sử, cache URL và metadata upload (2026-10-22)
+
+Agent lưu bền vững lịch sử từng step tại `data/agent/`, gồm thành công/thất bại/Dừng, thời gian, file/URL và vị trí dừng. Restart sau khi tiến trình bị ngắt đánh dấu lượt còn chạy là `interrupted`; không tự thực hiện lại các thao tác. Dashboard có nút **Xem / làm mới lịch sử profile**. URL đã tải được tra trước khi truy cập nguồn: file còn đúng size/SHA-256 thì báo đã tải và dùng đúng path đó cho các bước tiếp theo; file mất/đổi thì tải mới. Các yêu cầu cùng URL được xếp hàng trong agent để tránh tải trùng.
+
+Upload có các trường tùy chọn `pageId`, `pageName`, `pageUrl`, `platform`, `publicationDesc`, `folderTag`, hỗ trợ biến thông thường/runtime. Nên dùng `pageName: "{{page_name}}"`, `pageUrl: "{{reels_url}}"` và UUID page từ Content Manager nếu đã tồn tại; UUID khác ID số Facebook. Agent lưu SHA-256 asset, file instance, page, publication và sự kiện upload theo hợp đồng Team Content Manager. `uploaded_at` ghi thời gian hoàn tất thao tác; `published_at: null` khi chưa biết bài có được đăng hay chưa. Upload legacy/CSS selector vẫn chạy khi chưa thêm metadata.
+
+Xem cấu hình `MONGODB_URI`/`MONGODB_DATABASE`, ví dụ JSON, mô hình dữ liệu và giới hạn tại [ACTIVITY_STORAGE.md](ACTIVITY_STORAGE.md). Không cấu hình MongoDB vẫn dùng đầy đủ lịch sử/cache local. Reload extension 4.1.0, restart agent và tải lại dashboard để nhận URL tab thực tế và giao diện mới. Không ghi đè các kịch bản người dùng đang chỉnh.

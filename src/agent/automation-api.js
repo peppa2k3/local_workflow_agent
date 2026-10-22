@@ -15,6 +15,7 @@ function createAutomationApi({ workflows, scenarios, profiles, readBody, token =
     if (!authorized(request)) throw apiError(401, 'Valid Bearer token required');
     if (request.headers.origin) throw apiError(403, 'Automation API accepts CLI/server clients only');
     const route = url.pathname.slice('/api/v1'.length);
+    if (request.method === 'GET' && route === '/runs') return json(200, { runs: workflows.listRuns(url.searchParams.get('profile') || undefined) });
     if (request.method === 'GET' && route === '/profiles') return json(200, { profiles: profiles().map(p => ({ ...p, ...workflows.status(p.directory) })) });
     if (request.method === 'GET' && route === '/scenarios') return json(200, { names: scenarios.list() });
     const scenarioMatch = route.match(/^\/scenarios\/([a-z0-9][a-z0-9_-]{0,63})$/);
@@ -55,7 +56,7 @@ function createAutomationApi({ workflows, scenarios, profiles, readBody, token =
     const match = route.match(/^\/runs\/([0-9a-f-]{36})(\/stop)?$/);
     if (match && ((!match[2] && request.method === 'GET') || (match[2] && request.method === 'POST'))) {
       const run = match[2] ? workflows.stopRun(match[1]) : workflows.getRun(match[1]);
-      if (!run) throw apiError(404, 'Run not found (history is in memory)');
+      if (!run) throw apiError(404, 'Run not found');
       return json(200, run);
     }
     throw apiError(404, 'Not found');

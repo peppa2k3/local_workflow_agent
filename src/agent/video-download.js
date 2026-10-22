@@ -98,7 +98,7 @@ async function downloadVideo(step, signal) {
     if (combined.aborted) throw new Error('Video operation cancelled or timed out');
     const filePath = await publishVideo(stagedPath, directory);
     const [numerator, denominator = 1] = String(video.avg_frame_rate || '0/1').split('/').map(Number);
-    return { ...info, verified: true, filePath, name: path.basename(filePath), bytes: stat.size,
+    return { ...info, duration: Number(media.format.duration), verified: true, filePath, name: path.basename(filePath), bytes: stat.size,
       width: video.width, height: video.height, fps: denominator ? numerator / denominator : 0,
       videoCodec: video.codec_name, audioCodec: audio?.codec_name || null, bitrate: Number(media.format?.bit_rate) || null };
   } finally {
