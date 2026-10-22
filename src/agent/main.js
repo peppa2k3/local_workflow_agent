@@ -17,6 +17,7 @@ const { createCachedDownloader } = require('./download-cache');
 const { createMongoSync } = require('./mongo-sync');
 const { mongoSettings } = require('./env');
 const { createContentApi } = require('./content-api');
+const { createRemoteClient } = require('./remote-client');
 
 const scenarios = createScenarioStore(scenariosDir);
 const eventLoop = monitorEventLoopDelay({ resolution: 20 });
@@ -59,6 +60,8 @@ function readBody(request) {
 }
 const automation = createAutomationApi({ workflows, scenarios, profiles, readBody });
 const dashboardToken = randomBytes(32).toString('hex');
+const remote = createRemoteClient({ dataDir: process.env.LOCAL_AGENT_DATA_DIR || path.resolve(__dirname, '../../data/agent'),
+  profiles, scenarios, workflows, performance: () => performance, allowHttp: process.env.LOCAL_AGENT_REMOTE_ALLOW_HTTP_LOOPBACK === '1' });
 function dashboardAuthorized(request) {
   const candidate = request.headers['x-local-agent-session'];
   return typeof candidate === 'string' && /^[a-f0-9]{64}$/.test(candidate)
@@ -83,6 +86,12 @@ const server = http.createServer(async (request, response) => {
     return;
   }
   try {
+    if (route.startsWith('/api/remote/')) {
+      if (!dashboardAuthorized(request) || (origin && origin !== `http://127.0.0.1:${port}`)) return json(403, { error: 'Local dashboard approval required' });
+      if (request.method === 'GET' && route === '/api/remote/status') return json(200, remote.status());
+      if (request.method === 'POST') return json(200, await remote.action(route.slice('/api/remote/'.length), await readBody(request)));
+      return json(405, { error: 'Method not allowed' });
+    }
     if (route.startsWith('/api/v1/')) return await automation.handle(request, url, json);
     if (route.startsWith('/api/')) {
       const origin = request.headers.origin;
@@ -219,4 +228,4 @@ terminal.on('line', line => {
   } catch (error) { console.error(error.message); }
   terminal.prompt();
 });
-terminal.on('close', () => { profiles().forEach(item => workflows.stop(item.directory)); server.close(); void mongoSync.close(); });
+terminal.on('close', () => { remote.close(); profiles().forEach(item => workflows.stop(item.directory)); server.close(); void mongoSync.close(); });

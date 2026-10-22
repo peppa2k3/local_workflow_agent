@@ -204,3 +204,9 @@ Xem cấu hình `MONGODB_URI`/`MONGODB_DATABASE`, ví dụ JSON, mô hình dữ 
 ## MongoDB Atlas, .env và chọn page từ kho chung
 
 Agent đọc `.env` ở thư mục dự án, gồm `MONGODB_URI` và `MONGODB_DATABASE=team_content`. Mở `/content` để kiểm tra/kết nối lại, xem/tìm download, upload và lịch sử từ database, tạo/sửa page, cập nhật mô tả/ngày đăng/permalink publication. Trong bước upload, nút **Chọn page từ MongoDB** điền UUID/tên/URL/nền tảng từ page active dùng chung. Trước khi chọn file, agent kiểm tra lại page trong database; page inactive hoặc lỗi kết nối dừng bước có metadata page. Biến và CSS selector legacy vẫn được giữ. Reload extension 4.2.0, restart agent và dashboard sau nâng cấp; xem [MONGODB_ATLAS.md](MONGODB_ATLAS.md).
+# Remote control
+
+Remote control uses saved scenarios through the existing workflow engine. Pairing
+and device management are separate from scenario actions; legacy `selector` steps
+and extension messages retain their format. See [REMOTE_CONTROL.md](REMOTE_CONTROL.md).
+
