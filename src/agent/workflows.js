@@ -122,7 +122,11 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
       if (s.runId === runId) s.localPending = false;
     }
   }
-  function start(profile, scenario, uploadPath = '', scenarioName = null, variables = {}, timeoutMs = 3600000) {
+  function start(profile, scenario, uploadPath = '', scenarioName = null, variables = {}, timeoutMs = 3600000, executionId = null) {
+    if (executionId) {
+      if (!/^[0-9a-f-]{36}$/.test(executionId)) throw new Error('Invalid execution ID');
+      if (getRun(executionId)) throw new Error('Execution ID already exists');
+    }
     const s = session(profile);
     if (s.running) throw new Error('Stop this profile before starting another scenario');
     const workflow = scenarios.prepare(overrideVariables(scenario, variables), uploadPath);
@@ -134,7 +138,7 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
       steps: workflow.steps.map((step, index) => ({ index, number: index + 1, action: step.action, label: step.label?.trim() || `Bước ${index + 1}`,
         state: 'pending', started_at: null, ended_at: null, error: '' })),
       runtime: {}, index: 0, download: null, error: '', tabId: null, running: true, startedAt: Date.now(), endedAt: null, lastStepMs: null });
-    s.executionId = s.runId; s.outcome = 'running';
+    s.executionId = executionId || s.runId; s.outcome = 'running';
     s.runDeadline = Date.now() + timeoutMs;
     try { persist(s); } catch (error) { s.running = false; s.outcome = 'failed'; throw error; }
     void advance(s, s.runId);

@@ -1,20 +1,26 @@
 const path = require('node:path');
 const c = require('../remote/common');
+const { randomUUID } = require('node:crypto');
+const { createRemoteExecutor } = require('./remote-executor');
 function createRemoteClient({ dataDir, profiles, scenarios, workflows, performance = () => ({}) , allowHttp = false }) {
   const file = path.join(dataDir, 'remote.json');
   let config = c.readJson(file, { policy: { profiles: [], scenarios: [], variables: {} } });
   let pendingBusy = false, actionBusy = false, closed = false, timer, error = '', lastContact = 0;
   const abort = new AbortController();
+  const instanceId = randomUUID();
+  const executor = createRemoteExecutor({ dataDir, workflows, scenarios, getPolicy: () => config.policy });
+  let failures = 0, nextAttempt = 0;
   const save = () => c.atomicJson(file, config);
   const request = (route, data, secret) => c.post(config.url, route, data, secret, { allowHttp, signal: abort.signal });
   function status() {
     return { configured: !!config.device, url: config.url || '', device: config.device || null, policy: config.policy, error, lastContact,
+      connected: !!config.device && Date.now() - lastContact < 45000 && !error,
       pending: config.pending ? { id: config.pending.id, code: config.pending.code, expires: config.pending.expires,
         email: config.pending.email || null, claim: config.pending.claim || null, state: config.pending.state || 'waiting' } : null,
       available: { profiles: profiles().map(p => ({ directory: p.directory, name: p.name })), scenarios: scenarios.list().map(name => ({ name, variables: Object.keys(scenarios.load(name).variables || {}) })) } };
   }
   async function tick() {
-    if (closed || pendingBusy || actionBusy) return;
+    if (closed || pendingBusy || actionBusy || Date.now() < nextAttempt) return;
     pendingBusy = true;
     try {
       if (config.pending) {
@@ -22,8 +28,25 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, performan
         else { const p = config.pending; const state = await request('/device/pair-status', { id: p.id }, p.pollToken);
           Object.assign(p, { email: state.email, claim: state.claim, state: state.state }); save(); }
       }
-      error = '';
-    } catch (e) { error = e.status ? e.message : 'Không kết nối được VPS; sẽ thử lại'; }
+      if (config.device) {
+        const policy = config.policy;
+        executor.stopOwned(config.device.id, policy);
+        const metadata = { uptime: Math.floor(process.uptime()), performance: performance(),
+          profiles: profiles().filter(p => policy.profiles.includes(p.directory)).map(p => ({ directory: p.directory, name: p.name, ...Object.fromEntries(
+            ['running', 'extensionConnected'].map(k => [k, workflows.status(p.directory)[k]])) })),
+          scenarios: policy.scenarios.flatMap(name => { try { const s = scenarios.load(name); return [{ name, steps: s.steps.length,
+            variables: (policy.variables[name] || []).filter(v => Object.hasOwn(s.variables || {}, v)) }]; } catch { return []; } }) };
+        const response = await request('/device/exchange', { id: config.device.id, instanceId, metadata, reports: executor.reports(config.device.id) }, config.token);
+        executor.acknowledge(response.ack);
+        if (response.command) executor.execute(response.command, config.device.id);
+        lastContact = Date.now();
+      }
+      error = ''; failures = 0; nextAttempt = 0;
+    } catch (e) {
+      error = e.status ? e.message : 'Không kết nối được VPS; sẽ thử lại';
+      if (config.device && [401, 410].includes(e.status)) { executor.stopOwned(config.device.id); delete config.device; delete config.token; save(); }
+      nextAttempt = Date.now() + Math.min(60000, 3000 * 2 ** Math.min(++failures, 5)) + Math.random() * 500;
+    }
     finally { pendingBusy = false; }
   }
   function setPolicy(value) {
@@ -37,6 +60,7 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, performan
       variables[name] = [...new Set(names)];
     }
     config.policy = { profiles: [...new Set(value.profiles)], scenarios: [...new Set(value.scenarios)], variables }; save();
+    if (config.device) executor.stopOwned(config.device.id, config.policy);
   }
   async function action(route, data) {
     if (route === 'policy') setPolicy(data);
@@ -52,6 +76,7 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, performan
       config.device = { id: c.uuid(device.id), email: device.email }; config.token = p.deviceToken; delete config.pending; save();
     } else if (route === 'disconnect') {
       const previous = config;
+      if (previous.device) executor.stopOwned(previous.device.id);
       config = { policy: previous.policy }; save();
       if (previous.device) {
         try { await c.post(previous.url, '/device/revoke', { id: previous.device.id }, previous.token, { allowHttp, signal: abort.signal }); }

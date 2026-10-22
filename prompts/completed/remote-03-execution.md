@@ -6,3 +6,5 @@ ID execution ổn định và reconcile sau restart; không replay lượt khôn
 Chỉ chạy JSON đã lưu; biến override phải được local cho phép rõ từng tên. Stop chỉ
 đụng lượt remote sở hữu. Ghi tiến độ/kết quả; thu hồi dừng remote job.
 Phụ thuộc 02. Test fake workflow, reconnect, lỗi, quyền, duplicate và restart.
+
+Hoàn tất: tests/remote-execution.js đạt với fake workflow/HTTP cho policy, variables, UUID duplicate, lease, stop, revoke, ambiguous restart và stable execution ID. tests/workflows.js và tests/automation-api.js đạt. Không chạy kịch bản thật.

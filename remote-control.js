@@ -1,6 +1,7 @@
 const path = require('node:path');
 const { createStore } = require('./src/remote/store');
 const { createControlServer, addUser } = require('./src/remote/server');
+const { createCommandApi } = require('./src/remote/commands');
 try { process.loadEnvFile(process.env.CONTROL_ENV_FILE || path.join(__dirname, '.env.control')); } catch (e) { if (e.code !== 'ENOENT') throw e; }
 async function main() {
   const store = createStore(process.env.CONTROL_DATABASE || path.join(__dirname, 'data/control/control.sqlite'));
@@ -15,7 +16,7 @@ async function main() {
   }
   if (process.argv.length > 2) { store.close(); throw Error('Unknown control command'); }
   const server = createControlServer({ store, publicUrl: process.env.CONTROL_PUBLIC_URL,
-    allowHttp: process.env.CONTROL_ALLOW_HTTP_LOOPBACK === '1', trustProxy: process.env.CONTROL_TRUST_PROXY === '1' });
+    allowHttp: process.env.CONTROL_ALLOW_HTTP_LOOPBACK === '1', trustProxy: process.env.CONTROL_TRUST_PROXY === '1', commandApi: createCommandApi(store) });
   server.listen(Number(process.env.CONTROL_PORT || 34800), process.env.CONTROL_BIND || '127.0.0.1', () => console.log('Remote control server ready'));
   let closing = false;
   function close() { if (closing) return; closing = true; server.close(() => store.close()); server.closeIdleConnections(); }
