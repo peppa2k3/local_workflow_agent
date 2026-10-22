@@ -1,0 +1,78 @@
+{
+  "name": "Tải clip → upload Reels và điền tên phim (bản sao)",
+  "variables": {
+    "video_url": "https://www.youtube.com/watch?v=xkURrFkBPTM",
+    "thu_muc_tai": "D:\\Videos",
+    "reels_url": "https://www.facebook.com/profile.php?id=61551343781361&sk=reels_tab",
+    "ten_phim": "{{download_title}}",
+    "ten_file": "{{download_file_name}}"
+  },
+  "steps": [
+    {
+      "action": "downloadVideo",
+      "label": "Tải clip và xác nhận file hoàn tất liliphim",
+      "url": "{{video_url}}",
+      "directory": "{{thu_muc_tai}}",
+      "quality": 1080,
+      "downloadTimeoutMs": 1800000
+    },
+    {
+      "action": "openUrl",
+      "label": "Mở trang Reels",
+      "url": "{{reels_url}}",
+      "completion": {
+        "locatorType": "text",
+        "locator": "Tạo thước phim",
+        "state": "visible"
+      },
+      "navigationTimeoutMs": 60000
+    },
+    {
+      "action": "upload",
+      "label": "Upload chính clip vừa tải",
+      "locatorType": "role",
+      "locator": "Tạo thước phim",
+      "filePath": "{{download_file_path}}",
+      "timeoutMs": 30000,
+      "navigationTimeoutMs": 300000,
+      "completion": {
+        "locatorType": "role",
+        "role": "button",
+        "locator": "Tiếp",
+        "state": "enabled"
+      },
+      "role": "button"
+    },
+    {
+      "action": "type",
+      "locatorType": "role",
+      "locator": "Mô tả thước phim của bạn...",
+      "text": "{{ten_phim}}",
+      "clear": true,
+      "role": "presentation",
+      "index": 1,
+      "label": "nhap ten phim"
+    },
+    {
+      "action": "click",
+      "label": "nhap tiep",
+      "locatorType": "role",
+      "role": "button",
+      "locator": "Tiếp",
+      "timeoutMs": 30000,
+      "completion": {
+        "locatorType": "label",
+        "locator": "Mô tả thước phim của bạn...",
+        "state": "visible"
+      }
+    },
+    {
+      "action": "click",
+      "locatorType": "role",
+      "role": "button",
+      "locator": "Đăng",
+      "timeoutMs": 5000,
+      "label": "Đăng clip"
+    }
+  ]
+}

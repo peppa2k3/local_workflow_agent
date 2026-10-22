@@ -1,7 +1,7 @@
 {
   "name": "Tải clip → upload Reels và điền tên phim",
   "variables": {
-    "video_url": "https://www.youtube.com/watch?v=BwV2BJ_yKVU",
+    "video_url": "https://www.youtube.com/watch?v=yqSxhzfGtZU",
     "thu_muc_tai": "D:\\Videos",
     "reels_url": "https://www.facebook.com/profile.php?id=61583720522404&sk=reels_tab",
     "ten_phim": "{{download_title}}",
@@ -28,22 +28,10 @@
       "navigationTimeoutMs": 60000
     },
     {
-      "action": "click",
-      "label": "Tạo thước phim",
-      "locatorType": "text",
-      "locator": "Tạo thước phim",
-      "timeoutMs": 30000,
-      "completion": {
-        "locatorType": "text",
-        "locator": "Tải lên",
-        "state": "visible"
-      }
-    },
-    {
       "action": "upload",
       "label": "Upload chính clip vừa tải",
-      "locatorType": "text",
-      "locator": "Tải lên",
+      "locatorType": "role",
+      "locator": "Tạo thước phim",
       "filePath": "{{download_file_path}}",
       "timeoutMs": 30000,
       "navigationTimeoutMs": 300000,
@@ -52,19 +40,22 @@
         "role": "button",
         "locator": "Tiếp",
         "state": "enabled"
-      }
+      },
+      "role": "button"
     },
     {
-      "action": "click",
-      "label": "Tiếp sau khi upload",
+      "action": "type",
       "locatorType": "role",
-      "role": "button",
-      "locator": "Tiếp",
-      "timeoutMs": 30000
+      "locator": "Mô tả thước phim của bạn...",
+      "text": "{{ten_phim}}",
+      "clear": true,
+      "role": "presentation",
+      "index": 1,
+      "label": "nhap ten phim"
     },
     {
       "action": "click",
-      "label": "Mở phần mô tả",
+      "label": "nhap tiep",
       "locatorType": "role",
       "role": "button",
       "locator": "Tiếp",
@@ -74,15 +65,6 @@
         "locator": "Mô tả thước phim của bạn...",
         "state": "visible"
       }
-    },
-    {
-      "action": "type",
-      "label": "Điền tên phim lấy từ clip",
-      "locatorType": "label",
-      "locator": "Mô tả thước phim của bạn...",
-      "text": "{{ten_phim}}",
-      "clear": true,
-      "timeoutMs": 30000
     }
   ]
 }

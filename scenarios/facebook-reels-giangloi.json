@@ -3,7 +3,8 @@
   "steps": [
     {
       "action": "openUrl",
-      "url": "https://www.facebook.com/profile.php?id=61551343781361&sk=reels_tab"
+      "url": "https://www.facebook.com/profile.php?id=61551343781361&sk=reels_tab",
+      "label": "open facebook"
     },
     {
       "action": "upload",
