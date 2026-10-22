@@ -1,5 +1,26 @@
 # Remote control
 
+## Web workflow
+
+1. At `http://127.0.0.1:34719/remote`, select the profiles and saved scenarios to
+   grant. Select individual variables only if the remote account may override
+   them; click **Lưu quyền điều khiển**.
+2. Enter the HTTPS control origin and a device name; create a pairing code.
+3. Sign in to the VPS web UI, submit that code under **Ghép thiết bị mới**.
+4. Return to the local Remote page, review the exact VPS/account, then approve.
+   No connection is created if the local owner declines or lets the code expire.
+5. On the VPS, select the device. Its last heartbeat, CPU/RAM/uptime, per-profile
+   extension connection, granted scenarios and remote command history appear.
+   Choose profile/scenario, optionally enable a granted variable override and run.
+6. Expand history to see step outcomes and the stopping step. Stop targets that
+   specific execution. Revoke in the VPS or disconnect locally to remove access.
+
+The main dashboard and extension options link to the local Remote page. Existing
+scenario editing, content manager and upload/download behavior are unchanged.
+The web UI polls while visible and preserves unfinished permission/variable edits.
+An offline device cannot accept new runs. The device owner must keep the local
+agent, Chrome and the relevant extension running for browser actions.
+
 Remote control is a separate VPS service (`node remote-control.js`). The local
 agent keeps its existing loopback port 34719 and establishes outbound HTTPS
 connections. Do not expose 34719 through a router or reverse proxy.

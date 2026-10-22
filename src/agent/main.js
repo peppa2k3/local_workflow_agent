@@ -80,9 +80,13 @@ const server = http.createServer(async (request, response) => {
   if (request.headers.host !== `127.0.0.1:${port}` && request.headers.host !== `localhost:${port}`) return json(403, { error: 'Host not allowed' });
   const origin = request.headers.origin;
   if (origin && origin !== `http://127.0.0.1:${port}` && !/^chrome-extension:\/\/[a-z]+$/.test(origin)) return json(403, { error: 'Origin not allowed' });
-  if (request.method === 'GET' && ['/', '/content', '/content/'].includes(route)) {
+  if (request.method === 'GET' && ['/remote.js', '/remote.css'].includes(route)) {
+    response.writeHead(200, { 'Content-Type': route.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/css; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+    response.end(fs.readFileSync(route.endsWith('.js') ? path.join(path.dirname(dashboardPath), 'remote.js') : path.resolve(__dirname, '../../control-web/style.css'))); return;
+  }
+  if (request.method === 'GET' && ['/', '/content', '/content/', '/remote', '/remote/'].includes(route)) {
     response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-    response.end(fs.readFileSync(route === '/' ? dashboardPath : path.join(path.dirname(dashboardPath), 'content.html'), 'utf8').replaceAll('__LOCAL_AGENT_DASHBOARD_TOKEN__', dashboardToken));
+    response.end(fs.readFileSync(route === '/' ? dashboardPath : path.join(path.dirname(dashboardPath), route.startsWith('/remote') ? 'remote.html' : 'content.html'), 'utf8').replaceAll('__LOCAL_AGENT_DASHBOARD_TOKEN__', dashboardToken));
     return;
   }
   try {
@@ -108,7 +112,7 @@ const server = http.createServer(async (request, response) => {
         return json(run ? 200 : 404, run || { error: 'Run not found' });
       }
       if (request.method === 'GET' && route === '/api/profiles') {
-        return json(200, { defaultProfile: profile, automationEnabled: automation.enabled, storage: activity.syncStatus(), capabilities: ['shared-content-v1', 'activity-history-v1', 'download-cache-v1', 'automation-api-v1', 'variables-v1', 'video-download-v1', 'video-quality-best-v1', 'download-references-v1', 'scenario-management-v1'], performance, profiles: profiles().map(item => ({ ...item, ...workflows.status(item.directory) })) });
+        return json(200, { defaultProfile: profile, automationEnabled: automation.enabled, storage: activity.syncStatus(), capabilities: ['remote-control-v1', 'shared-content-v1', 'activity-history-v1', 'download-cache-v1', 'automation-api-v1', 'variables-v1', 'video-download-v1', 'video-quality-best-v1', 'download-references-v1', 'scenario-management-v1'], performance, profiles: profiles().map(item => ({ ...item, ...workflows.status(item.directory) })) });
       }
       if (request.method === 'POST' && route === '/api/profiles/open') {
         const body = await readBody(request);

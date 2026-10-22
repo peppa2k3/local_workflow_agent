@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Remote Control · Local Agent</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body><main class="shell">
+  <header><div><span class="eyebrow">Local Agent / Control Center</span><h1>Điều khiển từ xa</h1><small>Kết nối thiết bị. Chạy kịch bản. Theo dõi tiến độ.</small></div><div id="account" class="account" hidden><span id="email"></span><button id="logout">Đăng xuất</button></div></header>
+  <div id="message" class="notice" role="status" hidden></div>
+  <section id="login" class="login" hidden><div class="panel"><span class="eyebrow">Chào mừng trở lại</span><h2>Đăng nhập tài khoản</h2><p class="muted">Dùng tài khoản được quản trị viên VPS cấp để quản lý các máy đã ghép nối.</p><form id="login-form"><label>Email<input name="email" type="email" autocomplete="username" required maxlength="254"></label><label>Mật khẩu<input name="password" type="password" autocomplete="current-password" required maxlength="256"></label><button class="primary" type="submit">Đăng nhập</button></form></div></section>
+  <section id="workspace" hidden><div class="grid"><aside>
+    <div class="panel subtle"><h2>Ghép thiết bị mới</h2><small>Mở trang Remote trên máy local để tạo mã. Sau khi nhập mã tại đây, xác nhận tài khoản trên máy đó.</small><form id="pair-form"><label>Mã ghép nối<input name="code" autocomplete="off" maxlength="12" required placeholder="Mã gồm 12 ký tự"></label><button type="submit">Gửi yêu cầu kết nối</button></form></div>
+    <h2>Thiết bị của bạn</h2><div id="devices" class="stack"></div>
+  </aside><div><div id="empty" class="panel empty">Chọn một thiết bị để xem trạng thái và chạy kịch bản.</div><section id="detail" hidden>
+    <div class="panel"><div class="row"><h2 id="device-name"></h2><span id="device-status" class="badge"></span></div><p id="device-seen" class="muted"></p><div id="metrics" class="row"></div><p id="profiles" class="muted"></p><button id="revoke" class="danger">Thu hồi kết nối thiết bị</button></div>
+    <div class="panel"><h2>Chạy kịch bản</h2><p class="muted">Các kịch bản và biến bên dưới đã được máy local cho phép.</p><form id="run-form"><div class="two"><label>Chrome profile<select id="run-profile" required></select></label><label>Kịch bản<select id="run-scenario" required></select></label></div><div id="variables"></div><button id="run" class="primary" type="submit">Chạy trên thiết bị</button></form></div>
+    <div class="panel"><div class="row"><h2>Lịch sử điều khiển</h2><small>200 lệnh gần nhất · tự cập nhật</small></div><div id="history"></div></div>
+  </section></div></div></section>
+  <footer>Local Agent Remote · Thiết bị giữ quyền quyết định kịch bản được phép chạy.</footer>
+</main></body></html>
