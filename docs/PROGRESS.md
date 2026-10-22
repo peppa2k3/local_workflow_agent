@@ -1,5 +1,21 @@
 # Tiến độ phát triển
 
+## 2026-10-22 — Remote control (dev/remote)
+
+- Lõi outbound HTTPS, lưu control SQLite riêng, tài khoản scrypt/session/CSRF,
+  code ghép nối hết hạn, tài khoản và local xác nhận, revoke/ownership.
+- Queue/journal bền vững, command UUID/idempotency/lease, allowlist local,
+  run/stop remote-owned, heartbeat/reconnect, step history và crash recovery.
+- Web VPS đăng nhập/device/status/run/history; local /remote cấp quyền và xác
+  nhận; link dashboard/extension, giữ nguyên scenario/actions và loopback 34719.
+- Daemon, graceful shutdown, script startup Windows interactive, deploy templates
+  Node 24/nginx TLS/compose/systemd, docs REMOTE_CONTROL.md.
+- 5 feature prompt đã triển khai tuần tự; kiểm chứng fixture/mock riêng. Không
+  triển khai VPS, ghép máy thật, cài startup task hay chạy Facebook.
+- Kiểm chứng hoàn tất: `npm test` đạt toàn bộ; các thay đổi cuối ở expiry/receipt/UI
+  được chạy lại bằng `npm run test:remote`. `node --check` mọi JavaScript thay đổi,
+  PowerShell AST parse và `git diff --check` đạt.
+
 Cập nhật: 2026-10-22 (Asia/Bangkok).
 
 ## 2026-10-22: khôi phục agent đang chạy còn giữ lỗi DNS cũ

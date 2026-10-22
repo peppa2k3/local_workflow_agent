@@ -17,7 +17,9 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, performan
       connected: !!config.device && Date.now() - lastContact < 45000 && !error,
       pending: config.pending ? { id: config.pending.id, code: config.pending.code, expires: config.pending.expires,
         email: config.pending.email || null, claim: config.pending.claim || null, state: config.pending.state || 'waiting' } : null,
-      available: { profiles: profiles().map(p => ({ directory: p.directory, name: p.name })), scenarios: scenarios.list().map(name => ({ name, variables: Object.keys(scenarios.load(name).variables || {}) })) } };
+      available: { profiles: profiles().map(p => ({ directory: p.directory, name: p.name })), scenarios: scenarios.list().flatMap(name => {
+        try { return [{ name, variables: Object.keys(scenarios.load(name).variables || {}) }]; } catch { return []; }
+      }) } };
   }
   async function tick() {
     if (closed || pendingBusy || actionBusy || Date.now() < nextAttempt) return;
@@ -37,6 +39,7 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, performan
           scenarios: policy.scenarios.flatMap(name => { try { const s = scenarios.load(name); return [{ name, steps: s.steps.length,
             variables: (policy.variables[name] || []).filter(v => Object.hasOwn(s.variables || {}, v)) }]; } catch { return []; } }) };
         const response = await request('/device/exchange', { id: config.device.id, instanceId, metadata, reports: executor.reports(config.device.id) }, config.token);
+        if (closed) return;
         executor.acknowledge(response.ack);
         if (response.command) executor.execute(response.command, config.device.id);
         lastContact = Date.now();
@@ -50,13 +53,14 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, performan
     finally { pendingBusy = false; }
   }
   function setPolicy(value) {
-    if (!c.object(value) || !Array.isArray(value.profiles) || !Array.isArray(value.scenarios) || !c.object(value.variables || {})) c.fail('Invalid local policy');
+    if (!c.object(value) || !Array.isArray(value.profiles) || !Array.isArray(value.scenarios) || !c.object(value.variables || {})
+      || value.profiles.length > 100 || value.scenarios.length > 200 || Buffer.byteLength(JSON.stringify(value)) > 30000) c.fail('Invalid or oversized local policy');
     const knownProfiles = profiles().map(p => p.directory), knownScenarios = scenarios.list();
     if (value.profiles.some(p => !knownProfiles.includes(p)) || value.scenarios.some(s => !knownScenarios.includes(s))) c.fail('Unknown profile or scenario');
     const variables = {};
     for (const name of value.scenarios) {
       const names = value.variables?.[name] || [];
-      if (!Array.isArray(names) || names.some(v => !Object.hasOwn(scenarios.load(name).variables || {}, v))) c.fail('Unknown variable in local policy');
+      if (!Array.isArray(names) || names.length > 100 || names.some(v => typeof v !== 'string' || v.length > 100 || !Object.hasOwn(scenarios.load(name).variables || {}, v))) c.fail('Unknown variable in local policy');
       variables[name] = [...new Set(names)];
     }
     config.policy = { profiles: [...new Set(value.profiles)], scenarios: [...new Set(value.scenarios)], variables }; save();

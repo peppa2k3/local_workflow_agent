@@ -25,11 +25,18 @@ function snapshot(value, command) {
     endedAt: Number.isFinite(value.endedAt) ? value.endedAt : null };
 }
 function createCommandApi(store) {
+  function expire(owner, deviceId) {
+    const commands = store.list('command', owner).filter(v => v.deviceId === deviceId), now = Date.now();
+    for (const cmd of commands) if (['queued', 'dispatched'].includes(cmd.state) && cmd.expires < now) {
+      cmd.state = cmd.state === 'queued' ? 'expired' : 'unknown'; cmd.updated = now; store.put('command', cmd, owner);
+    }
+    return commands;
+  }
   function owned(user, id) { const d = store.get('device', c.uuid(id)); if (!d || d.owner !== user.id) c.fail('Device not found', 404); return d; }
   function account(route, method, user, data, url) {
     if (route === '/api/commands' && method === 'GET') {
       const id = url.searchParams.get('device'); owned(user, id);
-      return { commands: store.list('command', user.id).filter(v => v.deviceId === id).slice(-200).reverse().map(({ fingerprint, ...v }) => v) };
+      return { commands: expire(user.id, id).slice(-200).reverse().map(({ fingerprint, ...v }) => v) };
     }
     if (route !== '/api/commands' || method !== 'POST') c.fail('Not found', 404);
     const d = owned(user, data.deviceId), id = c.uuid(data.requestId), type = data.type;
@@ -41,6 +48,7 @@ function createCommandApi(store) {
       if (JSON.stringify(payload.variables).length > 16000) c.fail('Variables too large');
     }
     const fingerprint = c.hash(JSON.stringify({ deviceId: d.id, type, payload }));
+    expire(user.id, d.id);
     const previous = store.get('command', id);
     if (previous) {
       if (previous.owner !== user.id || previous.fingerprint !== fingerprint) c.fail('Request ID already used for a different command', 409);
@@ -89,10 +97,7 @@ function createCommandApi(store) {
         ack.push({ id: cmd.id, seq: report.seq });
       }
       Object.assign(d, { metadata: meta, lastSeen: now, instanceId: data.instanceId, leaseUntil: now + 35000 }); store.put('device', d, d.owner);
-      const commands = store.list('command', d.owner).filter(v => v.deviceId === d.id);
-      for (const cmd of commands) if (['queued', 'dispatched'].includes(cmd.state) && cmd.expires < now) {
-        cmd.state = cmd.state === 'queued' ? 'expired' : 'unknown'; cmd.updated = now; store.put('command', cmd, d.owner);
-      }
+      const commands = expire(d.owner, d.id);
       const next = commands.filter(cmd => ['queued', 'dispatched'].includes(cmd.state) && cmd.expires >= now && cmd.deliveryUntil <= now)
         .sort((a, b) => (a.type === 'stop' ? 0 : 1) - (b.type === 'stop' ? 0 : 1) || a.created - b.created)[0];
       if (next) { next.state = 'dispatched'; next.deliveryUntil = now + 10000; store.put('command', next, d.owner); }

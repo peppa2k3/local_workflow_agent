@@ -35,7 +35,7 @@ async function passwordValid(password, stored) {
   return equal((await scrypt(password, salt, 64)).toString('hex'), expected);
 }
 function atomicJson(file, value) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
   const temp = `${file}.${crypto.randomUUID()}.tmp`;
   try {
     const fd = fs.openSync(temp, 'wx', 0o600);

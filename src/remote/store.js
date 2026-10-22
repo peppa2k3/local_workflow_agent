@@ -3,8 +3,9 @@ const path = require('node:path');
 // Loaded by the VPS only. Local automation does not require SQLite support.
 const { DatabaseSync } = require('node:sqlite');
 function createStore(file) {
-  if (file !== ':memory:') fs.mkdirSync(path.dirname(file), { recursive: true });
+  if (file !== ':memory:') fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
   const db = new DatabaseSync(file);
+  if (file !== ':memory:') fs.chmodSync(file, 0o600);
   db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;
     CREATE TABLE IF NOT EXISTS records (kind TEXT NOT NULL, id TEXT NOT NULL, owner TEXT NOT NULL,
       value TEXT NOT NULL, PRIMARY KEY(kind,id));

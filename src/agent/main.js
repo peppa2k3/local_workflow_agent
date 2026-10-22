@@ -18,6 +18,7 @@ const { createMongoSync } = require('./mongo-sync');
 const { mongoSettings } = require('./env');
 const { createContentApi } = require('./content-api');
 const { createRemoteClient } = require('./remote-client');
+const daemon = process.argv[2] === '--daemon' || process.env.LOCAL_AGENT_DAEMON === '1';
 
 const scenarios = createScenarioStore(scenariosDir);
 const eventLoop = monitorEventLoopDelay({ resolution: 20 });
@@ -200,20 +201,20 @@ const performanceTimer = setInterval(() => {
   previousCpu = cpu; previousCpuAt = now; eventLoop.reset();
 }, 2000);
 performanceTimer.unref();
-profileCache.ready.then(() => server.listen(port, '127.0.0.1', () => {
+profileCache.ready.then(() => { if (closing) return; server.listen(port, '127.0.0.1', () => {
   console.log(`Local agent ready. Default Chrome profile: ${profile}.`);
   console.log(`Dashboard: http://127.0.0.1:${port}`);
   console.log(`Content manager: http://127.0.0.1:${port}/content`);
   console.log(`MongoDB ${activity.syncStatus().database}: ${activity.syncStatus().enabled ? 'configured; connection status in Content manager' : 'set MONGODB_URI in .env to connect'}`);
-  console.log('Commands: run <scenario.json> [--profile "Profile 1"] [--upload "path"] | stop [profile] | status | exit');
-  terminal.prompt();
-}));
+  console.log(daemon ? 'Daemon mode: stdin EOF does not stop the agent.' : 'Commands: run <scenario.json> [--profile "Profile 1"] [--upload "path"] | stop [profile] | status | exit');
+  terminal?.prompt();
+}); });
 server.on('error', error => {
   console.error(error.code === 'EADDRINUSE' ? `Port ${port} is already in use. Exit the previous local agent, then run this version again.` : error);
-  process.exitCode = 1; terminal.close();
+  process.exitCode = 1; void shutdown();
 });
-const terminal = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: 'agent> ' });
-terminal.on('line', line => {
+const terminal = daemon ? null : readline.createInterface({ input: process.stdin, output: process.stdout, prompt: 'agent> ' });
+terminal?.on('line', line => {
   const command = line.trim();
   try {
     if (command.startsWith('run ')) {
@@ -232,4 +233,15 @@ terminal.on('line', line => {
   } catch (error) { console.error(error.message); }
   terminal.prompt();
 });
-terminal.on('close', () => { remote.close(); profiles().forEach(item => workflows.stop(item.directory)); server.close(); void mongoSync.close(); });
+let closing = false;
+async function shutdown() {
+  if (closing) return; closing = true;
+  remote.close(); terminal?.close(); clearInterval(expiry); clearInterval(performanceTimer); eventLoop.disable();
+  profiles().forEach(item => workflows.stop(item.directory));
+  server.close(); server.closeIdleConnections();
+  const timeout = setTimeout(() => process.exit(process.exitCode || 0), 15000); timeout.unref();
+  await mongoSync.close();
+}
+terminal?.on('close', () => { void shutdown(); });
+process.on('SIGTERM', () => { void shutdown(); });
+process.on('SIGINT', () => { void shutdown(); });

@@ -1,0 +1,11 @@
+.git
+.env
+.env.*
+data
+node_modules
+.facebook-chrome-profile
+tools
+*.pem
+*.crx
+test-results
+playwright-report

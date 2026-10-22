@@ -1,5 +1,24 @@
 # Project context
 
+## Remote control trên nhánh dev/remote (2026-10-22)
+
+VPS riêng `node remote-control.js` (Node 24, SQLite) phục vụ web đăng nhập và điều
+khiển; local `node local-agent.js --daemon` chủ động poll HTTPS mỗi 3s, reconnect
+backoff. Không public cổng 34719. `/remote` trên dashboard local cấp allowlist
+profile/scenario/từng biến và xác nhận tài khoản sau khi account claim code trên
+VPS. Cả hai đồng ý mới tạo device credential; có revoke/disconnect. Extension
+options có link cấu hình, protocol action hiện tại không đổi.
+
+Command queue VPS và journal local bền vững; command UUID = executionId, độc lập
+runId của extension. Nhận lại lệnh không tự chạy lại; crash không rõ kết quả báo
+unknown. Remote Stop chỉ nhắm remote execution; mất mạng giữ lượt đang chạy, revoke
+được local quan sát thì dừng remote-owned jobs. VPS chỉ nhận metadata được cấp,
+step preview và kết quả; content/download/upload/Atlas vẫn do service local cũ.
+
+Đã chia 5 prompt và commit tuần tự, roadmap tại prompts/planed/REMOTE_CONTROL_ROADMAP.md.
+Hướng dẫn TLS/nginx/compose/systemd/Windows startup tại docs/REMOTE_CONTROL.md.
+Không deploy VPS, cài Scheduled Task hoặc điều khiển Chrome người dùng để thử thật.
+
 ## MongoDB Atlas và kho nội dung web (2026-10-22)
 
 Entry local-agent.js nạp .env tại project root trước CLI/server; biến shell có ưu tiên cao hơn file. MongoDB mặc định team_content; mongoSettings chỉ nạp lại URI/database/DNS khi người dùng bấm reconnect. Không đưa URI vào HTTP/log. npm run check:mongo ping thật, không tạo dữ liệu thử. .env bị ignore Git; chỉ commit .env.example.

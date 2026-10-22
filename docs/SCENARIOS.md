@@ -1,5 +1,13 @@
 # Local workflow agent
 
+Remote control: use `node local-agent.js --daemon` for an always-on local agent,
+and `/remote` to grant saved scenario/profile/variable permissions and approve a
+VPS account. The VPS web UI runs/stops only those granted saved scenarios through
+the existing workflow engine, with durable command IDs and per-step history. See
+[remote setup and deployment](REMOTE_CONTROL.md). Remote run defaults to a
+one-hour timeout; queue start deadlines are five minutes. Browser actions still
+need the corresponding Chrome profile and extension online.
+
 For scripted integrations, see [CLI and authenticated API v1](AUTOMATION_API.md). Run `node local-agent.js run --scenario NAME --profile "Profile 1" --var "caption=value" --wait` against a running agent configured with `LOCAL_AGENT_API_TOKEN`. API v1 requires an explicit profile and only accepts saved scenario names. Overrides merge with saved variables for this run without modifying the scenario; runtime download variables remain reserved. `GET /api/v1/runs/:runId` reports a stable execution ID and terminal outcome. Legacy `POST /api/run` also accepts `variables` and returns the run object. The dashboard and extension use the same action engine, including legacy CSS `selector` steps. Workflows now have a default one-hour execution budget, checked each second; API v1 can set `timeoutMs` up to 24 hours.
 
 Run `node local-agent.js`, then open **http://127.0.0.1:34719** in your browser. The dashboard lets you create, reorder, edit, save, run, and stop scenarios. You can still enter `run scenarios/facebook-reels.json` in the terminal.
@@ -204,9 +212,4 @@ Xem cấu hình `MONGODB_URI`/`MONGODB_DATABASE`, ví dụ JSON, mô hình dữ 
 ## MongoDB Atlas, .env và chọn page từ kho chung
 
 Agent đọc `.env` ở thư mục dự án, gồm `MONGODB_URI` và `MONGODB_DATABASE=team_content`. Mở `/content` để kiểm tra/kết nối lại, xem/tìm download, upload và lịch sử từ database, tạo/sửa page, cập nhật mô tả/ngày đăng/permalink publication. Trong bước upload, nút **Chọn page từ MongoDB** điền UUID/tên/URL/nền tảng từ page active dùng chung. Trước khi chọn file, agent kiểm tra lại page trong database; page inactive hoặc lỗi kết nối dừng bước có metadata page. Biến và CSS selector legacy vẫn được giữ. Reload extension 4.2.0, restart agent và dashboard sau nâng cấp; xem [MONGODB_ATLAS.md](MONGODB_ATLAS.md).
-# Remote control
-
-Remote control uses saved scenarios through the existing workflow engine. Pairing
-and device management are separate from scenario actions; legacy `selector` steps
-and extension messages retain their format. See [REMOTE_CONTROL.md](REMOTE_CONTROL.md).
 

@@ -1,0 +1,26 @@
+[Unit]
+Description=Local Agent Remote Control
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=local-agent-control
+Group=local-agent-control
+WorkingDirectory=/opt/local-agent-control
+Environment=CONTROL_ENV_FILE=/etc/local-agent-control.env
+Environment=CONTROL_DATABASE=/var/lib/local-agent-control/control.sqlite
+ExecStart=/usr/bin/node /opt/local-agent-control/remote-control.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=25
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+StateDirectory=local-agent-control
+ReadWritePaths=/var/lib/local-agent-control
+
+[Install]
+WantedBy=multi-user.target

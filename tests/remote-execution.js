@@ -43,6 +43,8 @@ const c = require('../src/remote/common');
     assert.equal((await api('/api/commands', command)).duplicate, true);
     await api('/api/commands', { ...command, scenario: 'different' }, 409);
     await client.tick(); assert.equal(started, 1);
+    const replay = createRemoteExecutor({ dataDir: dir, workflows, scenarios, getPolicy: () => policy });
+    replay.execute(first.command, deviceId); assert.equal(started, 1, 'Durable journal blocks a duplicate accepted delivery');
     // Simulate receipt loss: VPS retries exact command ID.
     const queued = f.store.get('command', command.requestId); queued.deliveryUntil = 0; f.store.put('command', queued, f.alice.id);
     await client.tick(); assert.equal(started, 1);
@@ -63,6 +65,28 @@ const c = require('../src/remote/common');
     const recovery = createRemoteExecutor({ dataDir: crashDir, workflows, scenarios, getPolicy: () => policy });
     assert.equal(recovery.reports(deviceId)[0].result.state, 'unknown');
     recovery.execute({ ...first.command, id: crashId }, deviceId); assert.equal(started, 2);
+    // Expiry, cancellation before delivery and late receipts without wall-clock sleeps.
+    const protocol = createCommandApi(f.store), another = { id: randomUUID(), owner: f.alice.id, lastSeen: Date.now(), revoked: false,
+      metadata: { profiles: [{ directory: 'Default' }], scenarios: [{ name: 'sample', variables: [], steps: 1 }] } };
+    f.store.put('device', another, f.alice.id);
+    const account = data => protocol.account('/api/commands', 'POST', f.alice, data, new URL(f.origin));
+    const input = { deviceId: another.id, requestId: randomUUID(), type: 'run', scenario: 'sample', profile: 'Default' };
+    const queuedForCancel = account(input).command;
+    assert.equal(account({ deviceId: another.id, requestId: randomUUID(), type: 'stop', runId: queuedForCancel.id }).command.state, 'succeeded');
+    assert.equal(f.store.get('command', queuedForCancel.id).state, 'cancelled');
+    const expired = account({ ...input, requestId: randomUUID() }).command; expired.expires = Date.now() - 1; f.store.put('command', expired, f.alice.id);
+    const instance = randomUUID(), meta = { profiles: [], scenarios: [] };
+    function exchange(reports = []) { return protocol.device('/device/exchange', f.store.get('device', another.id), { instanceId: instance, metadata: meta, reports }); }
+    exchange(); assert.equal(f.store.get('command', expired.id).state, 'expired');
+    another.lastSeen = 0; f.store.put('device', another, f.alice.id);
+    assert.throws(() => account({ ...input, requestId: randomUUID() }), /offline/);
+    another.lastSeen = Date.now(); f.store.put('device', another, f.alice.id);
+    const ambiguous = account({ ...input, requestId: randomUUID() }).command;
+    const delivered = exchange().command; assert.equal(delivered.id, ambiguous.id);
+    const deliveredRecord = f.store.get('command', ambiguous.id); deliveredRecord.expires = Date.now() - 1; f.store.put('command', deliveredRecord, f.alice.id);
+    exchange(); assert.equal(f.store.get('command', ambiguous.id).state, 'unknown');
+    exchange([{ id: ambiguous.id, seq: 2, result: { state: 'succeeded' } }]); assert.equal(f.store.get('command', ambiguous.id).state, 'succeeded');
+    exchange([{ id: ambiguous.id, seq: 1, result: { state: 'running' } }]); assert.equal(f.store.get('command', ambiguous.id).state, 'succeeded');
     // Stable execution UUID is independent of the extension protocol runId.
     const realScenarios = createScenarioStore(dir), real = createWorkflows({ scenarios: realScenarios, profiles, defaultProfile: 'Default' });
     const stableId = randomUUID(); real.start('Default', { steps: [{ action: 'wait', ms: 5 }] }, '', 'fixture', {}, 1000, stableId);

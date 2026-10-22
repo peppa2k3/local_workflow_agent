@@ -1,7 +1,7 @@
 (() => {
   const $ = id => document.getElementById(id);
   let csrf = '', selected = '', devices = [], busy = false, timer, formSignature = '', historySignature = '', runIntent = null;
-  const stateName = { queued: 'Đang đợi', dispatched: 'Đã gửi tới máy', running: 'Đang chạy', succeeded: 'Thành công', failed: 'Thất bại', cancelled: 'Đã dừng',
+  const stateName = { pending: 'Chờ thực hiện', queued: 'Đang đợi', dispatched: 'Đã gửi tới máy', running: 'Đang chạy', succeeded: 'Thành công', failed: 'Thất bại', cancelled: 'Đã dừng',
     interrupted: 'Bị gián đoạn', unknown: 'Chưa rõ kết quả — kiểm tra máy local', expired: 'Hết hạn', rejected: 'Máy local từ chối' };
   const when = n => n ? new Date(n).toLocaleString('vi-VN') : 'Chưa nhận heartbeat';
   function el(tag, text, className) { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (className) n.className = className; return n; }
@@ -57,6 +57,7 @@
       n.append(el('h3', cmd.type === 'run' ? `${cmd.payload.scenario} · ${cmd.payload.profile}` : 'Yêu cầu dừng tác vụ'));
       n.append(el('small', `ID: ${cmd.id}`));
       const result = cmd.result;
+      if (result?.startedAt) n.append(el('p', `Bắt đầu: ${when(result.startedAt)}${result.endedAt ? ' · Kết thúc: ' + when(result.endedAt) : ''}`, 'muted'));
       if (result?.total) { const progress = el('progress'); progress.max = result.total; progress.value = cmd.state === 'succeeded' ? result.total : result.index;
         n.append(el('p', result.stoppedAtStep ? `Dừng tại bước ${result.stoppedAtStep}/${result.total}` : `Tiến độ: ${Math.min(result.index + 1, result.total)}/${result.total}`), progress); }
       if (result?.message) n.append(el('p', result.message, 'muted'));

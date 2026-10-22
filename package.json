@@ -4,7 +4,10 @@
   "private": true,
   "scripts": {
     "start": "node local-agent.js",
-    "test": "node tests/mongo-dns.js && node tests/env-config.js && node tests/content-manager.js && node tests/activity-history.js && node tests/dashboard-performance.js && node tests/pipeline.js && node tests/video-download.js && node tests/scenario-features.js && node tests/workflows.js && node tests/agent-api.js && node tests/automation-api.js && node tests/overlay-flow.js && node tests/navigation-flow.js && node tests/file-picker.js",
+    "start:daemon": "node local-agent.js --daemon",
+    "start:control": "node remote-control.js",
+    "test:remote": "node tests/remote-core.js && node tests/remote-pairing.js && node tests/remote-execution.js && node tests/remote-web.js && node tests/remote-daemon.js",
+    "test": "npm run test:remote && node tests/mongo-dns.js && node tests/env-config.js && node tests/content-manager.js && node tests/activity-history.js && node tests/dashboard-performance.js && node tests/pipeline.js && node tests/video-download.js && node tests/scenario-features.js && node tests/workflows.js && node tests/agent-api.js && node tests/automation-api.js && node tests/overlay-flow.js && node tests/navigation-flow.js && node tests/file-picker.js",
     "check:mongo": "node scripts/check-mongodb.js",
     "setup:video": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-video.ps1"
   },

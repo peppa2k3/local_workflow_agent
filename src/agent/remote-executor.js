@@ -6,7 +6,7 @@ function createRemoteExecutor({ dataDir, workflows, scenarios, getPolicy }) {
   const save = () => c.atomicJson(file, journal);
   function result(run) {
     return { runId: run.runId, state: run.state, index: run.index, total: run.total, stoppedAtStep: run.stoppedAtStep,
-      steps: (run.steps || []).map(s => ({ number: s.number, state: s.state, action: s.action, label: s.label })),
+      steps: (run.steps || []).slice(0, 100).map(s => ({ number: s.number, state: s.state, action: s.action, label: String(s.label || '').slice(0, 120) })),
       startedAt: run.startedAt, endedAt: run.endedAt,
       message: ['failed', 'interrupted'].includes(run.state) ? 'Workflow failed/interrupted. See local history for details.' : '' };
   }
@@ -57,7 +57,13 @@ function createRemoteExecutor({ dataDir, workflows, scenarios, getPolicy }) {
         else { record.phase = 'done'; update(record, { state: 'unknown', message: 'Agent restarted during acceptance; this command will not be replayed.' }); }
       }
     }
-    return Object.values(journal).filter(r => r.deviceId === deviceId && r.seq > r.ack).slice(0, 20).map(r => ({ id: r.id, seq: r.seq, result: r.result }));
+    const batch = []; let bytes = 0;
+    for (const r of Object.values(journal)) if (r.deviceId === deviceId && r.seq > r.ack) {
+      const item = { id: r.id, seq: r.seq, result: r.result }, length = Buffer.byteLength(JSON.stringify(item));
+      if (batch.length === 20 || bytes + length > 60000) break;
+      batch.push(item); bytes += length;
+    }
+    return batch;
   }
   function acknowledge(ack) {
     let changed = false;

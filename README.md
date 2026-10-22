@@ -1,5 +1,12 @@
 # Local Chrome Workflow Agent
 
+**Remote từ VPS:** web đăng nhập, ghép nối cần cả account và local xác nhận,
+giám sát thiết bị, chạy/dừng kịch bản theo quyền local và lưu tiến độ từng bước.
+Local chạy `node local-agent.js --daemon`, cấu hình tại
+[Remote local](http://127.0.0.1:34719/remote). VPS chạy `node remote-control.js`
+với `.env.control` riêng. Xem [hướng dẫn triển khai và vận hành](docs/REMOTE_CONTROL.md)
+và [roadmap 5 feature](prompts/planed/REMOTE_CONTROL_ROADMAP.md).
+
 Công cụ tạo và chạy kịch bản tự động trên Chrome profile đang dùng. Agent Node.js nhận lệnh trên máy; Chrome Extension thực hiện click, nhập chữ, cuộn và chọn file trong tab. Dashboard local giúp chỉnh sửa kịch bản JSON bằng giao diện.
 
 Dashboard hỗ trợ chọn/mở nhiều Chrome profile và chạy kịch bản độc lập trên từng profile. Cài extension trong mỗi profile, vào **Extension options** để chọn đúng thư mục profile, rồi chọn profile trên dashboard. `openUrl`/`click` chờ trang tải xong; dùng điều kiện hoàn tất để chờ kết quả AJAX hoặc upload.

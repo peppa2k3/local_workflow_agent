@@ -6,8 +6,11 @@ const c = require('./common');
 async function addUser(store, email, password) {
   email = c.text(email, 254).toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) c.fail('Invalid email');
-  if (store.list('user').some(u => u.email === email)) c.fail('Account already exists');
-  return store.put('user', { id: randomUUID(), email, password: await c.passwordHash(password) });
+  const digest = await c.passwordHash(password);
+  return store.transaction(() => {
+    if (store.list('user').some(u => u.email === email)) c.fail('Account already exists');
+    return store.put('user', { id: randomUUID(), email, password: digest });
+  });
 }
 function createControlServer({ store, publicUrl, allowHttp = false, trustProxy = false, commandApi }) {
   publicUrl = c.baseUrl(publicUrl, allowHttp);
