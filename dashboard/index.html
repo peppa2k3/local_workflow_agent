@@ -107,6 +107,7 @@
     <div class="progress"><strong>Trạng thái:</strong> <span id="progress">Chưa chạy</span></div>
     <div id="runSteps" class="profiles-summary" style="white-space: pre-wrap" aria-live="polite"></div>
     <p id="storageStatus"></p>
+    <p><a href="/content" style="color:#9fbbff">Mở quản lý nội dung / MongoDB Atlas →</a></p>
     <button class="btn ghost" id="historyBtn" type="button">Xem / làm mới lịch sử profile</button>
     <div id="runHistory" class="profiles-summary"></div>
   </main>
@@ -365,6 +366,21 @@
           const hint = document.createElement('p'); hint.style.gridColumn = '1 / -1';
           hint.textContent = 'Điền tên/URL page đích để lưu đúng page khi website mở màn hình soạn bài. UUID là ID trong Content Manager. Thời gian upload được lưu riêng; chọn file xong chưa xác nhận đã Đăng.';
           fields.append(hint);
+          const loadPages = document.createElement('button'); loadPages.className = 'btn ghost'; loadPages.type = 'button'; loadPages.textContent = 'Chọn page từ MongoDB';
+          loadPages.onclick = () => handle(async () => {
+            const data = await api('/api/content/catalog/pages?active=true&limit=50');
+            const select = document.createElement('select'); select.setAttribute('aria-label', 'Page dùng chung');
+            select.append(new Option('Chọn page đích…', ''));
+            for (const page of data.rows) select.append(new Option(`${page.name} · ${page.platform}`, page._id));
+            select.onchange = () => {
+              const page = data.rows.find(page => page._id === select.value);
+              if (page) { Object.assign(step, { pageId: page._id, pageName: page.name, pageUrl: page.url, platform: page.platform }); render(); }
+            };
+            if (!data.rows.length) notice('Chưa có page active. Mở Quản lý nội dung để tạo page.');
+            if (data.total > data.rows.length) notice('Đang hiện 50 page đầu. Dùng Quản lý nội dung để tìm page và sao chép UUID.');
+            loadPages.replaceWith(select);
+          });
+          fields.append(loadPages);
         }
         const nameField = field('Tên bước (tùy chọn)', step.label || '', 'text', value => {
           if (value.trim()) step.label = value; else delete step.label;
@@ -500,7 +516,7 @@
         if (state.download?.reused) progress += ' · Đã tải URL này, dùng file đã lưu';
         setText('progress', progress);
         setText('runSteps', (state.steps || []).map(stepSummary).join('\n'));
-        setText('storageStatus', data.storage ? `Lịch sử lưu trên máy. ${data.storage.enabled ? `MongoDB: ${data.storage.error || 'đang đồng bộ'} · ${data.storage.pending} bản ghi chờ` : 'MongoDB chưa cấu hình (MONGODB_URI).'} ` : '');
+        setText('storageStatus', data.storage ? `Lịch sử lưu trên máy. ${data.storage.enabled ? `MongoDB ${data.storage.database || ''}: ${data.storage.error || (data.storage.connected ? 'đã kết nối' : 'đang kết nối')} · ${data.storage.pending} bản ghi chờ` : 'Điền MONGODB_URI trong .env để kết nối MongoDB Atlas.'} ` : '');
         const perf = data.performance;
         setText('performance', `${perf ? `Agent: CPU ${perf.cpuPercent}% · RAM ${perf.memoryMb} MB · Event loop p95 ${perf.eventLoopP95Ms} ms · ` : ''}Profile ${selectedProfile}: tổng ${((state.elapsedMs || 0) / 1000).toFixed(1)}s · bước hiện tại ${((state.stepElapsedMs || 0) / 1000).toFixed(1)}s${state.lastStepMs == null ? '' : ` · bước trước ${(state.lastStepMs / 1000).toFixed(1)}s`}`);
         if (pickId !== null) {

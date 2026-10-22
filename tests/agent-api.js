@@ -18,7 +18,7 @@ const { spawn } = require('node:child_process');
     } } }));
     child = spawn(process.execPath, ['local-agent.js'], {
       cwd: path.join(__dirname, '..'),
-      env: { ...process.env, MONGODB_URI: '', LOCAL_AGENT_DATA_DIR: path.join(temp, 'activity'), LOCAL_AGENT_PORT: String(port), CHROME_PROFILE: 'Profile 1', CHROME_USER_DATA_DIR: temp, LOCAL_AGENT_SCENARIOS_DIR: temp },
+      env: { ...process.env, LOCAL_AGENT_ENV_FILE: path.join(temp, '.env'), MONGODB_URI: '', LOCAL_AGENT_DATA_DIR: path.join(temp, 'activity'), LOCAL_AGENT_PORT: String(port), CHROME_PROFILE: 'Profile 1', CHROME_USER_DATA_DIR: temp, LOCAL_AGENT_SCENARIOS_DIR: temp },
       stdio: ['pipe', 'pipe', 'pipe']
     });
     let log = '';
@@ -41,6 +41,10 @@ const { spawn } = require('node:child_process');
     assert.equal(profiles.profiles[0].name, 'First test profile');
     assert.equal(typeof profiles.performance.memoryMb, 'number');
     assert(profiles.capabilities.includes('variables-v1'));
+    const contentPage = await fetch(base + '/content');
+    assert.equal(contentPage.status, 200); assert.match(await contentPage.text(), /Kho nội dung/);
+    assert.equal((await api('/api/content/status')).enabled, false);
+    await api('/api/content/catalog/pages', undefined, 'GET', 503);
     const clients = [{ profile: 'Profile 1', clientId: 'first' }, { profile: 'Profile 2', clientId: 'second' }];
     await api('/state', { clientId: 'legacy' }, 'POST', 400);
     for (const client of clients) await api('/state', client);

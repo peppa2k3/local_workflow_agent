@@ -130,7 +130,7 @@ async function until(test) { for (let i = 0; i < 100 && !test(); i++) await tick
     // Offline outbox retains writes, retries with BSON Dates and insert-only content fields.
     let offline = true;
     const writes = [];
-    const client = { db: () => ({ collection: name => ({
+    const client = { db: () => ({ command: async () => { if (offline) throw Object.assign(new Error('private URI'), { code: 'OFFLINE' }); }, collection: name => ({
       createIndex: async () => { if (offline) throw Object.assign(new Error('private URI'), { code: 'OFFLINE' }); },
       findOne: async () => null,
       updateOne: async (filter, update) => { writes.push({ name, filter, update }); }

@@ -8,3 +8,6 @@ test-results/
 
 tools/
 data/
+.env
+.env.*
+!.env.example

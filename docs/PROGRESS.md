@@ -2,6 +2,14 @@
 
 Cập nhật: 2026-10-22 (Asia/Bangkok).
 
+## 2026-10-22: .env, MongoDB Atlas và giao diện nội dung dùng chung
+
+- Nạp .env trước server/CLI, giữ ưu tiên biến shell; đọc lại URI/database qua giao diện. Thêm .env.example, ignore file cấu hình thật, script check:mongo chỉ ping và báo lỗi an toàn.
+- Trang /content hiển thị kết nối thật, thống kê và catalog download/upload/page/publication/asset/file/run; tìm kiếm literal, phân trang, xem chi tiết, quản lý page và sửa metadata publication. Kiểm tra phiên bản updated_at, giữ ID và các trường của service khác.
+- Thêm picker page active trong workflow, xác minh MongoDB trước upload; dùng UUID page đã có từ service khác, remap các quan hệ local trước đồng bộ. Thêm collection downloads dùng chung; không chuyển bytes video vào MongoDB.
+- Kiểm thử .env/ưu tiên shell/reload/cwd khác, API auth, adapter DB/date/retry/khóa phiên bản, reconcile page cùng quan hệ run/publication/event, preflight chặn upload khi DB lỗi và UI desktop/mobile bằng Chrome tách biệt. Npm test và node --check; đã xem ảnh render UI.
+- Kiểm tra Atlas thật hiện chưa thực hiện được: .env local đã tạo nhưng MONGODB_URI còn rỗng; không có URI trong môi trường. Người dùng điền URI rồi bấm Đọc lại .env / kết nối hoặc chạy npm run check:mongo.
+
 ## 2026-10-22: lịch sử tác vụ, metadata nội dung và dùng lại download
 
 - Lưu từng execution/step, thời gian, trạng thái, lỗi và vị trí dừng trên đĩa; khôi phục lượt bị ngắt thành interrupted. API/CLI đọc lịch sử sau restart, dashboard xem theo profile.

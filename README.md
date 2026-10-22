@@ -10,6 +10,8 @@ Dashboard hiển thị CPU/RAM/event loop của agent cùng thời gian chạy t
 
 Lịch sử từng bước được lưu qua restart tại `data/agent/`. URL đã tải dùng lại file nếu kích thước/SHA-256 còn đúng, rồi tiếp tục các bước upload. Bước upload có tên/URL/UUID page và thời gian upload; metadata có thể đồng bộ MongoDB qua `MONGODB_URI`. Xem [cấu hình lưu trữ và ví dụ biến page](docs/ACTIVITY_STORAGE.md).
 
+Để dùng MongoDB Atlas chung với các service khác, điền `MONGODB_URI` và `MONGODB_DATABASE=team_content` trong `.env` (mẫu `.env.example`), chạy `npm run check:mongo`, rồi khởi động agent. Giao diện [Kho nội dung](http://127.0.0.1:34719/content) quản lý download/upload, page, publication và lịch sử trong database. Hỗ trợ đọc lại `.env`, kiểm tra kết nối, đồng bộ ngay và chọn page chung trong bước upload. Xem [hướng dẫn Atlas](docs/MONGODB_ATLAS.md).
+
 **Bắt đầu:** [Hướng dẫn cài đặt và chạy từng bước](docs/SETUP.md).
 
 ## Cấu trúc

@@ -99,6 +99,7 @@ const { createScenarioStore } = require('../src/agent/scenario-store');
     context.job = job;
     vm.runInContext('activeJob = job', context);
     const execute = vm.runInContext('execute', context);
+    await assert.rejects(execute(job, { action: 'upload', filePath: uploadFile, pageName: '{{page_name}}', selector: '#upload' }), /page metadata must be resolved/);
     let started = Date.now();
     await execute(job, { action: 'openUrl', url: base + '/redirect', navigationTimeoutMs: 10000 });
     assert(Date.now() - started >= 900, 'openUrl must wait for load, including resources');

@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kho nội dung · Workflow Studio</title>
+  <style>
+    [hidden]{display:none!important}
+
+    .main,.sidebar{min-width:0}
+.table-wrap{max-width:100%}
+.table-wrap table{min-width:850px}
+
+    :root{color-scheme:dark;font-family:Segoe UI,Arial,sans-serif;background:#0c1220;color:#e6edf8}
+*{box-sizing:border-box}
+body{margin:0}
+button,input,select,textarea{font:inherit}
+button{cursor:pointer}
+a{color:#92b9ff;text-decoration:none}
+button,.button{border:1px solid #34435b;border-radius:8px;background:#202e43;color:#e7edf9;padding:10px 14px;display:inline-block}
+button:hover,.button:hover{background:#2a3c55}
+button:disabled{opacity:.5;cursor:wait}
+.primary{background:#087f70;border-color:#0e9d88}
+.muted{color:#92a3bb;font-size:13px;line-height:1.7}
+.layout{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:100vh}
+.sidebar{border-right:1px solid #283247;background:#101928;padding:28px 20px}
+.brand{font-weight:700;font-size:19px;letter-spacing:-.5px}
+.brand span{display:block;color:#55d5ba;font-size:11px;letter-spacing:2px;margin-top:7px}
+.sidebar nav{display:grid;gap:10px;margin-top:40px}
+.sidebar nav a{padding:12px;border-radius:8px;color:#9db0c9}
+.sidebar nav .active{background:#173b3c;color:#8be2d0}
+.sidebar .note{margin-top:40px}
+.main{padding:32px clamp(18px,3vw,44px);max-width:1600px;width:100%;margin:auto}
+header{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:26px}
+h1{font-size:30px;letter-spacing:-1px;margin:0 0 8px}
+h2{font-size:18px;margin:0 0 12px}
+p{margin:0}
+.badge{display:inline-block;font-size:12px;padding:7px 11px;border-radius:30px;background:#273246;color:#b4c4db}
+.badge.ok{background:#103d34;color:#77dec3}
+.connection{background:#121e30;border:1px solid #2c3c53;border-radius:13px;padding:20px;margin-bottom:24px}
+.connection-head{display:flex;gap:14px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:28px}
+.metric{background:#152033;border:1px solid #293950;border-radius:12px;padding:19px}
+.metric strong{display:block;font-size:30px;margin-top:8px;letter-spacing:-1px}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid #2c3a50;margin-bottom:20px;padding-bottom:8px}
+.tabs button{background:transparent;border:0;color:#91a3bf;border-radius:6px;padding:10px 13px}
+.tabs button[aria-selected=true]{background:#23354d;color:#e7f2ff}
+.filters{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:18px}
+label{display:grid;gap:7px;font-size:12px;color:#a5b6cf;font-weight:600}
+input,select,textarea{border:1px solid #35455f;background:#0d1626;color:#eef4ff;border-radius:8px;padding:10px;min-width:0}
+input:focus,select:focus,textarea:focus{outline:2px solid #3a998b}
+.search{flex:1;min-width:210px}
+.table-wrap{overflow:auto;border:1px solid #2a3850;border-radius:10px;background:#111c2d}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{text-align:left;background:#172338;color:#8fa5c4;font-size:11px;letter-spacing:.5px;text-transform:uppercase;padding:15px;white-space:nowrap}
+td{padding:16px 15px;border-top:1px solid #263249;max-width:340px;overflow-wrap:anywhere;vertical-align:top;line-height:1.6}
+td:first-child{font-weight:600}
+td button{padding:5px 9px;font-size:12px;white-space:nowrap}
+td .secondary{display:block;font-size:11px;color:#8fa0ba;font-weight:400}
+.empty{padding:55px 20px;text-align:center;color:#a5b6ce}
+.footer{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:16px}
+.message{min-height:22px;color:#80d7c1;margin:14px 0;font-size:13px}
+.message.error{color:#ffb1ba}
+.spacer{flex:1}
+dialog{border:1px solid #3b4b66;border-radius:14px;background:#142035;color:#e8f0ff;width:min(750px,94vw);max-height:90vh;padding:24px}
+dialog::backdrop{background:#030813bb}
+dialog form{display:grid;gap:15px}
+dialog textarea{min-height:110px;resize:vertical}
+dialog .actions{justify-content:flex-end;margin-top:8px}
+.detail-row{display:grid;grid-template-columns:150px minmax(0,1fr);gap:12px;padding:10px 0;border-bottom:1px solid #2b3b53;font-size:13px}
+.detail-row div{white-space:pre-wrap;overflow-wrap:anywhere}
+.detail-row strong{color:#9cb1ce}
+details{margin-top:10px}
+code{font-family:Consolas,monospace;font-size:12px}
+#tableStatus{font-size:13px;color:#9aacbe}
+@media(max-width:950px){.layout{grid-template-columns:1fr}
+.sidebar{padding:18px;border:0;border-bottom:1px solid #283247;display:flex;justify-content:space-between;align-items:center;gap:20px}
+.sidebar nav{margin:0;display:flex}
+.sidebar .note{display:none}
+.main{padding:22px 16px}
+.metrics{gap:8px}
+.metric{padding:13px}
+.metric strong{font-size:24px}
+}
+@media(max-width:550px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+.sidebar{flex-wrap:wrap}
+.detail-row{grid-template-columns:1fr;gap:3px}
+}
+
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">Workflow Studio<span>CONTENT LIBRARY</span></div>
+      <nav aria-label="Điều hướng"><a href="/">Kịch bản tự động</a><a class="active" href="/content" aria-current="page">Kho nội dung</a></nav>
+      <p class="note muted">Quản lý metadata dùng chung với Team Content Manager.<br><br>File video nằm tại máy tải hoặc kho file của service tương ứng.</p>
+    </aside>
+    <main class="main">
+      <header><div><h1>Kho nội dung</h1><p class="muted">Theo dõi clip đã tải, page đích và các lượt upload trên cùng database.</p></div><button id="refresh">Làm mới dữ liệu</button></header>
+      <section class="connection" aria-label="Kết nối MongoDB Atlas">
+        <div class="connection-head"><div><h2>MongoDB Atlas <span class="badge" id="connectionBadge">Đang kiểm tra</span></h2><p id="connectionInfo" class="muted">Database: team_content</p></div><div class="actions"><button id="ping">Kiểm tra kết nối</button><button id="reconnect">Đọc lại .env / kết nối</button><button id="sync" class="primary">Đồng bộ ngay</button></div></div>
+        <p id="connectionHelp" class="muted" style="margin-top:12px"></p>
+      </section>
+      <div class="metrics" aria-label="Tổng quan"><div class="metric"><span class="muted">Clip đã tải</span><strong id="countDownloads">—</strong></div><div class="metric"><span class="muted">Lượt upload</span><strong id="countUploads">—</strong></div><div class="metric"><span class="muted">Asset nội dung</span><strong id="countAssets">—</strong></div><div class="metric"><span class="muted">Publication</span><strong id="countPublications">—</strong></div></div>
+      <div class="tabs" id="tabs" role="tablist" aria-label="Loại dữ liệu"></div>
+      <form class="filters" id="searchForm"><label class="search">Tìm kiếm<input id="search" placeholder="Tiêu đề, URL hoặc mã nội dung…" maxlength="256"></label><label id="activeFilterLabel" hidden>Trạng thái page<select id="activeFilter"><option value="">Tất cả</option><option value="true">Đang hoạt động</option><option value="false">Đã ngừng</option></select></label><button type="submit">Tìm kiếm</button><button id="newPage" type="button" class="primary" hidden>＋ Thêm page</button></form>
+      <div id="message" class="message" role="status"></div>
+      <div class="table-wrap"><table id="catalogTable"><thead id="tableHead"></thead><tbody id="tableBody"></tbody></table><div id="empty" class="empty" hidden>Chưa có dữ liệu.</div></div>
+      <div class="footer"><span id="tableStatus"></span><div class="actions"><button id="previous">← Trước</button><button id="next">Sau →</button></div></div>
+    </main>
+  </div>
+  <dialog id="pageDialog"><form id="pageForm"><h2 id="pageTitle">Thêm page</h2><p class="muted">Page được lưu trong database dùng chung. Các lượt upload có thể chọn trực tiếp page này.</p><label>Tên page<input id="pageName" required maxlength="256"></label><label>Nền tảng<input id="pagePlatform" required maxlength="64" value="Facebook"></label><label>URL page<input id="pageUrl" type="url" placeholder="https://www.facebook.com/..."></label><label>Trạng thái<select id="pageActive"><option value="true">Đang hoạt động</option><option value="false">Ngừng hoạt động</option></select></label><p id="pageError" class="message error" role="alert"></p><div class="actions"><button type="button" data-close="pageDialog">Hủy</button><button id="savePage" class="primary" type="submit">Lưu page</button></div></form></dialog>
+  <dialog id="publicationDialog"><form id="publicationForm"><h2>Sửa publication</h2><p class="muted">Cập nhật metadata của bản ghi hiện tại. Để trống ngày đăng nếu chưa xác nhận bài đã xuất bản.</p><label>Mô tả<textarea id="publicationDesc" maxlength="20000"></textarea></label><label>Link bài đã đăng<input id="postUrl" type="url"></label><label>Ngày đăng (Asia/Bangkok, UTC+7)<input id="publishedAt" type="datetime-local"></label><p id="publicationError" class="message error" role="alert"></p><div class="actions"><button type="button" data-close="publicationDialog">Hủy</button><button id="savePublication" class="primary" type="submit">Lưu publication</button></div></form></dialog>
+  <dialog id="detailDialog"><h2 id="detailTitle">Chi tiết</h2><div id="detailBody"></div><div class="actions" style="margin-top:18px"><button id="copyId">Sao chép ID</button><button data-close="detailDialog">Đóng</button></div></dialog>
+  <script>
+    const $ = id => document.getElementById(id);
+    const token = '__LOCAL_AGENT_DASHBOARD_TOKEN__';
+    const dateFormat = new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Bangkok', dateStyle: 'short', timeStyle: 'medium' });
+    const date = value => value && Number.isFinite(new Date(value).getTime()) ? dateFormat.format(new Date(value)) : '—';
+    const short = value => value ? String(value).slice(0, 12) + '…' : '—';
+    const size = value => Number.isFinite(value) ? (value / 1048576).toFixed(1) + ' MB' : '—';
+    const duration = value => value == null ? '—' : Number(value).toFixed(1) + ' giây';
+    const states = { running: 'Đang chạy', succeeded: 'Thành công', failed: 'Thất bại', cancelled: 'Đã dừng', interrupted: 'Gián đoạn', pending: 'Chưa chạy', uploaded: 'Đã upload' };
+    const types = {
+      downloads: { title: 'Download', columns: [['Clip', row => row.title || row.file_name], ['URL nguồn', row => row.source_url], ['File đã lưu', row => row.file_path], ['Dung lượng', row => size(row.size)], ['Thời gian tải', row => date(row.downloaded_at)]] },
+      upload_events: { title: 'Upload', columns: [['Page đích', row => row.page?.name || row.page_url || 'Chưa rõ page'], ['Asset', row => short(row.asset_id)], ['Kết quả', row => states[row.state] || row.state], ['Thời gian upload', row => date(row.uploaded_at)], ['Lượt chạy', row => short(row.run_id)]] },
+      pages: { title: 'Pages', columns: [['Tên page', row => row.name], ['Nền tảng', row => row.platform], ['URL', row => row.url], ['Trạng thái', row => row.active ? 'Đang hoạt động' : 'Đã ngừng'], ['Cập nhật', row => date(row.updated_at)]] },
+      publications: { title: 'Publications', columns: [['Page', row => row.page?.name || short(row.page_id)], ['Mô tả', row => row.desc], ['Ngày đăng', row => date(row.published_at)], ['Link bài', row => row.post_url], ['Asset', row => short(row.asset_id)]] },
+      assets: { title: 'Assets', columns: [['SHA-256', row => short(row._id)], ['Dung lượng', row => size(row.size)], ['Thời lượng', row => duration(row.duration)], ['Kho file', row => row.storage?.status || 'Metadata'], ['Tạo lúc', row => date(row.created_at)]] },
+      file_instances: { title: 'File trên máy', columns: [['Tên file', row => row.name], ['Thư mục', row => row.folder_name], ['Tag', row => row.folder_tag], ['Đường dẫn', row => row.path], ['Nhập lần đầu', row => date(row.imported_at)]] },
+      workflow_runs: { title: 'Lượt chạy', columns: [['Kịch bản', row => row.scenario], ['Profile', row => row.profile], ['Kết quả', row => states[row.state] || row.state], ['Tiến độ', row => row.stoppedAtStep ? 'Dừng tại bước ' + row.stoppedAtStep + '/' + row.total : row.index + '/' + row.total], ['Bắt đầu', row => date(row.startedAt)]] }
+    };
+    let selected = 'downloads', offset = 0, total = 0, rows = [], requestVersion = 0, editingPage = null, editingPublication = null, originalPublishedInput = '', detailId = '';
+    function message(value, failed = false) { $('message').textContent = value; $('message').classList.toggle('error', failed); }
+    async function api(route, method = 'GET', body) {
+      const response = await fetch('/api/content' + route, { method, headers: { 'Content-Type': 'application/json', 'X-Local-Agent-Session': token },
+        body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(30000) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+      return result;
+    }
+    function connection(state) {
+      $('connectionBadge').textContent = !state.enabled ? 'Chưa cấu hình' : state.connected ? 'Đã kết nối' : 'Chưa kết nối';
+      $('connectionBadge').classList.toggle('ok', state.connected === true);
+      $('connectionInfo').textContent = `Database: ${state.database || 'team_content'} · ${state.pending || 0} bản ghi local chờ đồng bộ · Đồng bộ gần nhất: ${date(state.lastSyncedAt)}`;
+      $('connectionHelp').textContent = state.error || (!state.enabled ? 'Điền MONGODB_URI Atlas trong file .env của dự án, giữ MONGODB_DATABASE=team_content, rồi bấm Đọc lại .env / kết nối.' : 'Dữ liệu bên dưới được đọc trực tiếp từ database dùng chung. Bấm Làm mới để nhận thay đổi từ service khác.');
+    }
+    async function status() { const state = await api('/status'); connection(state); return state; }
+    async function summary() {
+      const result = await api('/summary'); connection(result.storage);
+      for (const [id, field] of [['countDownloads','downloads'],['countUploads','upload_events'],['countAssets','assets'],['countPublications','publications']]) $(id).textContent = result.counts[field] ?? 0;
+    }
+    function renderRows() {
+      const head = document.createElement('tr');
+      for (const title of [...types[selected].columns.map(column => column[0]), 'Thao tác']) { const th = document.createElement('th'); th.textContent = title; head.append(th); }
+      $('tableHead').replaceChildren(head);
+      $('tableBody').replaceChildren(...rows.map(row => {
+        const tr = document.createElement('tr');
+        for (const [, value] of types[selected].columns) { const td = document.createElement('td'); td.textContent = String(value(row) ?? '—'); tr.append(td); }
+        const td = document.createElement('td'), detail = document.createElement('button'); detail.textContent = 'Chi tiết'; detail.onclick = () => showDetail(row); td.append(detail);
+        if (['pages','publications'].includes(selected)) {
+          const edit = document.createElement('button'); edit.textContent = 'Sửa'; edit.style.marginLeft = '6px'; edit.onclick = () => selected === 'pages' ? editPage(row) : editPublication(row); td.append(edit);
+        }
+        tr.append(td); return tr;
+      }));
+      $('empty').hidden = rows.length !== 0;
+      $('tableStatus').textContent = `${total ? offset + 1 : 0}–${Math.min(offset + rows.length, total)} / ${total} bản ghi · MongoDB`;
+      $('previous').disabled = offset === 0; $('next').disabled = offset + rows.length >= total;
+    }
+    async function load() {
+      const version = ++requestVersion;
+      message('Đang đọc dữ liệu…');
+      const params = new URLSearchParams({ offset, limit: 25, q: $('search').value.trim() });
+      if (selected === 'pages' && $('activeFilter').value) params.set('active', $('activeFilter').value);
+      try {
+        const result = await api('/catalog/' + selected + '?' + params);
+        if (version !== requestVersion) return;
+        rows = result.rows; total = result.total; renderRows(); message('');
+      } catch (error) {
+        if (version !== requestVersion) return;
+        rows = []; total = 0; renderRows(); message(error.message, true);
+      }
+    }
+    async function refresh() {
+      try {
+        const state = await status();
+        if (!state.enabled) { rows = []; total = 0; renderRows(); message('Cấu hình .env để xem và quản lý dữ liệu trên Atlas.'); return; }
+        const results = await Promise.allSettled([summary(), load()]);
+        for (const result of results) if (result.status === 'rejected') message(result.reason.message, true);
+      } catch (error) { message(error.message, true); }
+    }
+    for (const [name, spec] of Object.entries(types)) {
+      const button = document.createElement('button'); button.textContent = spec.title; button.role = 'tab'; button.setAttribute('aria-selected', name === selected);
+      button.onclick = () => {
+        selected = name; offset = 0;
+        for (const item of $('tabs').children) item.setAttribute('aria-selected', item === button);
+        $('activeFilterLabel').hidden = name !== 'pages'; $('newPage').hidden = name !== 'pages';
+        void load();
+      }; $('tabs').append(button);
+    }
+    function showDetail(row) {
+      detailId = row._id; $('detailTitle').textContent = types[selected].title + ' · Chi tiết';
+      const parts = Object.entries(row).map(([key, value]) => {
+        const line = document.createElement('div'), name = document.createElement('strong'), content = document.createElement('div'); line.className = 'detail-row'; name.textContent = key;
+        if (key === 'steps' && Array.isArray(value)) content.textContent = value.map(step => `${step.number}. ${step.label} · ${states[step.state] || step.state}${step.error ? '\n' + step.error : ''}`).join('\n\n');
+        else content.textContent = value == null ? '—' : typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value);
+        line.append(name, content); return line;
+      }); $('detailBody').replaceChildren(...parts); $('detailDialog').showModal();
+    }
+    function editPage(row = null) {
+      editingPage = row; $('pageTitle').textContent = row ? 'Sửa page' : 'Thêm page';
+      $('pageName').value = row?.name || ''; $('pagePlatform').value = row?.platform || 'Facebook'; $('pageUrl').value = row?.url || ''; $('pageActive').value = String(row?.active ?? true); $('pageError').textContent = ''; $('pageDialog').showModal();
+    }
+    $('pageForm').onsubmit = async event => {
+      event.preventDefault(); $('savePage').disabled = true; $('pageError').textContent = '';
+      try {
+        const body = { name: $('pageName').value, platform: $('pagePlatform').value, url: $('pageUrl').value, active: $('pageActive').value === 'true' };
+        if (editingPage) body.expectedUpdatedAt = editingPage.updated_at || null;
+        await api('/pages' + (editingPage ? '/' + editingPage._id : ''), editingPage ? 'PATCH' : 'POST', body);
+        $('pageDialog').close(); await refresh(); message('Đã lưu page vào database dùng chung.');
+      } catch (error) { $('pageError').textContent = error.message; }
+      finally { $('savePage').disabled = false; }
+    };
+    function bangkokInput(value) {
+      if (!value) return '';
+      const shifted = new Date(new Date(value).getTime() + 7 * 3600000);
+      return shifted.toISOString().slice(0, 16);
+    }
+    function editPublication(row) {
+      editingPublication = row; $('publicationDesc').value = row.desc || ''; $('postUrl').value = row.post_url || ''; $('publishedAt').value = bangkokInput(row.published_at); originalPublishedInput = $('publishedAt').value; $('publicationError').textContent = ''; $('publicationDialog').showModal();
+    }
+    $('publicationForm').onsubmit = async event => {
+      event.preventDefault(); $('savePublication').disabled = true; $('publicationError').textContent = '';
+      try {
+        const input = $('publishedAt').value;
+        const published = input === originalPublishedInput ? editingPublication.published_at : input ? new Date(input + ':00+07:00').toISOString() : null;
+        await api('/publications/' + editingPublication._id, 'PATCH', { desc: $('publicationDesc').value, post_url: $('postUrl').value,
+          published_at: published ?? null, expectedUpdatedAt: editingPublication.updated_at || null });
+        $('publicationDialog').close(); await refresh(); message('Đã lưu publication, giữ nguyên ID bản ghi.');
+      } catch (error) { $('publicationError').textContent = error.message; }
+      finally { $('savePublication').disabled = false; }
+    };
+    for (const button of document.querySelectorAll('[data-close]')) button.onclick = () => $(button.dataset.close).close();
+    $('copyId').onclick = async () => { try { await navigator.clipboard.writeText(detailId); $('copyId').textContent = 'Đã sao chép'; } catch { message('ID: ' + detailId); } };
+    $('newPage').onclick = () => editPage();
+    $('searchForm').onsubmit = event => { event.preventDefault(); offset = 0; void load(); };
+    $('activeFilter').onchange = () => { offset = 0; void load(); };
+    $('previous').onclick = () => { offset = Math.max(0, offset - 25); void load(); };
+    $('next').onclick = () => { offset += 25; void load(); };
+    $('refresh').onclick = () => { void refresh(); };
+    for (const [id, route] of [['ping','/ping'],['reconnect','/reconnect'],['sync','/sync']]) $(id).onclick = async () => {
+      for (const key of ['ping','reconnect','sync']) $(key).disabled = true;
+      message('Đang kết nối / đồng bộ…');
+      try { const state = await api(route, 'POST'); connection(state); await refresh(); if (state.error) message(state.error, true); }
+      catch (error) { message(error.message, true); try { await status(); } catch {} }
+      finally { for (const key of ['ping','reconnect','sync']) $(key).disabled = false; }
+    };
+    void refresh();
+  </script>
+</body>
+</html>

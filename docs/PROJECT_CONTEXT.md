@@ -1,5 +1,11 @@
 # Project context
 
+## MongoDB Atlas và kho nội dung web (2026-10-22)
+
+Entry local-agent.js nạp .env tại project root trước CLI/server; biến shell có ưu tiên cao hơn file. MongoDB mặc định team_content; mongoSettings chỉ nạp lại URI/database khi người dùng bấm reconnect. Không đưa URI vào HTTP/log. npm run check:mongo ping thật, không tạo dữ liệu thử. .env bị ignore Git; chỉ commit .env.example.
+
+Trang /content và /api/content/* dùng cùng token/session dashboard, truy vấn live catalog có projection/tìm kiếm/phân trang. Quản lý page và sửa publication giữ nguyên ID, patch trường đã biết, kiểm tra updated_at để tránh đè cập nhật service khác. Hiển thị ngày giờ Asia/Bangkok; BSON Date UTC trong database. Không upload video bytes vào Atlas. Extension 4.2.0 kiểm tra metadata page đã resolve; dashboard chọn page active từ MongoDB, agent xác minh lại trước upload. Page local trùng key được nhận UUID chung và remap publication/event/run trước đồng bộ. Downloads cũng đồng bộ machine/source/hash/path/time để các service đọc chung. Xem docs/MONGODB_ATLAS.md.
+
 ## Lưu trữ tác vụ và cache download (2026-10-22)
 
 Kho local `data/agent` (override LOCAL_AGENT_DATA_DIR, không theo dõi Git) lưu machine UUID, catalog metadata/outbox và từng execution trong runs/*.json bằng ghi temp + fsync + rename. Workflow persist trước thao tác/sau kết quả, giữ chi tiết step và stoppedAtStep; startup đánh dấu lượt còn chạy interrupted, không tự thực hiện lại. API/dashboard tra lịch sử sau restart. Cache URL dùng hash toàn file để tái sử dụng đúng file đã verified, khóa theo URL trong một process để hai profile không tải trùng. File mất/đổi thì tải mới; không suy đoán theo title.

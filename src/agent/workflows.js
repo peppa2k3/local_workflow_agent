@@ -2,9 +2,13 @@ const { randomUUID } = require('crypto');
 const { setTimeout: delay } = require('timers/promises');
 const { overrideVariables } = require('./variables');
 
-function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, downloadVideo, activity }) {
+function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, downloadVideo, activity, prepareUpload }) {
   const sessions = new Map();
   const completed = new Map();
+  activity?.onPageRemap?.(remap => {
+    for (const s of sessions.values()) remap(s);
+    for (const run of completed.values()) remap(run);
+  });
   function persist(s) { if (activity && s.executionId) activity.saveRun(runStatus(s)); }
   function endStep(s, state, error = '') {
     const record = s.steps?.[s.index];
@@ -77,6 +81,10 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
         s.currentStep = step;
         if (step.url) record.url = step.url;
         if (step.action === 'upload') {
+          if (prepareUpload) {
+            await prepareUpload(step, s.currentUrl);
+            if (s.runId !== runId || !s.running) return;
+          }
           record.file_path = step.filePath;
           record.page_url = step.pageUrl || s.currentUrl || '';
           record.page_name = step.pageName || '';

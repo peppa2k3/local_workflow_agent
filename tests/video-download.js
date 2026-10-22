@@ -66,6 +66,7 @@ const { createCachedDownloader } = require('../src/agent/download-cache');
           else data = saved;
         }
         else if (pathname === '/api/video/inspect') { assert.equal(request.postDataJSON().url, url); inspected = true; data = { title, id: 'sample' }; }
+        else if (pathname === '/api/content/catalog/pages') data = { rows: [{ _id: '8d7956a8-cb45-457f-a7f0-094ae1a9362e', name: 'Page dùng chung', platform: 'Facebook', url: 'https://example.test/shared' }], total: 1 };
         else if (pathname === '/api/history') data = { runs: [{ runId: 'fixture-run', scenario: 'download-upload-reels-lili', state: 'failed', startedAt: Date.now(), total: 6, stoppedAtStep: 6,
           steps: [{ number: 1, label: 'Tải clip', state: 'succeeded', reused: true, file_path: 'D:/Videos/sample.mp4' }, { number: 6, label: 'Bước cuối', state: 'failed', error: 'Target not found' }] }] };
         return route.fulfill({ json: data });
@@ -107,11 +108,15 @@ const { createCachedDownloader } = require('../src/agent/download-cache');
       assert.equal(await page.locator('#scenarioSelect option').count(), 0);
       assert.equal(await page.locator('#fileName').inputValue(), 'my-workflow');
       await page.locator('.step-head select').selectOption('upload');
+      await page.getByRole('button', { name: 'Chọn page từ MongoDB', exact: true }).click();
+      await page.getByLabel('Page dùng chung', { exact: true }).selectOption('8d7956a8-cb45-457f-a7f0-094ae1a9362e');
+      assert.equal(await page.getByRole('textbox', { name: 'Tên page đích (khuyến nghị)', exact: true }).inputValue(), 'Page dùng chung');
       await page.getByRole('textbox', { name: 'Tên page đích (khuyến nghị)', exact: true }).fill('Lili');
       await page.getByRole('textbox', { name: 'URL page đích (nên dùng biến)', exact: true }).fill('https://example.test/lili');
       await page.locator('#saveBtn').click();
       await page.waitForFunction(() => document.getElementById('message').textContent.includes('Đã lưu'));
       assert.equal(saved.steps[0].pageName, 'Lili'); assert.equal(saved.steps[0].pageUrl, 'https://example.test/lili');
+      assert.equal(saved.steps[0].pageId, '8d7956a8-cb45-457f-a7f0-094ae1a9362e');
       await page.locator('#historyBtn').click();
       await page.locator('#runHistory summary').waitFor();
       assert.match(await page.locator('#runHistory summary').textContent(), /download-upload-reels-lili.*Dừng tại bước 6/);

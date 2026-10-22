@@ -15,6 +15,8 @@ const { createAutomationApi } = require('./automation-api');
 const { createActivityStore } = require('./activity-store');
 const { createCachedDownloader } = require('./download-cache');
 const { createMongoSync } = require('./mongo-sync');
+const { mongoSettings } = require('./env');
+const { createContentApi } = require('./content-api');
 
 const scenarios = createScenarioStore(scenariosDir);
 const eventLoop = monitorEventLoopDelay({ resolution: 20 });
@@ -26,8 +28,9 @@ let filePickerPending = false;
 const profileCache = createProfileCache(userDataDir, profile);
 const profiles = profileCache.get;
 const activity = createActivityStore(process.env.LOCAL_AGENT_DATA_DIR || path.resolve(__dirname, '../../data/agent'));
-const mongoSync = createMongoSync(activity);
-const workflows = createWorkflows({ scenarios, defaultProfile: profile, profiles, activity, downloadVideo: createCachedDownloader(activity, downloadVideo), openFolder(folderPath) {
+const mongoSync = createMongoSync(activity, { settings: mongoSettings });
+const content = createContentApi({ mongo: mongoSync, activity, readBody });
+const workflows = createWorkflows({ scenarios, defaultProfile: profile, profiles, activity, prepareUpload: content.prepareUpload, downloadVideo: createCachedDownloader(activity, downloadVideo), openFolder(folderPath) {
   const folder = path.resolve(folderPath);
   if (!fs.existsSync(folder) || !fs.statSync(folder).isDirectory()) throw new Error(`Folder does not exist: ${folder}`);
   return launch('explorer.exe', [folder]);
@@ -74,9 +77,9 @@ const server = http.createServer(async (request, response) => {
   if (request.headers.host !== `127.0.0.1:${port}` && request.headers.host !== `localhost:${port}`) return json(403, { error: 'Host not allowed' });
   const origin = request.headers.origin;
   if (origin && origin !== `http://127.0.0.1:${port}` && !/^chrome-extension:\/\/[a-z]+$/.test(origin)) return json(403, { error: 'Origin not allowed' });
-  if (request.method === 'GET' && route === '/') {
+  if (request.method === 'GET' && ['/', '/content', '/content/'].includes(route)) {
     response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-    response.end(fs.readFileSync(dashboardPath, 'utf8').replace('__LOCAL_AGENT_DASHBOARD_TOKEN__', dashboardToken));
+    response.end(fs.readFileSync(route === '/' ? dashboardPath : path.join(path.dirname(dashboardPath), 'content.html'), 'utf8').replaceAll('__LOCAL_AGENT_DASHBOARD_TOKEN__', dashboardToken));
     return;
   }
   try {
@@ -86,6 +89,7 @@ const server = http.createServer(async (request, response) => {
       const extensionRead = request.method === 'GET' && route === '/api/profiles' && /^chrome-extension:\/\/[a-z]+$/.test(origin || '');
       if (origin && origin !== `http://127.0.0.1:${port}` && !extensionRead) throw new Error('Origin not allowed');
       if (automation.enabled && !extensionRead && !dashboardAuthorized(request) && !automation.authorized(request)) return json(401, { error: 'Valid Bearer token or dashboard session required' });
+      if (route.startsWith('/api/content/')) return await content.handle(request, url, json);
       const selected = url.searchParams.get('profile') || profile;
       if (request.method === 'GET' && route === '/api/status') return json(200, workflows.status(selected));
       if (request.method === 'GET' && route === '/api/history') return json(200, { runs: workflows.listRuns(selected), storage: activity.syncStatus() });
@@ -95,7 +99,7 @@ const server = http.createServer(async (request, response) => {
         return json(run ? 200 : 404, run || { error: 'Run not found' });
       }
       if (request.method === 'GET' && route === '/api/profiles') {
-        return json(200, { defaultProfile: profile, automationEnabled: automation.enabled, storage: activity.syncStatus(), capabilities: ['activity-history-v1', 'download-cache-v1', 'automation-api-v1', 'variables-v1', 'video-download-v1', 'video-quality-best-v1', 'download-references-v1', 'scenario-management-v1'], performance, profiles: profiles().map(item => ({ ...item, ...workflows.status(item.directory) })) });
+        return json(200, { defaultProfile: profile, automationEnabled: automation.enabled, storage: activity.syncStatus(), capabilities: ['shared-content-v1', 'activity-history-v1', 'download-cache-v1', 'automation-api-v1', 'variables-v1', 'video-download-v1', 'video-quality-best-v1', 'download-references-v1', 'scenario-management-v1'], performance, profiles: profiles().map(item => ({ ...item, ...workflows.status(item.directory) })) });
       }
       if (request.method === 'POST' && route === '/api/profiles/open') {
         const body = await readBody(request);
@@ -186,6 +190,8 @@ performanceTimer.unref();
 profileCache.ready.then(() => server.listen(port, '127.0.0.1', () => {
   console.log(`Local agent ready. Default Chrome profile: ${profile}.`);
   console.log(`Dashboard: http://127.0.0.1:${port}`);
+  console.log(`Content manager: http://127.0.0.1:${port}/content`);
+  console.log(`MongoDB ${activity.syncStatus().database}: ${activity.syncStatus().enabled ? 'configured; connection status in Content manager' : 'set MONGODB_URI in .env to connect'}`);
   console.log('Commands: run <scenario.json> [--profile "Profile 1"] [--upload "path"] | stop [profile] | status | exit');
   terminal.prompt();
 }));

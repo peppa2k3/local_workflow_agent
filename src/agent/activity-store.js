@@ -51,6 +51,7 @@ function createActivityStore(directory) {
     version: 1, pages: {}, folders: {}, assets: {}, file_instances: {}, publications: {}, downloads: {}, upload_events: {}, outbox: {}
   };
   let syncState = { enabled: false, error: '' };
+  const pageListeners = new Set();
   function save() { atomicJson(catalogFile, data); }
   function put(collection, doc) {
     data[collection][doc._id] = doc;
@@ -101,8 +102,56 @@ function createActivityStore(directory) {
   }
   function rememberDownload(url, download, file) {
     const key = canonicalUrl(url);
-    data.downloads[key] = { ...download, ...file, source_url: key, downloaded_at: new Date().toISOString() };
+    data.downloads[key] = { ...download, ...file, source_url: key, machine_id: machineId,
+      _id: uuid5(URL_NAMESPACE, pythonArray([machineId, key])), downloaded_at: new Date().toISOString() };
+    queueDownload(data.downloads[key]);
     save(); return structuredClone(data.downloads[key]);
+  }
+  function queueDownload(row) {
+    const doc = { _id: row._id, machine_id: machineId, source_url: row.source_url, asset_id: row.asset_id,
+      file_instance_id: row.file_instance_id, file_path: row.filePath, file_name: row.name, title: row.title,
+      video_id: row.id, size: row.bytes, duration: row.duration ?? null, downloaded_at: row.downloaded_at, verified: row.verified === true };
+    data.outbox[`downloads/${doc._id}`] = { collection: 'downloads', doc };
+  }
+  // Upgrade existing local URL mappings without changing their original download time.
+  for (const [url, row] of Object.entries(data.downloads)) if (!row._id) {
+    Object.assign(row, { _id: uuid5(URL_NAMESPACE, pythonArray([machineId, url])), machine_id: machineId, source_url: url });
+    queueDownload(row); save();
+  }
+  function cachePage(page) {
+    if (!page || !uuidPattern.test(page._id)) throw new Error('Shared page must have a string UUID');
+    data.pages[page._id] = cleanPage(page); save();
+  }
+  function cleanPage(page) {
+    return JSON.parse(JSON.stringify(Object.fromEntries(['_id', 'name', 'name_key', 'platform', 'platform_key', 'url', 'active', 'updated_at']
+      .filter(key => Object.hasOwn(page, key)).map(key => [key, page[key]]))));
+  }
+  function adoptPage(oldId, page) {
+    if (oldId === page._id) return cachePage(page);
+    if (!uuidPattern.test(page._id)) throw new Error('Shared page must have a string UUID');
+    if (Object.values(data.publications).some(doc => doc.page_id === oldId && doc.published_at !== null)) throw new Error('Cannot re-key a dated publication automatically');
+    const publications = {};
+    delete data.pages[oldId]; delete data.outbox[`pages/${oldId}`];
+    data.pages[page._id] = cleanPage(page);
+    for (const doc of Object.values(data.publications)) if (doc.page_id === oldId) {
+      // Locally produced publications have no confirmed publication date.
+      const id = uuid5(URL_NAMESPACE, pythonArray([doc.asset_id, page._id, '', doc.post_url.trim()]));
+      publications[doc._id] = id;
+      delete data.publications[doc._id]; delete data.outbox[`publications/${doc._id}`];
+      if (!data.publications[id]) put('publications', { ...doc, _id: id, page_id: page._id });
+    }
+    for (const doc of Object.values(data.upload_events)) if (doc.page_id === oldId) {
+      put('upload_events', { ...doc, page_id: page._id, publication_id: publications[doc.publication_id] || doc.publication_id });
+    }
+    const remap = run => {
+      for (const step of run.steps || []) if (step.upload?.page_id === oldId) {
+        step.upload.page_id = page._id;
+        step.upload.publication_id = publications[step.upload.publication_id] || step.upload.publication_id;
+      }
+    };
+    for (const run of listRuns(null, Infinity)) { remap(run); saveRun(run); }
+    for (const listener of pageListeners) listener(remap);
+    save();
   }
   async function cachedDownload(url, signal) {
     const cached = data.downloads[canonicalUrl(url)];
@@ -141,7 +190,8 @@ function createActivityStore(directory) {
       page_url: target, actual_url: actualUrl, publication_id: publicationId, uploaded_at: now, state: 'uploaded' };
     put('upload_events', event); save(); return structuredClone(event);
   }
-  return { directory, data, registerFile, rememberDownload, cachedDownload, recordUpload, saveRun, readRun, listRuns,
+  return { directory, data, registerFile, rememberDownload, cachedDownload, recordUpload, saveRun, readRun, listRuns, cachePage, adoptPage,
+    onPageRemap: listener => pageListeners.add(listener),
     pending: () => Object.values(data.outbox).map(item => structuredClone(item)),
     acknowledge(item) {
       const key = `${item.collection}/${item.doc._id}`;
