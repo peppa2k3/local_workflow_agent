@@ -11,6 +11,10 @@ Thực hiện tuần tự, mỗi task một commit; chuyển prompt sang process
 3. [Execution — hoàn tất](../completed/remote-03-execution.md): queue, chạy/dừng, chống replay.
 4. [Web — hoàn tất](../completed/remote-04-web.md): UI, trạng thái và lịch sử.
 5. [Operations — hoàn tất](../completed/remote-05-operations.md): daemon, deploy, startup.
+6. [Docker Hub + Traefik](../completed/remote-06-dockerhub-traefik.md): image build/push,
+   VPS pull bằng docker-compose.yml, env mẫu, proxy trust và healthcheck.
+
+Hướng dẫn deploy hiện tại: [Docker Hub → VPS Traefik](../../deploy/control/README.md).
 
 Ranh giới: chỉ chạy scenario đã lưu và profile được local cấp quyền; không shell,
 không sửa file từ xa, không public cổng 34719, không đưa URI Mongo/đường dẫn file

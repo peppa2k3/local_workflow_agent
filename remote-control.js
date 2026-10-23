@@ -16,7 +16,8 @@ async function main() {
   }
   if (process.argv.length > 2) { store.close(); throw Error('Unknown control command'); }
   const server = createControlServer({ store, publicUrl: process.env.CONTROL_PUBLIC_URL,
-    allowHttp: process.env.CONTROL_ALLOW_HTTP_LOOPBACK === '1', trustProxy: process.env.CONTROL_TRUST_PROXY === '1', commandApi: createCommandApi(store) });
+    allowHttp: process.env.CONTROL_ALLOW_HTTP_LOOPBACK === '1', trustProxy: process.env.CONTROL_TRUST_PROXY === '1',
+    trustedProxyIps: process.env.CONTROL_TRUSTED_PROXY_IPS || '', commandApi: createCommandApi(store) });
   server.listen(Number(process.env.CONTROL_PORT || 34800), process.env.CONTROL_BIND || '127.0.0.1', () => console.log('Remote control server ready'));
   let closing = false;
   function close() { if (closing) return; closing = true; server.close(() => store.close()); server.closeIdleConnections(); }

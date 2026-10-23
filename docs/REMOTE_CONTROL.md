@@ -41,9 +41,42 @@ Lịch sử VPS có trạng thái/nhãn từng bước, thời gian bắt đầu
 
 ## Triển khai trên VPS
 
-Chuẩn bị VPS Linux có Node 24 LTS, tên miền trỏ tới VPS và nginx với chứng chỉ TLS hợp lệ. Dịch vụ điều khiển không cần Chrome, Playwright, kết nối MongoDB hay công cụ xử lý video. Không sao chép `.env`, Chrome profile hoặc dữ liệu local lên VPS.
+### Docker Hub → VPS có Traefik (cách triển khai chính)
 
-### Cách 1: Container (dùng mạng của máy chủ Linux)
+Với VPS đang dùng Traefik, làm theo [hướng dẫn build/push và deploy từng bước](../deploy/control/README.md).
+Máy build đóng gói image và đẩy lên Docker Hub; VPS chỉ cần pull image, không cần
+checkout source hoặc cài Node/nginx. Bộ file gồm:
+
+- [Dockerfile](../deploy/control/Dockerfile) và [script build/push Windows](../scripts/publish-control-image.ps1).
+- [docker-compose.yml](../deploy/control/docker-compose.yml): image từ Docker Hub, volume SQLite, network external và labels Traefik.
+- [.env mẫu cho VPS](../deploy/control/.env.example): copy thành `.env` cạnh `docker-compose.yml`, điền image/tag, domain, network, entrypoint, resolver và IP Traefik.
+
+Các bước: đăng nhập Docker Hub → build/push tag phiên bản → chép Compose và mẫu env
+lên VPS → điền env → `docker compose --env-file .env -f docker-compose.yml pull`
+→ tạo tài khoản bằng lệnh bootstrap trong hướng dẫn →
+`docker compose --env-file .env -f docker-compose.yml up -d --no-build`
+→ kiểm tra HTTPS → ghép máy local.
+
+Traefik kết nối tới cổng 34800 trong Docker network; không publish cổng lên host.
+`CONTROL_PUBLIC_URL` được ghép từ `CONTROL_DOMAIN`. TLS do Traefik xử lý. Cấu hình
+`CONTROL_TRUSTED_PROXY_IPS` chứa IP nội bộ chính xác của Traefik trên network chung
+để giới hạn đăng nhập theo đúng IP khách; không dùng IP public VPS hoặc CIDR.
+Nếu Traefik đổi IP, cập nhật env và recreate control. Header chuyển tiếp chỉ được
+tin khi kết nối đến từ proxy đã cấu hình; chuỗi IP được đọc từ phải sang trái.
+
+File `.env` ở gốc project local vẫn dành cho MongoDB/local agent. File `.env.control`
+ở gốc chỉ dành cho chạy control trực tiếp hoặc cách nginx cũ; không cần gửi hai
+file này lên VPS Traefik. Hướng dẫn mới có đủ lệnh tạo tài khoản, cập nhật,
+rollback, sao lưu và xử lý lỗi.
+
+### Các cách triển khai thay thế
+
+Các cách bên dưới dành cho môi trường chưa dùng bộ Traefik ở trên. Chuẩn bị VPS
+Linux có Node 24 LTS (nếu chạy trực tiếp), tên miền trỏ tới VPS và nginx với chứng
+chỉ TLS hợp lệ. Dịch vụ điều khiển không cần Chrome, Playwright, kết nối MongoDB
+hay công cụ xử lý video. Không sao chép `.env`, Chrome profile hoặc dữ liệu local lên VPS.
+
+#### Container cũ: host network và nginx
 
 Trong bản checkout trên VPS, chạy:
 
@@ -63,7 +96,7 @@ Sửa `CONTROL_PUBLIC_URL` trong `.env.control` thành đúng địa chỉ HTTPS
 
 File Compose dùng volume để giữ SQLite, chạy bằng người dùng không có quyền quản trị, đặt hệ thống file ứng dụng ở chế độ chỉ đọc và dùng mạng của máy chủ Linux. Dịch vụ chỉ lắng nghe tại `127.0.0.1:34800`; chỉ chạy một bản dịch vụ. Cài và chỉnh `deploy/control/nginx.conf.example`, thay tên miền/đường dẫn chứng chỉ, kiểm tra cấu hình nginx trước khi tải lại. Mở HTTPS cổng 443 và HTTP cổng 80 để chuyển hướng; giữ cổng 34800 và cổng local 34719 ở chế độ riêng tư. URL công khai phải khớp với Host mà nginx chuyển tiếp. nginx ghi đè header IP chuyển tiếp; chỉ bật `CONTROL_TRUST_PROXY=1` khi dùng reverse proxy đáng tin cậy kết nối qua loopback. `/health` chỉ kiểm tra dịch vụ còn hoạt động, không trả thông tin tài khoản/thiết bị. Không cần cấu hình WebSocket.
 
-### Cách 2: Dịch vụ chạy trực tiếp
+#### Dịch vụ chạy trực tiếp
 
 Sao chép `remote-control.js`, `src/remote/` và `control-web/` vào `/opt/local-agent-control`. Tạo người dùng hệ thống riêng `local-agent-control`. Lưu cấu hình theo file mẫu tại `/etc/local-agent-control.env` và chỉ cho người dùng đó đọc. Cài và điều chỉnh `deploy/control/local-agent-control.service`; đường dẫn Node trong file đang giả định là `/usr/bin/node`. Tạo `/var/lib/local-agent-control` và giao quyền sở hữu cho người dùng đó. Sau đó chạy lệnh tạo tài khoản bằng chính người dùng này, với `CONTROL_ENV_FILE=/etc/local-agent-control.env` và `CONTROL_DATABASE=/var/lib/local-agent-control/control.sqlite`. Cài nginx/TLS như trên rồi bật và chạy dịch vụ systemd.
 

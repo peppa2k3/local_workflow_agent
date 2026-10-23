@@ -1,5 +1,17 @@
 # Project context
 
+## Docker Hub và Traefik (2026-10-23)
+
+`deploy/control/docker-compose.yml` là bộ deploy pull image cho VPS Traefik:
+external Docker network, không host ports, volume tên cố định, env mẫu cùng thư mục.
+Image bind 0.0.0.0 trong container; local agent vẫn loopback. Proxy IP được cấu hình
+qua CONTROL_TRUSTED_PROXY_IPS (exact IP), đọc X-Forwarded-For từ phải sang trái;
+CONTROL_TRUST_PROXY=1 vẫn dành riêng cho loopback nginx cũ. Healthcheck nội bộ dùng
+đúng Host của CONTROL_PUBLIC_URL. Script publish-control-image.ps1 hỗ trợ build
+local hoặc push tag Docker Hub; Dockerfile.dockerignore chỉ cho source control.
+Hướng dẫn tiếng Việt: deploy/control/README.md. compose.yaml cũ vẫn là host/nginx;
+luôn chỉ định -f docker-compose.yml khi deploy Traefik.
+
 ## Remote control trên nhánh dev/remote (2026-10-22)
 
 VPS riêng `node remote-control.js` (Node 24, SQLite) phục vụ web đăng nhập và điều

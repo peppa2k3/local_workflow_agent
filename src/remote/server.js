@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const c = require('./common');
+const { createClientIp } = require('./proxy');
 async function addUser(store, email, password) {
   email = c.text(email, 254).toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) c.fail('Invalid email');
@@ -12,11 +13,12 @@ async function addUser(store, email, password) {
     return store.put('user', { id: randomUUID(), email, password: digest });
   });
 }
-function createControlServer({ store, publicUrl, allowHttp = false, trustProxy = false, commandApi }) {
+function createControlServer({ store, publicUrl, allowHttp = false, trustProxy = false, trustedProxyIps = '', commandApi }) {
   publicUrl = c.baseUrl(publicUrl, allowHttp);
   const secure = publicUrl.startsWith('https:');
   const cookieName = secure ? '__Host-control' : 'control-dev';
   const rates = new Map();
+  const clientIp = createClientIp({ trustedProxyIps, trustLoopback: trustProxy });
   function rate(key, limit, period = 600000) {
     const now = Date.now();
     for (const [k, v] of rates) if (v.until < now) rates.delete(k);
@@ -54,8 +56,7 @@ function createControlServer({ store, publicUrl, allowHttp = false, trustProxy =
       const isDevice = route.startsWith('/device/');
       if (isDevice && (req.headers.origin || req.method !== 'POST')) c.fail('Device API requires a native client', 403);
       if (!isDevice && req.method === 'POST' && req.headers.origin !== publicUrl) c.fail('Origin not allowed', 403);
-      let ip = req.socket.remoteAddress;
-      if (trustProxy && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(ip)) ip = String(req.headers['x-forwarded-for'] || ip).split(',')[0].trim();
+      const ip = clientIp(req);
       const data = req.method === 'POST' ? await c.body(req) : {};
       if (route === '/api/login' && req.method === 'POST') {
         rate(`login-ip:${ip}`, 15); const email = c.text(data.email, 254).toLowerCase(); rate(`login:${email}`, 10);

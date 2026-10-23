@@ -1,0 +1,51 @@
+name: ${COMPOSE_PROJECT_NAME:-local-agent-control}
+services:
+  control:
+    image: ${CONTROL_IMAGE:?Set CONTROL_IMAGE to your Docker Hub repository and version}
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 25s
+    environment:
+      NODE_ENV: production
+      CONTROL_PUBLIC_URL: https://${CONTROL_DOMAIN:?Set CONTROL_DOMAIN}
+      CONTROL_BIND: 0.0.0.0
+      CONTROL_PORT: "34800"
+      CONTROL_DATABASE: /data/control.sqlite
+      CONTROL_ALLOW_HTTP_LOOPBACK: "0"
+      CONTROL_TRUST_PROXY: "0"
+      CONTROL_TRUSTED_PROXY_IPS: ${CONTROL_TRUSTED_PROXY_IPS:?Set the exact Traefik container IP on its Docker network}
+    volumes:
+      - control-data:/data
+    networks:
+      - traefik
+    # No host ports: Traefik reaches port 34800 over the shared Docker network.
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=${TRAEFIK_NETWORK:?Set the existing Traefik Docker network}"
+      - "traefik.http.routers.${CONTROL_ROUTER:-local-agent-control}.rule=Host(`${CONTROL_DOMAIN}`)"
+      - "traefik.http.routers.${CONTROL_ROUTER:-local-agent-control}.entrypoints=${TRAEFIK_HTTPS_ENTRYPOINT:-websecure}"
+      - "traefik.http.routers.${CONTROL_ROUTER:-local-agent-control}.tls=true"
+      - "traefik.http.routers.${CONTROL_ROUTER:-local-agent-control}.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-}"
+      - "traefik.http.routers.${CONTROL_ROUTER:-local-agent-control}.service=${CONTROL_ROUTER:-local-agent-control}"
+      - "traefik.http.services.${CONTROL_ROUTER:-local-agent-control}.loadbalancer.server.port=34800"
+      - "traefik.http.services.${CONTROL_ROUTER:-local-agent-control}.loadbalancer.server.scheme=http"
+      - "traefik.http.services.${CONTROL_ROUTER:-local-agent-control}.loadbalancer.passhostheader=true"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+volumes:
+  control-data:
+    name: ${CONTROL_VOLUME_NAME:-local-agent-control-data}
+networks:
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK}

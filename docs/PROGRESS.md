@@ -1,5 +1,17 @@
 # Tiến độ phát triển
 
+## 2026-10-23 — Đóng gói Docker Hub và VPS Traefik
+
+- Thêm docker-compose.yml pull image, env VPS, external network/labels Traefik,
+  SQLite volume bền vững, giới hạn log và healthcheck đúng Host.
+- Thêm script Windows build/push theo tag/kiến trúc và giới hạn build context.
+- Proxy chỉ tin IP cấu hình, chống giả X-Forwarded-For và giữ chế độ nginx loopback.
+- Hướng dẫn tiếng Việt từ build/push đến bootstrap, ghép local, update/rollback/backup.
+- Kiểm chứng: npm test đầy đủ, node --check, PowerShell AST và compose config đạt.
+  Build linux/amd64 local thành công; container fixture xác nhận UID 1000,
+  healthcheck, SQLite giữ tài khoản qua restart và không chứa dữ liệu local.
+  Chưa push Docker Hub hoặc thay đổi VPS/Traefik thật.
+
 ## 2026-10-22 — Remote control (dev/remote)
 
 - Lõi outbound HTTPS, lưu control SQLite riêng, tài khoản scrypt/session/CSRF,
