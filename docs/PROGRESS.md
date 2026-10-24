@@ -1,5 +1,12 @@
 # Tiến độ phát triển
 
+## 2026-10-24 — Navbar chuyển nội dung và remote
+
+- Thống nhất navbar đầu trang local: Kịch bản, Quản lý nội dung, Remote Control.
+- Đánh dấu trang hiện tại, hỗ trợ bàn phím và xuống dòng trên mobile.
+- Kiểm tra chuyển trang bằng Chrome tách biệt ở chiều rộng 1280 và 390 px.
+- npm test đầy đủ, node --check và git diff --check đạt.
+
 ## 2026-10-23 — Đóng gói Docker Hub và VPS Traefik
 
 - Thêm docker-compose.yml pull image, env VPS, external network/labels Traefik,

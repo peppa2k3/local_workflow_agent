@@ -65,8 +65,19 @@
     .performance { margin: 12px 0; color: #acbbd6; font-size: 13px; }
     @media (max-width: 700px) { .top { flex-direction: column; } .fields { grid-template-columns: 1fr; } .fields label:first-of-type { grid-column: auto; } .toolbar select, .toolbar input { width: 100%; } .toolbar label { flex: 1 1 100%; } }
   </style>
+<style>
+.site-nav{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px clamp(16px,3vw,36px);background:#101928;border-bottom:1px solid #2c3c53;font-family:Segoe UI,Arial,sans-serif}
+.site-nav .site-brand{color:#eef4ff;font-size:16px;font-weight:700;text-decoration:none}
+.site-nav .site-links{display:flex;gap:6px;flex-wrap:wrap}
+.site-nav .site-links a{display:block;padding:10px 14px;border:1px solid transparent;border-radius:8px;color:#acbbd6;text-decoration:none;font-size:14px;line-height:1.4}
+.site-nav .site-links a:hover{background:#23354d;color:#fff}
+.site-nav .site-links a[aria-current=page]{background:#173b3c;border-color:#287266;color:#8be2d0}
+.site-nav a:focus-visible{outline:2px solid #8be2d0;outline-offset:3px}
+@media(max-width:550px){.site-nav{gap:10px}.site-nav .site-links{width:100%}.site-nav .site-links a{padding:10px;font-size:13px}}
+</style>
 </head>
 <body>
+<nav class="site-nav" aria-label="Điều hướng chính"><a class="site-brand" href="/">Workflow Studio</a><div class="site-links"><a href="/" aria-current="page">Kịch bản</a><a href="/content">Quản lý nội dung</a><a href="/remote">Remote Control</a></div></nav>
   <main class="shell">
     <header class="top">
       <div><div class="eyebrow">Local automation</div><h1>Workflow Studio</h1><p>Tạo kịch bản trực quan và chạy trên Chrome profile hiện có.</p></div>
@@ -107,8 +118,6 @@
     <div class="progress"><strong>Trạng thái:</strong> <span id="progress">Chưa chạy</span></div>
     <div id="runSteps" class="profiles-summary" style="white-space: pre-wrap" aria-live="polite"></div>
     <p id="storageStatus"></p>
-    <p><a href="/content" style="color:#9fbbff">Mở quản lý nội dung / MongoDB Atlas →</a></p>
-    <p><a href="/remote" style="color:#9fbbff">Kết nối VPS và quản lý quyền điều khiển từ xa →</a></p>
     <button class="btn ghost" id="historyBtn" type="button">Xem / làm mới lịch sử profile</button>
     <div id="runHistory" class="profiles-summary"></div>
   </main>

@@ -7,6 +7,28 @@ const { chromium } = require('playwright');
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
   try {
     const page = await browser.newPage(), errors = [], posted = [];
+    // Navigate the local workspace pages without connecting to a real agent or Chrome profile.
+    const navigation = await browser.newPage();
+    await navigation.route('https://navigation.test/**', async route => {
+      const pathname = new URL(route.request().url()).pathname;
+      const file = { '/': 'index.html', '/content': 'content.html', '/remote': 'remote.html' }[pathname];
+      if (file) return route.fulfill({ contentType: 'text/html', body: fs.readFileSync(path.join(__dirname, '../dashboard', file), 'utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '') });
+      if (pathname === '/remote.css') return route.fulfill({ contentType: 'text/css', body: fs.readFileSync(path.join(__dirname, '../control-web/style.css'), 'utf8') });
+      return route.fulfill({ status: 404, body: '' });
+    });
+    for (const width of [1280, 390]) {
+      await navigation.setViewportSize({ width, height: 844 });
+      await navigation.goto('https://navigation.test/');
+      for (const route of ['/content', '/remote', '/']) {
+        await navigation.locator('.site-nav .site-links a[href="' + route + '"]').click();
+        await navigation.waitForURL('https://navigation.test' + route);
+        const nav = navigation.getByRole('navigation', { name: 'Điều hướng chính', exact: true });
+        assert.equal(await nav.locator('[aria-current=page]').getAttribute('href'), route);
+        assert.equal(await nav.locator('.site-links a').count(), 3);
+        assert(await nav.evaluate(el => el.scrollWidth <= el.clientWidth));
+      }
+    }
+    await navigation.close();
     page.on('pageerror', e => errors.push(e.message));
     const id = 'e43c8711-3731-4daa-9725-6721f78f1039';
     let loggedIn = false, online = true;

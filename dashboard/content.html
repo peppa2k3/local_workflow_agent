@@ -89,12 +89,22 @@ code{font-family:Consolas,monospace;font-size:12px}
 }
 
   </style>
+<style>
+.site-nav{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px clamp(16px,3vw,36px);background:#101928;border-bottom:1px solid #2c3c53;font-family:Segoe UI,Arial,sans-serif}
+.site-nav .site-brand{color:#eef4ff;font-size:16px;font-weight:700;text-decoration:none}
+.site-nav .site-links{display:flex;gap:6px;flex-wrap:wrap}
+.site-nav .site-links a{display:block;padding:10px 14px;border:1px solid transparent;border-radius:8px;color:#acbbd6;text-decoration:none;font-size:14px;line-height:1.4}
+.site-nav .site-links a:hover{background:#23354d;color:#fff}
+.site-nav .site-links a[aria-current=page]{background:#173b3c;border-color:#287266;color:#8be2d0}
+.site-nav a:focus-visible{outline:2px solid #8be2d0;outline-offset:3px}
+@media(max-width:550px){.site-nav{gap:10px}.site-nav .site-links{width:100%}.site-nav .site-links a{padding:10px;font-size:13px}}
+</style>
 </head>
 <body>
+<nav class="site-nav" aria-label="Điều hướng chính"><a class="site-brand" href="/">Workflow Studio</a><div class="site-links"><a href="/">Kịch bản</a><a href="/content" aria-current="page">Quản lý nội dung</a><a href="/remote">Remote Control</a></div></nav>
   <div class="layout">
     <aside class="sidebar">
       <div class="brand">Workflow Studio<span>CONTENT LIBRARY</span></div>
-      <nav aria-label="Điều hướng"><a href="/">Kịch bản tự động</a><a class="active" href="/content" aria-current="page">Kho nội dung</a></nav>
       <p class="note muted">Quản lý metadata dùng chung với Team Content Manager.<br><br>File video nằm tại máy tải hoặc kho file của service tương ứng.</p>
     </aside>
     <main class="main">

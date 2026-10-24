@@ -1,6 +1,17 @@
 <!doctype html>
-<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="local-agent-session" content="__LOCAL_AGENT_DASHBOARD_TOKEN__"><title>Kết nối remote · Local Agent</title><link rel="stylesheet" href="/remote.css"><script src="/remote.js" defer></script></head>
-<body><main class="shell"><header><div><span class="eyebrow">Local Agent / Thiết bị này</span><h1>Kết nối điều khiển từ xa</h1><small>Chỉ tài khoản bạn xác nhận mới có quyền chạy kịch bản được cấp phép.</small></div><a href="/">← Dashboard local</a></header>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="local-agent-session" content="__LOCAL_AGENT_DASHBOARD_TOKEN__"><title>Kết nối remote · Local Agent</title><link rel="stylesheet" href="/remote.css"><script src="/remote.js" defer></script><style>
+.site-nav{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px clamp(16px,3vw,36px);background:#101928;border-bottom:1px solid #2c3c53;font-family:Segoe UI,Arial,sans-serif}
+.site-nav .site-brand{color:#eef4ff;font-size:16px;font-weight:700;text-decoration:none}
+.site-nav .site-links{display:flex;gap:6px;flex-wrap:wrap}
+.site-nav .site-links a{display:block;padding:10px 14px;border:1px solid transparent;border-radius:8px;color:#acbbd6;text-decoration:none;font-size:14px;line-height:1.4}
+.site-nav .site-links a:hover{background:#23354d;color:#fff}
+.site-nav .site-links a[aria-current=page]{background:#173b3c;border-color:#287266;color:#8be2d0}
+.site-nav a:focus-visible{outline:2px solid #8be2d0;outline-offset:3px}
+@media(max-width:550px){.site-nav{gap:10px}.site-nav .site-links{width:100%}.site-nav .site-links a{padding:10px;font-size:13px}}
+</style>
+</head>
+<body>
+<nav class="site-nav" aria-label="Điều hướng chính"><a class="site-brand" href="/">Workflow Studio</a><div class="site-links"><a href="/">Kịch bản</a><a href="/content">Quản lý nội dung</a><a href="/remote" aria-current="page">Remote Control</a></div></nav><main class="shell"><header><div><span class="eyebrow">Local Agent / Thiết bị này</span><h1>Kết nối điều khiển từ xa</h1><small>Chỉ tài khoản bạn xác nhận mới có quyền chạy kịch bản được cấp phép.</small></div></header>
 <div id="message" role="status" class="notice" hidden></div>
 <div class="two"><section><div class="panel"><h2>Kết nối VPS</h2><div id="connection" class="muted">Đang đọc trạng thái…</div><form id="pair-form"><label>Địa chỉ web điều khiển<input name="url" type="url" placeholder="https://control.example.com" required></label><label>Tên máy hiển thị<input name="name" required maxlength="80" placeholder="Máy đăng Reels văn phòng"></label><button type="submit" class="primary">Tạo mã ghép nối</button></form>
 <div id="pending" hidden><p>Đăng nhập web VPS và nhập mã sau:</p><code id="code" class="code"></code><small id="expires"></small><p id="claim"></p><button id="approve" class="primary" hidden>Đồng ý cho tài khoản này kết nối</button></div><p><button id="disconnect" class="danger" hidden>Ngắt kết nối / hủy ghép nối</button></p></div>

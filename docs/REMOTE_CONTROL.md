@@ -1,5 +1,7 @@
 # Điều khiển từ xa
 
+Dashboard local có navbar chung ở đầu trang để chuyển giữa **Kịch bản** (`/`), **Quản lý nội dung** (`/content`) và **Remote Control** (`/remote`). Mục đang mở được đánh dấu; trang Remote Control dùng để ghép nối VPS và quản lý quyền trên máy này.
+
 ## Tổng quan
 
 Dịch vụ điều khiển từ xa chạy riêng trên VPS bằng `node remote-control.js`. Agent trên máy local tiếp tục lắng nghe tại cổng nội bộ 34719 và chủ động kết nối HTTPS tới VPS. Không mở cổng 34719 ra Internet qua router hoặc reverse proxy.
