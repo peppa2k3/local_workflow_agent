@@ -1,5 +1,9 @@
 # Project context
 
+## Chống trùng media (2026-10-24)
+
+main.js gắn media-guard vào download/upload: kiểm tra local và MongoDB nếu enabled, DB lỗi thì dừng. Workflow vẫn state running nhưng paused/confirmation cho UI; chỉ dashboard session xác nhận qua /api/confirm, kèm execution UUID và confirmation UUID. Media lock trong process giữ đến kết quả upload hoặc kết thúc download. upload_events có pending trước dispatch và uploaded sau acknowledgement; sync collection này dùng $set để đổi trạng thái. Assets/publications vẫn insert-only. Popup dùng textContent trên dashboard; VPS báo chờ xác nhận local. Không tự replay sau restart.
+
 ## Docker Hub và Traefik (2026-10-23)
 
 `deploy/control/docker-compose.yml` là bộ deploy pull image cho VPS Traefik:

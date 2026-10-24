@@ -8,7 +8,7 @@ function createRemoteExecutor({ dataDir, workflows, scenarios, getPolicy }) {
     return { runId: run.runId, state: run.state, index: run.index, total: run.total, stoppedAtStep: run.stoppedAtStep,
       steps: (run.steps || []).slice(0, 100).map(s => ({ number: s.number, state: s.state, action: s.action, label: String(s.label || '').slice(0, 120) })),
       startedAt: run.startedAt, endedAt: run.endedAt,
-      message: ['failed', 'interrupted'].includes(run.state) ? 'Workflow failed/interrupted. See local history for details.' : '' };
+      message: run.paused ? 'Tạm dừng vì trùng dữ liệu. Xác nhận tại dashboard local để tiếp tục hoặc dừng.' : ['failed', 'interrupted'].includes(run.state) ? 'Workflow failed/interrupted. See local history for details.' : '' };
   }
   function update(record, value) {
     if (JSON.stringify(record.result) !== JSON.stringify(value)) { record.result = value; record.seq++; save(); }

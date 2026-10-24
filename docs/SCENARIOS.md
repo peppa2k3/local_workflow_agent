@@ -213,3 +213,13 @@ Xem cấu hình `MONGODB_URI`/`MONGODB_DATABASE`, ví dụ JSON, mô hình dữ 
 
 Agent đọc `.env` ở thư mục dự án, gồm `MONGODB_URI` và `MONGODB_DATABASE=team_content`. Mở `/content` để kiểm tra/kết nối lại, xem/tìm download, upload và lịch sử từ database, tạo/sửa page, cập nhật mô tả/ngày đăng/permalink publication. Trong bước upload, nút **Chọn page từ MongoDB** điền UUID/tên/URL/nền tảng từ page active dùng chung. Trước khi chọn file, agent kiểm tra lại page trong database; page inactive hoặc lỗi kết nối dừng bước có metadata page. Biến và CSS selector legacy vẫn được giữ. Reload extension 4.2.0, restart agent và dashboard sau nâng cấp; xem [MONGODB_ATLAS.md](MONGODB_ATLAS.md).
 
+# Kiểm tra trùng download/upload
+
+Trước `downloadVideo`, agent kiểm tra URL chuẩn hóa trong lịch sử local và collection `downloads` của MongoDB nếu đã cấu hình. Trước `upload`, agent đối chiếu đường dẫn, tên file (không phân biệt hoa/thường) và SHA-256 với `file_instances`, `upload_events`, `publications`, trên mọi page. File đã nhập kho nhưng chưa có upload/publication không tự coi là upload trùng.
+
+Khi trùng, workflow giữ bước hiện tại và trả `paused: true`, `confirmation` trong status; extension chưa nhận bước upload. Popup trên dashboard local có **Dừng tác vụ** và **Xác nhận tiếp tục**. Download sau xác nhận vẫn dùng cache nếu file còn đúng size/hash; nếu không còn file hợp lệ thì tải lại. Upload sau xác nhận là chủ động cho phép upload thêm lần nữa. Quyết định được lưu cùng step; ID xác nhận cũ hoặc khác execution bị từ chối. Stop, timeout và restart không tự tiếp tục tác vụ đang chờ.
+
+Agent ghi sự kiện upload `pending` trước dispatch và đổi thành `uploaded` sau acknowledgement. Nếu lỗi hoặc mất phản hồi, bản ghi pending vẫn cảnh báo nguy cơ trùng ở lần chạy sau. MongoDB đã cấu hình nhưng không truy vấn được sẽ làm tác vụ thất bại và hiển thị popup; không tự bỏ kiểm tra DB. Trong một process agent, các thao tác media được tuần tự hóa đến kết quả; các service độc lập vẫn cần phối hợp khóa riêng nếu yêu cầu chống chạy đồng thời giữa nhiều máy.
+
+Popup lỗi có nút **Đã hiểu** trên các trang local. Web VPS thông báo tác vụ tạm dừng và yêu cầu mở dashboard local để xác nhận. Các bước click xuất bản riêng của website vẫn cần điều kiện xác nhận tương ứng; acknowledgement upload không chứng minh đã xuất bản.
+

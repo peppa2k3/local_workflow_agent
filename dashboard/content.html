@@ -99,6 +99,8 @@ code{font-family:Consolas,monospace;font-size:12px}
 .site-nav a:focus-visible{outline:2px solid #8be2d0;outline-offset:3px}
 @media(max-width:550px){.site-nav{gap:10px}.site-nav .site-links{width:100%}.site-nav .site-links a{padding:10px;font-size:13px}}
 </style>
+<meta name="local-agent-session" content="__LOCAL_AGENT_DASHBOARD_TOKEN__">
+<script src="/issues.js" defer></script>
 </head>
 <body>
 <nav class="site-nav" aria-label="Điều hướng chính"><a class="site-brand" href="/">Workflow Studio</a><div class="site-links"><a href="/">Kịch bản</a><a href="/content" aria-current="page">Quản lý nội dung</a><a href="/remote">Remote Control</a></div></nav>
@@ -135,7 +137,7 @@ code{font-family:Consolas,monospace;font-size:12px}
     const states = { running: 'Đang chạy', succeeded: 'Thành công', failed: 'Thất bại', cancelled: 'Đã dừng', interrupted: 'Gián đoạn', pending: 'Chưa chạy', uploaded: 'Đã upload' };
     const types = {
       downloads: { title: 'Download', columns: [['Clip', row => row.title || row.file_name], ['URL nguồn', row => row.source_url], ['File đã lưu', row => row.file_path], ['Dung lượng', row => size(row.size)], ['Thời gian tải', row => date(row.downloaded_at)]] },
-      upload_events: { title: 'Upload', columns: [['Page đích', row => row.page?.name || row.page_url || 'Chưa rõ page'], ['Asset', row => short(row.asset_id)], ['Kết quả', row => states[row.state] || row.state], ['Thời gian upload', row => date(row.uploaded_at)], ['Lượt chạy', row => short(row.run_id)]] },
+      upload_events: { title: 'Upload', columns: [['File', row => row.file_path || row.file_name || 'Chưa có đường dẫn'], ['Page đích', row => row.page?.name || row.page_url || 'Chưa rõ page'], ['Asset', row => short(row.asset_id)], ['Kết quả', row => row.state === 'pending' ? 'Đã thử / chưa rõ kết quả' : states[row.state] || row.state], ['Thời gian thử / upload', row => date(row.uploaded_at || row.attempted_at)], ['Lượt chạy', row => short(row.run_id)]] },
       pages: { title: 'Pages', columns: [['Tên page', row => row.name], ['Nền tảng', row => row.platform], ['URL', row => row.url], ['Trạng thái', row => row.active ? 'Đang hoạt động' : 'Đã ngừng'], ['Cập nhật', row => date(row.updated_at)]] },
       publications: { title: 'Publications', columns: [['Page', row => row.page?.name || short(row.page_id)], ['Mô tả', row => row.desc], ['Ngày đăng', row => date(row.published_at)], ['Link bài', row => row.post_url], ['Asset', row => short(row.asset_id)]] },
       assets: { title: 'Assets', columns: [['SHA-256', row => short(row._id)], ['Dung lượng', row => size(row.size)], ['Thời lượng', row => duration(row.duration)], ['Kho file', row => row.storage?.status || 'Metadata'], ['Tạo lúc', row => date(row.created_at)]] },

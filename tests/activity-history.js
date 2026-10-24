@@ -143,7 +143,16 @@ async function until(test) { for (let i = 0; i < 100 && !test(); i++) await tick
     assert.equal(restarted.pending().length, 0); assert.equal(restarted.syncStatus().error, '');
     assert(writes.find(write => write.name === 'assets').update.$setOnInsert.created_at instanceof Date);
     assert.equal(writes.find(write => write.name === 'publications').update.$setOnInsert.published_at, null);
-    assert(writes.find(write => write.name === 'upload_events').update.$setOnInsert.uploaded_at instanceof Date);
+    assert(writes.find(write => write.name === 'upload_events').update.$set.uploaded_at instanceof Date);
+    // Attempt state must advance after acknowledgement even if the pending event synced first.
+    const attemptId = randomUUID();
+    const attemptStep = { filePath: activity.data.downloads[source.url].filePath };
+    restarted.recordUploadAttempt(attemptStep, { asset_id: firstHash, file_instance_id: event.file_instance_id }, attemptId, 0);
+    await sync.flush();
+    assert(writes.some(write => write.name === 'upload_events' && write.update.$set?.state === 'pending'));
+    restarted.recordUpload(attemptStep, { asset_id: firstHash, file_instance_id: event.file_instance_id }, { runId: attemptId, index: 0 });
+    await sync.flush();
+    assert.equal(writes.filter(write => write.name === 'upload_events').at(-1).update.$set.state, 'uploaded');
     assert(writes.find(write => write.name === 'workflow_runs').update.$set.startedAt instanceof Date);
     assert(bsonDates({ imported_at: '2026-10-22T03:00:00Z' }).imported_at instanceof Date);
     console.log('Durable per-step history, restart recovery, URL/hash reuse, concurrent downloads, blueprint IDs and Mongo retry: OK');

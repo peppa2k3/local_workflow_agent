@@ -92,3 +92,7 @@ MongoDB chưa được cấu hình trên máy triển khai thì chưa thể ki�
 ## Cập nhật: .env, Atlas và giao diện dùng chung
 
 Agent hiện tự đọc `.env` trước server/CLI; trang `/content` đọc trực tiếp database, quản lý page/publication, kiểm tra kết nối, đọc lại `.env` và đồng bộ ngay. Bước upload chọn được page có sẵn và kiểm tra page active từ MongoDB trước thao tác trình duyệt. Page local trùng platform/name với page chung được chuyển về UUID đang có, bao gồm liên kết publication/upload/lịch sử; thay cho yêu cầu xử lý xung đột UUID local bằng tay ở phiên bản đầu bên trên. `downloads` cũng được đồng bộ để các service truy vấn nguồn/asset/path/thời gian. Xem [MONGODB_ATLAS.md](MONGODB_ATLAS.md) để cấu hình và mô tả API/schema mới.
+
+## Tạm dừng chống trùng và sự kiện chưa rõ kết quả
+
+Trước upload, guard kiểm tra local và MongoDB theo filepath/filename/SHA-256. Sự kiện `pending` được lưu trước dispatch, có `file_path`, `file_name`, `attempted_at`; sau acknowledgement đổi thành `uploaded` và có `uploaded_at`. Upload event dùng `$set` khi đồng bộ để trạng thái tiến từ pending sang uploaded. Assets/publications vẫn insert-only. Pending sau lỗi/restart tiếp tục được coi là nguy cơ trùng. Popup local yêu cầu xác nhận hoặc dừng, lưu quyết định trong step; lỗi DB không bị bỏ qua. Xem [SCENARIOS.md](SCENARIOS.md#kiểm-tra-trùng-downloadupload).

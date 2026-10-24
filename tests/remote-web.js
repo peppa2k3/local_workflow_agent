@@ -62,7 +62,7 @@ const { chromium } = require('playwright');
     await page.route('https://local.test/**', async route => {
       const req = route.request(), endpoint = new URL(req.url()).pathname;
       if (endpoint === '/remote') return route.fulfill({ contentType: 'text/html', body: fs.readFileSync(path.join(__dirname, '../dashboard/remote.html'), 'utf8').replaceAll('__LOCAL_AGENT_DASHBOARD_TOKEN__', 'local-fixture') });
-      if (endpoint === '/remote.js' || endpoint === '/remote.css') return route.fulfill({ contentType: endpoint.endsWith('js') ? 'text/javascript' : 'text/css', body: fs.readFileSync(path.join(__dirname, endpoint.endsWith('js') ? '../dashboard/remote.js' : '../control-web/style.css'), 'utf8') });
+      if (['/remote.js', '/issues.js', '/remote.css'].includes(endpoint)) return route.fulfill({ contentType: endpoint.endsWith('js') ? 'text/javascript' : 'text/css', body: fs.readFileSync(path.join(__dirname, endpoint.endsWith('js') ? '../dashboard' + endpoint : '../control-web/style.css'), 'utf8') });
       assert.equal(req.headers()['x-local-agent-session'], 'local-fixture');
       if (req.method() === 'POST') {
         posted.push({ path: endpoint, data: req.postDataJSON() });

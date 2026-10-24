@@ -88,7 +88,7 @@ function createMongoSync(store, options = {}) {
         for (const item of store.pending()) {
           if (item.collection === 'pages') continue;
           const collection = db.collection(item.collection), doc = bsonDates(item.doc);
-          const insertOnly = ['assets', 'publications', 'upload_events'].includes(item.collection);
+          const insertOnly = ['assets', 'publications'].includes(item.collection);
           if (insertOnly) await collection.updateOne({ _id: doc._id }, { $setOnInsert: doc }, { upsert: true });
           else {
             const { _id, imported_at, ...fields } = doc;

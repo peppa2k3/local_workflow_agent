@@ -17,6 +17,7 @@ const { createCachedDownloader } = require('./download-cache');
 const { createMongoSync } = require('./mongo-sync');
 const { mongoSettings } = require('./env');
 const { createContentApi } = require('./content-api');
+const { createMediaGuard } = require('./media-guard');
 const { createRemoteClient } = require('./remote-client');
 const daemon = process.argv[2] === '--daemon' || process.env.LOCAL_AGENT_DAEMON === '1';
 
@@ -32,7 +33,12 @@ const profiles = profileCache.get;
 const activity = createActivityStore(process.env.LOCAL_AGENT_DATA_DIR || path.resolve(__dirname, '../../data/agent'));
 const mongoSync = createMongoSync(activity, { settings: mongoSettings });
 const content = createContentApi({ mongo: mongoSync, activity, readBody });
-const workflows = createWorkflows({ scenarios, defaultProfile: profile, profiles, activity, prepareUpload: content.prepareUpload, downloadVideo: createCachedDownloader(activity, downloadVideo), openFolder(folderPath) {
+const mediaGuard = createMediaGuard({ activity, mongo: mongoSync });
+const cachedDownloader = createCachedDownloader(activity, downloadVideo);
+const workflows = createWorkflows({ scenarios, defaultProfile: profile, profiles, activity, mediaGuard, prepareUpload: content.prepareUpload, async downloadVideo(step, signal, context) {
+  const release = await mediaGuard.check(step, null, { ...context, signal });
+  try { return await cachedDownloader(step, signal); } finally { release(); }
+}, openFolder(folderPath) {
   const folder = path.resolve(folderPath);
   if (!fs.existsSync(folder) || !fs.statSync(folder).isDirectory()) throw new Error(`Folder does not exist: ${folder}`);
   return launch('explorer.exe', [folder]);
@@ -81,9 +87,9 @@ const server = http.createServer(async (request, response) => {
   if (request.headers.host !== `127.0.0.1:${port}` && request.headers.host !== `localhost:${port}`) return json(403, { error: 'Host not allowed' });
   const origin = request.headers.origin;
   if (origin && origin !== `http://127.0.0.1:${port}` && !/^chrome-extension:\/\/[a-z]+$/.test(origin)) return json(403, { error: 'Origin not allowed' });
-  if (request.method === 'GET' && ['/remote.js', '/remote.css'].includes(route)) {
+  if (request.method === 'GET' && ['/remote.js', '/remote.css', '/issues.js'].includes(route)) {
     response.writeHead(200, { 'Content-Type': route.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/css; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
-    response.end(fs.readFileSync(route.endsWith('.js') ? path.join(path.dirname(dashboardPath), 'remote.js') : path.resolve(__dirname, '../../control-web/style.css'))); return;
+    response.end(fs.readFileSync(route.endsWith('.js') ? path.join(path.dirname(dashboardPath), route.slice(1)) : path.resolve(__dirname, '../../control-web/style.css'))); return;
   }
   if (request.method === 'GET' && ['/', '/content', '/content/', '/remote', '/remote/'].includes(route)) {
     response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -105,6 +111,12 @@ const server = http.createServer(async (request, response) => {
       if (automation.enabled && !extensionRead && !dashboardAuthorized(request) && !automation.authorized(request)) return json(401, { error: 'Valid Bearer token or dashboard session required' });
       if (route.startsWith('/api/content/')) return await content.handle(request, url, json);
       const selected = url.searchParams.get('profile') || profile;
+      if (request.method === 'GET' && route === '/api/issues') return json(200, { profiles: profiles().map(p => workflows.status(p.directory)), storage: activity.syncStatus() });
+      if (request.method === 'POST' && route === '/api/confirm') {
+        if (!dashboardAuthorized(request)) return json(403, { error: 'Local dashboard approval required' });
+        const body = await readBody(request);
+        return json(200, workflows.resolveConfirmation(body.profile, body.executionId, body.id, body.proceed));
+      }
       if (request.method === 'GET' && route === '/api/status') return json(200, workflows.status(selected));
       if (request.method === 'GET' && route === '/api/history') return json(200, { runs: workflows.listRuns(selected), storage: activity.syncStatus() });
       const historyMatch = route.match(/^\/api\/history\/([0-9a-f-]{36})$/);

@@ -5,7 +5,22 @@
     interrupted: 'Bị gián đoạn', unknown: 'Chưa rõ kết quả — kiểm tra máy local', expired: 'Hết hạn', rejected: 'Máy local từ chối' };
   const when = n => n ? new Date(n).toLocaleString('vi-VN') : 'Chưa nhận heartbeat';
   function el(tag, text, className) { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (className) n.className = className; return n; }
-  function message(text, error = false) { $('message').textContent = text; $('message').className = error ? 'notice error' : 'notice'; $('message').hidden = !text; }
+  const notices = new Set(), noticeQueue = [];
+  let notice;
+  function popup(text) {
+    if (!text || notices.has(text)) return;
+    notices.add(text); if (notices.size > 200) notices.delete(notices.values().next().value);
+    noticeQueue.push(text); showNotice();
+  }
+  function showNotice() {
+    if (notice || !noticeQueue.length) return;
+    notice = el('dialog'); notice.style.cssText = 'max-width:560px;width:calc(100% - 32px);background:#142136;color:#edf2ff;border:1px solid #607897;border-radius:14px;padding:24px;overflow-wrap:anywhere';
+    const close = el('button', 'Đã hiểu'); close.addEventListener('click', () => notice.close());
+    notice.append(el('h2', 'Thông báo tác vụ'), el('p', noticeQueue.shift()), close);
+    notice.addEventListener('close', () => { notice.remove(); notice = null; showNotice(); });
+    document.body.append(notice); notice.showModal();
+  }
+  function message(text, error = false) { $('message').textContent = text; $('message').className = error ? 'notice error' : 'notice'; $('message').hidden = !text; if (error) popup(text); }
   async function api(route, data) {
     const r = await fetch(route, { method: data === undefined ? 'GET' : 'POST', credentials: 'same-origin', redirect: 'error',
       headers: { 'content-type': 'application/json', 'x-csrf-token': csrf }, body: data === undefined ? undefined : JSON.stringify(data), signal: AbortSignal.timeout(18000) });
@@ -60,7 +75,7 @@
       if (result?.startedAt) n.append(el('p', `Bắt đầu: ${when(result.startedAt)}${result.endedAt ? ' · Kết thúc: ' + when(result.endedAt) : ''}`, 'muted'));
       if (result?.total) { const progress = el('progress'); progress.max = result.total; progress.value = cmd.state === 'succeeded' ? result.total : result.index;
         n.append(el('p', result.stoppedAtStep ? `Dừng tại bước ${result.stoppedAtStep}/${result.total}` : `Tiến độ: ${Math.min(result.index + 1, result.total)}/${result.total}`), progress); }
-      if (result?.message) n.append(el('p', result.message, 'muted'));
+      if (result?.message) { n.append(el('p', result.message, 'muted')); popup(`${cmd.payload.scenario || cmd.type}: ${result.message}`); }
       if (result?.steps?.length) { const details = el('details'), list = el('ol'); details.dataset.id = cmd.id; details.open = open.has(cmd.id);
         details.append(el('summary', 'Chi tiết từng bước')); list.append(...result.steps.map(s => el('li', `${s.label || s.action} — ${stateName[s.state] || s.state}`))); details.append(list); n.append(details); }
       if (cmd.type === 'run' && ['queued', 'dispatched', 'running', 'unknown'].includes(cmd.state)) {

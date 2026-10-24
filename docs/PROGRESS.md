@@ -1,5 +1,13 @@
 # Tiến độ phát triển
 
+## 2026-10-24 — Chống trùng download/upload và popup
+
+- Guard URL, filepath/filename/SHA-256 dựa trên local và MongoDB; DB lỗi thì dừng.
+- Tạm dừng trước thao tác, xác nhận đúng execution/step trên local, có nút dừng.
+- Lưu quyết định và upload pending trước dispatch; cảnh báo thử lại khi kết quả chưa rõ.
+- Popup lỗi trên các trang local và thông báo trên VPS, giữ legacy selectors.
+- Kiểm chứng: npm test đầy đủ, fixture local/DB + popup, pending → uploaded và node --check/git diff --check đạt; không thao tác website hoặc ghi thử Atlas thật.
+
 ## 2026-10-24 — Navbar chuyển nội dung và remote
 
 - Thống nhất navbar đầu trang local: Kịch bản, Quản lý nội dung, Remote Control.

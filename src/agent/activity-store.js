@@ -74,6 +74,7 @@ function createActivityStore(directory) {
   for (const run of listRuns(null, Infinity)) {
     if (run.state !== 'running') continue;
     run.running = false; run.waiting = false; run.state = 'interrupted'; run.endedAt = Date.now();
+    run.paused = false; run.confirmation = null;
     run.stoppedAtStep = run.index + 1; run.elapsedMs = run.endedAt - run.startedAt; run.stepElapsedMs = 0;
     run.error = 'Agent restarted before the workflow completed';
     for (const step of run.steps || []) if (step.state === 'running') {
@@ -186,11 +187,18 @@ function createActivityStore(directory) {
         page_id: page._id, published_at: null, post_url: '', desc: step.publicationDesc || '', created_at: now });
     }
     const event = { _id: uuid5(runId, String(index)), run_id: runId, step_index: index,
+      file_path: step.filePath || file.filePath || '', file_name: path.basename(step.filePath || file.filePath || ''),
       asset_id: file.asset_id, file_instance_id: file.file_instance_id, page_id: page?._id || null,
       page_url: target, actual_url: actualUrl, publication_id: publicationId, uploaded_at: now, state: 'uploaded' };
     put('upload_events', event); save(); return structuredClone(event);
   }
-  return { directory, data, registerFile, rememberDownload, cachedDownload, recordUpload, saveRun, readRun, listRuns, cachePage, adoptPage,
+  function recordUploadAttempt(step, file, runId, index) {
+    const event = { _id: uuid5(runId, String(index)), run_id: runId, step_index: index,
+      asset_id: file.asset_id, file_instance_id: file.file_instance_id, file_path: step.filePath,
+      file_name: path.basename(step.filePath), page_url: step.pageUrl || '', state: 'pending', attempted_at: new Date().toISOString() };
+    put('upload_events', event); save();
+  }
+  return { directory, data, registerFile, rememberDownload, cachedDownload, recordUpload, recordUploadAttempt, saveRun, readRun, listRuns, cachePage, adoptPage,
     onPageRemap: listener => pageListeners.add(listener),
     pending: () => Object.values(data.outbox).map(item => structuredClone(item)),
     acknowledge(item) {

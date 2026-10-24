@@ -2,7 +2,7 @@ const { randomUUID } = require('crypto');
 const { setTimeout: delay } = require('timers/promises');
 const { overrideVariables } = require('./variables');
 
-function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, downloadVideo, activity, prepareUpload }) {
+function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, downloadVideo, activity, prepareUpload, mediaGuard }) {
   const sessions = new Map();
   const completed = new Map();
   activity?.onPageRemap?.(remap => {
@@ -52,6 +52,7 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
       total: s.workflow?.steps.length || 0, action: s.workflow?.steps[s.index]?.action || null,
       stepLabel: s.currentStep?.label?.trim() || s.workflow?.steps[s.index]?.label?.trim() || `Bước ${s.index + 1}`,
       extensionConnected: Date.now() - s.lastContact < 10000, error: s.error,
+      paused: Boolean(s.confirmation), confirmation: s.confirmation ? structuredClone(s.confirmation) : null,
       tabId: s.tabId, waiting: s.inFlight || s.localPending,
       elapsedMs: s.startedAt ? (s.endedAt || Date.now()) - s.startedAt : 0,
       stepElapsedMs: s.running && s.stepStartedAt ? Date.now() - s.stepStartedAt : 0,
@@ -62,12 +63,34 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
   function stop(profile) {
     const s = session(profile);
     s.controller.abort(); s.controller = new AbortController();
+    s.releaseMedia?.(); s.releaseMedia = null; s.confirmation = null; s.decide = null;
     if (s.running) finish(s, s.error ? 'failed' : 'cancelled');
     s.running = false; s.inFlight = false; s.localPending = false;
     s.picker.active = false; s.runId = randomUUID();
   }
   function fail(s, error) {
     s.error = String(error.message || error); stop(s.profile);
+  }
+  function confirm(s, issue) {
+    const signal = s.controller.signal;
+    return new Promise((resolve, reject) => {
+      signal.throwIfAborted();
+      const clean = () => { signal.removeEventListener('abort', abort); s.confirmation = null; s.decide = null; };
+      const abort = () => { clean(); reject(new Error('Đã dừng tác vụ đang chờ xác nhận')); };
+      s.confirmation = { ...issue, id: randomUUID(), executionId: s.executionId, step: s.index + 1 };
+      s.decide = () => { clean(); resolve(); };
+      signal.addEventListener('abort', abort, { once: true });
+      try { persist(s); } catch (error) { clean(); reject(error); }
+    });
+  }
+  function resolveConfirmation(profile, executionId, id, proceed) {
+    const s = session(profile);
+    if (!s.running || s.executionId !== executionId || s.confirmation?.id !== id || typeof proceed !== 'boolean') throw new Error('Xác nhận đã hết hiệu lực. Làm mới trạng thái.');
+    s.steps[s.index].decisions ||= [];
+    s.steps[s.index].decisions.push({ ...structuredClone(s.confirmation), proceed, at: new Date().toISOString() });
+    persist(s);
+    if (proceed) s.decide(); else stop(profile);
+    return status(profile);
   }
   async function advance(s, runId) {
     s.localPending = true;
@@ -94,12 +117,18 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
             if (s.runId !== runId || !s.running) return;
             if (s.download?.filePath === step.filePath && s.download.asset_id && file.asset_id !== s.download.asset_id) throw new Error('Downloaded file changed before upload');
             s.uploadFile = file; record.asset_id = file.asset_id;
+            if (mediaGuard) {
+              const release = await mediaGuard.check(step, file, { signal: s.controller.signal, confirm: issue => confirm(s, issue) });
+              if (s.runId !== runId || !s.running) { release(); return; }
+              s.releaseMedia = release;
+              activity.recordUploadAttempt?.(step, file, s.executionId, s.index);
+            }
           }
         }
         persist(s);
         if (step.action === 'wait') await delay(step.ms, undefined, { signal: s.controller.signal });
         else if (step.action === 'downloadVideo') {
-          const download = await downloadVideo(step, s.controller.signal);
+          const download = await downloadVideo(step, s.controller.signal, { confirm: issue => confirm(s, issue) });
           if (s.runId !== runId || !s.running) return;
           if (download.verified !== true || !download.filePath) throw new Error('Download must finish final-file verification before continuing');
           if (s.runId === runId && s.running) {
@@ -156,8 +185,8 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
     return s;
   }
   function next(s) {
-    const answer = { running: s.running, runId: s.runId, step: null, tabId: s.tabId };
-    if (s.running && !s.localPending && !s.inFlight) {
+    const answer = { running: s.running, paused: Boolean(s.confirmation), runId: s.runId, step: null, tabId: s.tabId };
+    if (s.running && !s.confirmation && !s.localPending && !s.inFlight) {
       s.inFlight = true;
       s.stepStartedAt = Date.now();
       s.steps[s.index].started_at = new Date(s.stepStartedAt).toISOString(); persist(s);
@@ -185,6 +214,7 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
       }
       if (s.currentUrl) s.steps[s.index].result_url = s.currentUrl;
       endStep(s, 'succeeded'); persist(s);
+      s.releaseMedia?.(); s.releaseMedia = null;
     } catch (error) { return fail(s, error); }
     s.index++;
     void advance(s, s.runId);
@@ -198,7 +228,7 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
   function usesScenario(name) {
     return [...sessions.values()].some(s => s.running && s.scenarioName === name);
   }
-  return { usesScenario, session, status, start, stop, connect, next, result, expire, getRun, stopRun,
+  return { resolveConfirmation, usesScenario, session, status, start, stop, connect, next, result, expire, getRun, stopRun,
     listRuns: profile => activity ? activity.listRuns(profile) : [...completed.values()].filter(run => !profile || run.profile === profile).reverse() };
 }
 

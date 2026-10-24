@@ -155,7 +155,7 @@ async function poll() {
       lastPick = null;
     }
     const next = await call('/next', {}, client);
-    if (!next.step) return;
+    if (next.paused || !next.step) return; // Duplicate confirmation stays in the local dashboard.
     const job = { client, runId: next.runId, tabId: next.tabId };
     activeJob = job;
     const keepAlive = setInterval(() => {
