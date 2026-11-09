@@ -15,11 +15,23 @@ Agent chạy tại `http://127.0.0.1:34719`. CLI cần một terminal khác và 
 $env:LOCAL_AGENT_API_TOKEN = 'token-32-ky-tu-tro-len'
 ```
 
+`node .\local-agent.js` tự nạp biến từ file `.env` ở thư mục dự án. Vì vậy,
+nếu token đã được lưu trong `.env`, không cần chạy lại lệnh `$env:` ở terminal
+CLI; chỉ cần khởi động lại agent sau khi thêm hoặc đổi token.
+
 Nếu agent cũng dùng API token, đặt biến trước khi khởi động agent:
 
 ```powershell
 $env:LOCAL_AGENT_API_TOKEN = 'token-32-ky-tu-tro-len'
-node .\local-agent.js
+node .\local-agent.js --daemon
+```
+
+Nếu chưa có token, tạo một token mới trong `.env` bằng PowerShell:
+
+```powershell
+$token = node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
+Add-Content .\.env "`nLOCAL_AGENT_API_TOKEN=$token"
+node .\local-agent.js --daemon
 ```
 
 ## 2. Xem profile và kịch bản
