@@ -23,12 +23,14 @@ const { createScenarioStore } = require('../local-workflow-agent/src/workflow/sc
     response.end(`<a id="go" href="/next">Next</a><img src="/image${request.url}">
       <button id="spa" onclick="setTimeout(()=>{document.getElementById('done').hidden=false;document.getElementById('spinner').remove()},800)">Load data</button>
       <span id="spinner">Loading</span><span id="done" hidden>Done</span><input id="text">
-      <div role="presentation" aria-label="Mô tả thước phim của bạn...">Outside duplicate</div>
-      <div role="presentation" aria-label="Mô tả thước phim của bạn..." style="padding:12px;border:1px solid">
+      <div id="outside-description" role="presentation" aria-label="Mô tả thước phim của bạn...">Outside duplicate</div>
+      <div id="rich-wrapper" role="presentation" aria-label="Mô tả thước phim của bạn..." style="padding:12px;border:1px solid">
         <div id="rich" contenteditable="true" role="textbox" aria-label="Nội dung phim" style="min-height:35px"><p>Nội dung cũ</p></div>
       </div>
       <textarea id="textarea">Cũ</textarea><input id="readonly-text" readonly value="Giữ nguyên">
       <div id="activation" style="padding:12px" onclick="if(!this.querySelector('input'))setTimeout(()=>{this.innerHTML='<input id=activated>';},200)">Click to edit</div>
+      <div id="replace-editor" role="presentation" aria-label="Dynamic editor" style="padding:12px" onclick="const editor=document.createElement('div');editor.id='replacement-input';editor.contentEditable='true';editor.setAttribute('aria-label','Dynamic editor');editor.style.minHeight='35px';this.replaceWith(editor)">Dynamic editor</div>
+      <div id="implicit-editor" contenteditable="true" aria-label="Implicit editor" style="min-height:35px">Old implicit text</div>
       <button id="not-editable">Cannot type here</button>
       <script>window.richEvents=[];document.getElementById('rich').addEventListener('input',e=>richEvents.push({type:e.type,trusted:e.isTrusted}));</script>
       <input id="date" type="date"><input id="time" type="time"><input id="date-text" aria-label="Date text">
@@ -36,6 +38,9 @@ const { createScenarioStore } = require('../local-workflow-agent/src/workflow/sc
       <input id="file" type="file" hidden><button id="upload" onclick="document.getElementById('file').click()">Upload</button>
       <script>window.dateEvents=[];document.getElementById('date').addEventListener('input',e=>dateEvents.push(e.type));document.getElementById('date').addEventListener('change',e=>dateEvents.push(e.type));</script>
       <button id="noop">No operation</button>
+      <button class="indexed-click" disabled>Unavailable first match</button><button class="indexed-click" onclick="window.indexedClicked=true">Available second match</button>
+      <button id="persistent" onclick="window.persistentClicks=(window.persistentClicks||0)+1;if(!window.noiseTimer)window.noiseTimer=setInterval(()=>document.getElementById('noise').textContent=Date.now(),25);if(window.persistentClicks===3)setTimeout(()=>document.getElementById('persistent-result').hidden=false,800)">Tiếp</button>
+      <span id="noise">0</span><span id="persistent-result" hidden>Next stage ready</span>
       <button id="delayed" onclick="setTimeout(()=>location.assign('/delayed-result'),900)">Delayed navigation</button>
       ${request.url === '/delayed-result' ? '<span id="arrived">Arrived</span>' : ''}`);
   });
@@ -115,6 +120,21 @@ const { createScenarioStore } = require('../local-workflow-agent/src/workflow/sc
     assert.equal(await tabs.get(job.tabId).page.locator('#text').inputValue(), 'Ready');
     const typingPage = tabs.get(job.tabId).page;
     const store = createScenarioStore(temp);
+    await execute(job, {action: 'click', selector: '.indexed-click', index: 1, timeoutMs: 1000});
+    assert(await typingPage.evaluate(() => indexedClicked), 'actionability filtering must not shift a saved visible-match index');
+    const persistentSteps = store.prepare({steps: [
+      {action: 'click', selector: '#persistent', navigationTimeoutMs: 1200, completion: {state: 'visible', locatorType: 'text'}},
+      {action: 'click', selector: '#persistent', navigationTimeoutMs: 1200}
+    ]}).steps;
+    for (const step of persistentSteps) await execute(job, step);
+    assert.equal(await typingPage.evaluate(() => persistentClicks), 2, 'a persistent button and unrelated DOM updates must not prevent the next click');
+    assert(await typingPage.locator('#persistent').isVisible(), 'successful click does not require the clicked button to disappear');
+    await execute(job, {action: 'click', selector: '#persistent', completion: {selector: '#persistent-result', state: 'visible'}, navigationTimeoutMs: 2000});
+    assert(await typingPage.locator('#persistent-result').isVisible(), 'explicit completion still waits for the actual UI result despite unrelated mutations');
+    await assert.rejects(execute(job, {action: 'click', selector: '#persistent', settleMs: 350, navigationTimeoutMs: 300}), /DOM did not settle/);
+    assert.equal(await typingPage.evaluate(() => persistentClicks), 4, 'a failed explicit settle wait must not replay the click');
+    await typingPage.evaluate(() => clearInterval(noiseTimer));
+    console.log('Persistent-button clicks, continuously changing DOM, sequential clicks, result conditions and explicit settle timeout: OK');
     const template = { variables: { tenphimn: 'Tên phim tiếng Việt từ biến' }, steps: [{ action: 'type', locatorType: 'role', role: 'presentation', locator: 'Mô tả thước phim của bạn...', index: 1, text: '{{tenphimn}}', clear: true }] };
     await typingPage.locator('#text').focus();
     await execute(job, store.prepare(template).steps[0]);
@@ -126,6 +146,32 @@ const { createScenarioStore } = require('../local-workflow-agent/src/workflow/sc
     await execute(job, store.prepare(template).steps[0]);
     assert.equal(await typingPage.locator('#rich').innerText(), 'Giá trị mới khi chạy lại');
     assert.equal(template.steps[0].text, '{{tenphimn}}', 'template is never replaced with a hard-coded value');
+    await typingPage.locator('#outside-description').evaluate(element => { element.hidden = true; });
+    await execute(job, {...store.prepare(template).steps[0], text: 'One remaining description editor', timeoutMs: 1000});
+    assert.equal(await typingPage.locator('#rich').innerText(), 'One remaining description editor', 'a stale semantic index can resolve only to the single matching editor');
+    await typingPage.evaluate(() => {
+      const dialog = document.createElement('div'); dialog.id = 'editor-dialog'; dialog.role = 'dialog';
+      dialog.append(document.getElementById('rich-wrapper')); document.body.append(dialog);
+      document.getElementById('outside-description').hidden = false;
+    });
+    await execute(job, {...store.prepare(template).steps[0], text: 'Editor in active dialog', timeoutMs: 1000});
+    assert.equal(await typingPage.locator('#rich').innerText(), 'Editor in active dialog', 'dialog scoping must not turn a saved index into a false not-found');
+    await typingPage.evaluate(() => { document.body.append(document.getElementById('rich-wrapper')); document.getElementById('editor-dialog').remove(); });
+    await execute(job, {action: 'type', locatorType: 'role', role: 'presentation', locator: 'Mô tả thước phim của bạn...', text: 'Unique editor behind matching wrappers'});
+    assert.equal(await typingPage.locator('#rich').innerText(), 'Unique editor behind matching wrappers');
+    await execute(job, {action: 'type', locatorType: 'role', role: 'presentation', locator: 'Dynamic editor', text: 'Replaced editor received text', timeoutMs: 1500});
+    assert.equal(await typingPage.locator('#replacement-input').innerText(), 'Replaced editor received text', 'replacement editor with the same label can be focused even if the page did not focus it');
+    await execute(job, {action: 'type', locatorType: 'role', role: 'textbox', locator: 'Implicit editor', text: 'Implicit textbox received text'});
+    assert.equal(await typingPage.locator('#implicit-editor').innerText(), 'Implicit textbox received text');
+    await typingPage.evaluate(() => {
+      const group = document.createElement('div'); group.id = 'ambiguous-inputs';
+      group.innerHTML = '<input aria-label="Duplicated editor"><textarea aria-label="Duplicated editor"></textarea>'; document.body.append(group);
+    });
+    await assert.rejects(execute(job, {action: 'type', locatorType: 'label', locator: 'Duplicated editor', index: 9, text: 'Must not be entered', timeoutMs: 300}), /index 9/);
+    assert.deepEqual(await typingPage.locator('#ambiguous-inputs input,#ambiguous-inputs textarea').evaluateAll(elements => elements.map(element => element.value)), ['', '']);
+    await typingPage.locator('#ambiguous-inputs').evaluate(element => element.remove());
+    await execute(job, store.prepare(template).steps[0]);
+    console.log('Typing: stale semantic index, active dialog, replaced editor focus, implicit textbox and ambiguity guard: OK');
     await execute(job, { action: 'type', selector: '#rich p', text: ' + thêm', clear: false });
     assert.equal(await typingPage.locator('#rich').innerText(), 'Giá trị mới khi chạy lại + thêm');
     await execute(job, { action: 'type', selector: '#textarea', text: 'Dòng mới\nDòng hai' });
@@ -224,6 +270,7 @@ const { createScenarioStore } = require('../local-workflow-agent/src/workflow/sc
     await dashboard.goto('http://dashboard.test/');
     await dashboard.getByLabel('Chrome profile', { exact: true }).selectOption('Profile 2');
     await dashboard.getByRole('button', { name: 'Mở chi tiết bước 1' }).click();
+    await dashboard.getByLabel('DOM ổn định sau click (ms, mặc định 0)', {exact: true}).fill('0');
     await dashboard.getByLabel('Chờ phần tử kết quả (tùy chọn)', { exact: true }).fill('#ready');
     await dashboard.getByLabel('Trạng thái cần chờ', { exact: true }).selectOption('hidden');
     await Promise.all([
@@ -233,6 +280,7 @@ const { createScenarioStore } = require('../local-workflow-agent/src/workflow/sc
     assert.equal(runRequest.profile, 'Profile 2');
     assert.equal(savedScenario.steps[0].completion.locator, '#ready');
     assert.equal(savedScenario.steps[0].completion.state, 'hidden');
+    assert.equal(savedScenario.steps[0].settleMs, 0);
     assert.equal(savedScenario.steps[0].locator, '#go');
     console.log('Dashboard profile selection and completion condition persistence: OK');
     await dashboard.locator('#scenarioSelect').selectOption('typing');

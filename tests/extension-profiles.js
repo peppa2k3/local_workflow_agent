@@ -34,6 +34,13 @@ const {chromium} = require('playwright');
       const response = await fetch(base + route, {method: body ? 'POST' : 'GET', headers: {Authorization: `Bearer ${token}`, 'Content-Type': 'application/json'}, body: body ? JSON.stringify(body) : undefined});
       assert(response.ok); return response.json();
     }
+    async function waitForConnected(profile) {
+      for (let n = 0; n < 40; n++) {
+        if ((await api('/api/v1/profiles')).profiles.find(p => p.directory === profile)?.extensionConnected) return;
+        await new Promise(r => setTimeout(r, 250));
+      }
+      assert.fail(`Extension did not connect to ${profile}`);
+    }
     const extension = path.join(temp, 'extension');
     fs.cpSync(path.join(root, 'chrome-reels-extension'), extension, {recursive: true});
     for (const name of ['options.js', 'background.js']) {
@@ -56,10 +63,10 @@ const {chromium} = require('playwright');
     assert.deepEqual(discovery, {get: 401, post: 200}, 'real extension GET omits Origin; POST discovers profiles with API token enabled');
     await page.locator('#profile').selectOption('Profile 1'); await page.locator('#save').click();
     await page.waitForFunction(async () => (await chrome.storage.local.get('profile')).profile === 'Profile 1');
-    assert((await api('/api/v1/profiles')).profiles.find(p => p.directory === 'Profile 1').extensionConnected);
+    await waitForConnected('Profile 1');
     await page.locator('#profile').selectOption('Profile 2'); await page.locator('#save').click();
     await page.waitForFunction(async () => (await chrome.storage.local.get('profile')).profile === 'Profile 2');
-    assert((await api('/api/v1/profiles')).profiles.find(p => p.directory === 'Profile 2').extensionConnected);
+    await waitForConnected('Profile 2');
     const stored = await page.evaluate(() => chrome.storage.local.get(null));
     assert.deepEqual(Object.keys(stored).sort(), ['clientId', 'profile']); assert(!JSON.stringify(stored).includes(token));
     const run = await api('/api/v1/runs', {scenario: 'wait', profile: 'Profile 2'});

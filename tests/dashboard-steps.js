@@ -43,6 +43,8 @@ const { chromium } = require('playwright');
 
     await cards.nth(1).getByRole('button', { name: 'Mở chi tiết bước 2' }).click();
     assert.equal(await cards.nth(1).locator('.step-body').isVisible(), true);
+    assert.equal(await cards.nth(1).getByLabel('DOM ổn định sau click (ms, mặc định 0)', {exact: true}).inputValue(), '');
+    assert(await cards.nth(1).getByText('Nút có thể vẫn hiển thị sau khi click.', {exact: false}).isVisible());
     await cards.nth(1).getByRole('textbox', { name: 'Tên bước (tùy chọn)' }).fill('Chọn clip');
     assert.equal(await cards.nth(1).locator('.step-title').textContent(), 'Chọn clip');
     await cards.nth(1).getByRole('button', { name: 'Lên bước 2' }).click();

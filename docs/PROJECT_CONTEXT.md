@@ -136,3 +136,8 @@ downloadVideo mặc định best với sort-force FPS → res (cạnh ngắn, h�
 Dashboard adaptive polling: idle 10s, running 1500ms, picker 1000ms; hidden/pagehide pause, visibility resume, request chung cho Run preflight và status, lỗi backoff tối đa 60s. Chỉ ghi DOM khi đổi, giữ editor/focus và tái dùng profile options. Chạy/Dừng/switch cập nhật ngay, không đổi protocol hành động.
 
 Server createProfileCache khởi tạo bằng readFile async rồi listen; get trả snapshot RAM, stale 30s trigger một async refresh dùng chung. Giữ snapshot cũ khi metadata tạm lỗi. listProfiles sync vẫn dành cho caller cũ, không dùng trong hot path server. Test dashboard-performance dùng fake clock trên Chrome riêng để đo request/DOM/focus/backoff và test cache đọc chậm.
+## Click và nhập editor động (2026-11-10)
+
+Extension 4.2.2: click mặc định `settleMs=0`, vẫn chờ navigation và completion được chỉ định. Nút còn hiện sau click là hợp lệ; DOM video/progress thay đổi liên tục không còn chặn click tiếp theo. `openUrl` giữ mặc định 350ms. Completion không có locator/selector bị bỏ trên bản prepare, không sửa JSON gốc.
+
+Type theo role/label/placeholder/text phục hồi index cũ chỉ khi các kết quả xác định đúng một editor. CSS/XPath giữ index nghiêm ngặt; nhiều editor vẫn báo lỗi. Hỗ trợ textbox contenteditable không khai báo role và tìm lại editor bị thay thế sau click trong dialog tương ứng. Dashboard và docs giải thích index bắt đầu từ 0.

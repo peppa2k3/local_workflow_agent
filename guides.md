@@ -80,7 +80,7 @@ Cách này dùng ngay trên máy local, không cần chờ phát hành trên Web
 
 5. Chọn **thư mục**, không chọn riêng `manifest.json` hoặc file ZIP.
 6. Kiểm tra thẻ **Local Workflow Agent Bridge** đã bật. Bản manifest hiện tại
-   là `4.2.1`.
+   là `4.2.2`.
 7. Lặp lại trên từng profile muốn điều khiển. Việc ánh xạ profile thực hiện ở bước 5.
 
 ### 2.2. Đóng ZIP và upload Chrome Web Store — nếu muốn phát hành
@@ -91,7 +91,7 @@ Cách này dùng ngay trên máy local, không cần chờ phát hành trên Web
    npm run package:extension
    ```
 
-   Kết quả hiện tại: `dist/chrome-reels-extension-4.2.1.zip`. Script lấy version
+   Kết quả hiện tại: `dist/chrome-reels-extension-4.2.2.zip`. Script lấy version
    từ manifest và không ghi đè ZIP đã có. Nếu cần đóng lại cùng version, chọn
    thư mục kết quả mới:
 
@@ -420,6 +420,8 @@ thêm `--var "ten_bien=gia_tri"` hoặc `--variables-file file.json`. Dùng `des
 | Profile bận/API `409` | Xem lượt đang chạy của profile đó, chờ hoàn tất hoặc dừng đúng runId. |
 | Scenario lỗi tải video | Kiểm tra `tools/`, FFmpeg/FFprobe, URL và thư mục ghi file trên máy local. |
 | Scenario dừng chờ xác nhận | Mở dashboard local kiểm tra popup download/upload trùng. |
+| Click đã xong nhưng timeout chờ trang | Cập nhật engine/extension 4.2.2: click mặc định `settleMs: 0`. Nút không cần biến mất; điền completion locator nếu cần chờ UI tiếp theo. Nếu tự đặt settleMs lớn hơn 0, DOM liên tục thay đổi vẫn có thể timeout. |
+| Nhập mô tả báo không tìm thấy phần tử | Kiểm tra locator/role và index: 1 là kết quả thứ hai. Bản 4.2.2 có thể tìm lại editor duy nhất khi số kết quả thay đổi hoặc editor bị thay sau click; nhiều ô khác nhau vẫn cần locator/index chính xác. |
 | File/path không tồn tại | Đường dẫn phải có thật trên máy local đang chạy engine; sửa biến/scenario theo máy đó. |
 
 ## Tài liệu liên quan

@@ -11,6 +11,16 @@ Extension Chrome Manifest V3, chạy trong từng profile muốn kết nối v�
 
 Load unpacked bằng chính thư mục này. Hướng dẫn: [SETUP](../docs/SETUP.md).
 
+Bản 4.2.2 sửa timeout sau click trên trang có video/progress cập nhật DOM liên
+tục. Click mặc định không chờ DOM đứng yên (`settleMs: 0`), vẫn chờ tải trang và
+completion đã chỉ định. Nút vẫn tồn tại sau click không bị coi là thất bại.
+Restart engine, Reload extension và refresh dashboard sau nâng cấp.
+
+Bản này cũng sửa `type` khi index cũ không còn sau khi dialog mở/duplicate ẩn:
+chỉ tự phục hồi nếu locator ngữ nghĩa khớp đúng một editor. Editor bị thay sau
+click được tìm lại theo locator/tên truy cập và focus trước khi nhập; nhiều ô
+khớp khác nhau vẫn báo lỗi để tránh nhập nhầm.
+
 Bản 4.2.1 sửa discovery profile khi engine có API token: Options dùng POST
 chỉ đọc để Chrome gửi Origin extension, không yêu cầu nhập token vào extension.
 Sau nâng cấp cần restart workflow engine, Reload extension rồi mở lại Options.

@@ -6,8 +6,10 @@ const http=require('node:http');
 const {spawn}=require('node:child_process');
 const {once}=require('node:events');
 const {pathToFileURL}=require('node:url');
+const {agentDirectory}=require('../scripts/test-terminal-workflow');
 (async()=>{
-  const {createWorkflowClient}=await import('../local-agent/src/workflow.js');
+  if(!agentDirectory)throw Error('Workflow bridge source directory not found');
+  const {createWorkflowClient}=await import(pathToFileURL(path.join(agentDirectory,'src/workflow.js')));
   const root=path.resolve(__dirname,'..'),temp=fs.mkdtempSync(path.join(os.tmpdir(),'terminal-workflow-'));
   let child;
   try {
@@ -32,7 +34,7 @@ const {pathToFileURL}=require('node:url');
     assert((await client.request('runs')).runs.some(item=>item.runId===slow.runId));
     // The CLI runs from another cwd and uses a local env file, without VPS credentials.
     const settingsFile=path.join(temp,'cli.env');fs.writeFileSync(settingsFile,`LOCAL_AGENT_API_TOKEN=${token}\nLOCAL_AGENT_PORT=${port}\n`);
-    const cli=spawn(process.execPath,[path.join(root,'local-agent/workflow.js'),'scenarios'],{cwd:os.tmpdir(),env:{...process.env,WORKFLOW_AGENT_ENV_FILE:settingsFile,WORKFLOW_AGENT_URL:`http://127.0.0.1:${port}`,LOCAL_AGENT_API_TOKEN:token},stdio:['ignore','pipe','pipe']});
+    const cli=spawn(process.execPath,[path.join(agentDirectory,'workflow.js'),'scenarios'],{cwd:os.tmpdir(),env:{...process.env,WORKFLOW_AGENT_ENV_FILE:settingsFile,WORKFLOW_AGENT_URL:`http://127.0.0.1:${port}`,LOCAL_AGENT_API_TOKEN:token},stdio:['ignore','pipe','pipe']});
     let output='',errors='';cli.stdout.on('data',b=>{output+=b});cli.stderr.on('data',b=>{errors+=b});const [code]=await once(cli,'close');assert.equal(code,0,errors);assert.deepEqual(JSON.parse(output),{names:['fixture']});
     console.log('Terminal workflow: real loopback engine auth, catalog, variables, retry dedupe/conflict, history, stop and standalone CLI passed');
   } finally {

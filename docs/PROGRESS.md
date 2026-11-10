@@ -231,3 +231,10 @@ Kiểm chứng thực tế 2026-10-19: tải video HTTP cục bộ, tải lại 
 - DOM cập nhật có so sánh, không ghi lại text không đổi hoặc dựng lại profile dropdown đang focus; giữ input/editor.
 - Metadata Chrome được đọc bất đồng bộ với cache 30s, dedupe refresh, giữ dữ liệu khi Chrome đang ghi. Chặn khởi động server tới khi lượt nạp đầu hoàn tất để giữ profile discovery đúng.
 - Test mới mô phỏng thời gian trên Chrome tách biệt: budget request, hidden/resume, request chậm, Chạy/Dừng, focus/DOM, backoff và cache async.
+## 2026-11-10: click liên tiếp và nhập mô tả động
+
+- Sửa click bị timeout do DOM video/progress không ổn định: mặc định settle 0, giữ kiểm tra navigation/completion và thông báo riêng khi người dùng yêu cầu DOM settle.
+- Sửa type khi index ngữ nghĩa đã cũ nhưng chỉ còn một editor, wrapper trùng và editor bị thay thế sau click. Giữ từ chối trường hợp nhiều editor; hỗ trợ contenteditable có textbox role ngầm định.
+- Cập nhật dashboard, tài liệu và extension 4.2.2. Kiểm tra bằng Chrome riêng với fixture, không chạy Facebook hoặc dùng profile đăng nhập.
+- Test terminal workflow nhận cả tên thư mục local-agent gốc và local-agent-corebase đã được đổi tên trong workspace.
+- Kiểm chứng: toàn bộ `npm test`, `npm run test:extension`, kiểm tra cú pháp JavaScript và đối chiếu ZIP 4.2.2 với source đều pass.

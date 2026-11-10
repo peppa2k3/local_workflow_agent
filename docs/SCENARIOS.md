@@ -48,7 +48,7 @@ Edit a JSON file in `scenarios` and run it again. Steps run in order:
 | `openFolder` | `path` | Opens a local directory in Windows Explorer. |
 | `wait` | `ms` | Waits for a duration. |
 | `waitFor` | `locatorType`, `locator`, optional `role`, `index`, `timeoutMs` | Waits for a visible matching element (default 10 seconds). |
-| `click` | `locatorType`, `locator`, optional `role`, `index`, `timeoutMs`, `navigationTimeoutMs`, `settleMs`, `completion` | Clicks an actionable element and waits for navigation/DOM stability and the optional result condition. |
+| `click` | `locatorType`, `locator`, optional `role`, `index`, `timeoutMs`, `navigationTimeoutMs`, `settleMs`, `completion` | Clicks an actionable element, waits for navigation and an optional result condition. DOM quiet waiting defaults to 0. |
 | `type` | `locatorType`, `locator`, `text`, optional `clear`, `timeoutMs` | Clicks an editable input/textarea/rich text area, confirms focus and caret, then enters text. |
 | `setDate` | locator fields, `value` (`YYYY-MM-DD`), optional `format`, `timeoutMs`, `completion` | Clicks an input and fills a valid calendar date, then fires input/change and blurs. |
 | `setTime` | locator fields, `value` (`HH:mm`), optional `timeoutMs`, `completion` | Clicks an input and fills a 24-hour time, then fires input/change and blurs. |
@@ -74,9 +74,23 @@ In the dashboard, choose **Role + name**, **Visible text**, **Label**, **Placeho
 
 `type` handles normal inputs, textarea, and `contenteditable` editors. It clicks the field, focuses it, and positions the caret before browser input. A locator may identify a label, a child of a rich text editor, or a container such as `role=presentation` with one editable field. If clicking a placeholder reveals an editor, the action waits for it using `timeoutMs` (default 10000). A container with multiple editable fields must use a more specific locator. Readonly/disabled fields and containers without a usable editor fail instead of typing into the previously focused field. `clear: true` (default) selects and deletes old content through browser editing, including rich text; `clear: false` appends at the end. No separate click step is needed.
 
+For semantic `type` locators (role/label/placeholder/text), a valid explicit
+`index` still selects that visible match. If the index is no longer available
+because a duplicate disappeared or dialog scoping narrowed the results, the
+action may recover only when all matching candidates identify exactly one
+editable field. Multiple distinct editors remain an error; CSS/XPath indices
+stay strict. Indices must be nonnegative integers. `role: textbox` also supports
+contenteditable editors without an explicit role attribute.
+
+If the clicked placeholder is replaced, `type` resolves the new matching field
+or the editor carrying the same accessible label, keeping active-dialog scope,
+then sets focus/caret even if the page did not focus it. It does not repeat the
+activation click. Missing indexed targets now report the requested index and
+visible match count to make stale locator/index settings easier to diagnose.
+
 ## Waiting for actions to finish
 
-Only one step is issued at a time **per profile**. The next step, including local `wait`/`openFolder`, starts after the extension acknowledges completion. `openUrl` and `click` wait for Chrome's tab load status and `document.readyState === 'complete'`, then a quiet DOM/URL interval (`settleMs`, default 350 ms). The background worker owns navigation, so replacing the old document or redirecting does not lose the completion acknowledgement. A click observes navigation/new-tab creation for at least 500 ms; if it opens a new tab during that interval, later steps use that tab. The selected target tab remains bound even if you switch to another tab.
+Only one step is issued at a time **per profile**. The next step, including local `wait`/`openFolder`, starts after the extension acknowledges completion. `openUrl` and `click` wait for Chrome's tab load status and `document.readyState === 'complete'`. `openUrl` then waits for a quiet DOM/URL interval (`settleMs`, default 350 ms); `click` defaults to `settleMs: 0` so video/progress updates cannot block an already delivered click. The background worker owns navigation, so replacing the old document or redirecting does not lose the completion acknowledgement. A click observes navigation/new-tab creation for at least 500 ms; if it opens a new tab during that interval, later steps use that tab. The selected target tab remains bound even if you switch to another tab.
 
 Page load does not tell an agent when a website's business operation is finished. For AJAX, delayed navigation, upload processing, or pages with continuously changing content, set **Chờ phần tử kết quả** in the dashboard or add `completion` to the action. It works on `openUrl`, `click`, `type`, `setDate`, `setTime`, and `upload` and accepts normal locator fields plus `state`: `visible` (default), `hidden`, or `enabled` (can receive a pointer click). For example:
 
@@ -95,7 +109,7 @@ Page load does not tell an agent when a website's business operation is finished
 }
 ```
 
-The condition should identify the **new** result of this action. For a spinner, `hidden` succeeds as soon as no matching visible spinner exists, including when it has not appeared yet; prefer a result element that appears after success. With a result condition, the default DOM quiet interval is 0 because the explicit condition determines readiness. Set `settleMs` explicitly to override it. Without a result condition, use `settleMs: 0` if persistent page mutations prevent DOM stability, then put a `waitFor` step for the next control.
+The condition should identify the **new** result of this action. For a spinner, `hidden` succeeds as soon as no matching visible spinner exists, including when it has not appeared yet; prefer a result element that appears after success. With a result condition, the default DOM quiet interval is 0 because the explicit condition determines readiness. Set `settleMs` explicitly to override it. A clicked button may remain visible and be clicked again in the following step: its disappearance is never required implicitly. An unfinished `completion` object with only type/state and no locator/selector is ignored on the prepared copy; saved JSON is not rewritten. Use a completion locator or a separate `waitFor` for the actual next UI control. Explicit DOM quiet timeouts report `Page DOM did not settle...`; increasing page-load timeout alone does not fix an endlessly changing DOM.
 
 `navigationTimeoutMs` defaults to 30000 ms for page readiness and separately for the completion condition; `timeoutMs` continues to control finding the action target (default 10000 ms). A timeout/error stops that profile without issuing later steps. Stop cancels pending waits and rejects stale results; it cannot undo an input already delivered to the website. The agent also times out a browser action if its extension disappears. Browser actions require the selected profile's extension to be connected before Run.
 

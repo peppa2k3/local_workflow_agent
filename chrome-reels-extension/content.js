@@ -57,7 +57,7 @@
       for (let i = 0; i < result.snapshotLength; i++) elements.push(result.snapshotItem(i));
     } else if (type === 'role') {
       if (!step.role) throw new Error('Role is empty');
-      const tags = { button: 'button', link: 'a', textbox: 'input,textarea' };
+      const tags = { button: 'button', link: 'a', textbox: 'input,textarea,[contenteditable="true"],[contenteditable="plaintext-only"]' };
       elements = [...document.querySelectorAll(`[role="${CSS.escape(step.role)}"],${tags[step.role] || 'nosuchtag'}`)]
         .filter(element => nameOf(element) === normalize(value));
     } else if (type === 'text') {
@@ -83,20 +83,37 @@
     return insideDialog.length ? insideDialog : candidates;
   }
 
-  async function find(step, includeHidden = false, actionable = false) {
+  function selectMatch(step, found, typing = false) {
+    if (step.index !== undefined && found[step.index]) return found[step.index];
+    if (step.index === undefined && found.length === 1) return found[0];
+    if (typing && ['role', 'label', 'placeholder', 'text'].includes(step.locatorType)) {
+      const editors = new Set(); let ambiguous = false;
+      for (const target of found) {
+        try { const editor = editableFor(target); if (editor) editors.add(editor); }
+        catch { ambiguous = true; }
+      }
+      // DOM wrappers and dialog scoping can change the match count. Recover a
+      // stale index only when those exact semantic matches identify one editor.
+      if (!ambiguous && editors.size === 1) return [...editors][0];
+    }
+    if (step.index === undefined && found.length > 1) throw new Error(`Locator matches ${found.length} elements. Set index (0-based) or use a more specific locator.`);
+    return null;
+  }
+
+  async function find(step, includeHidden = false, actionable = false, typing = false) {
     const deadline = Date.now() + (step.timeoutMs || 10000);
+    let matchCount = 0;
     while (Date.now() < deadline) {
       checkCancelled();
-      const found = matches(step, includeHidden).filter(element => !actionable || receivesPointer(element));
-      if (found.length) {
-        if (step.index !== undefined) {
-          if (found[step.index]) return found[step.index];
-        } else if (found.length === 1) return found[0];
-        else throw new Error(`Locator matches ${found.length} elements. Set index (0-based) or use a more specific locator.`);
-      }
+      const found = matches(step, includeHidden); matchCount = found.length;
+      // An explicit index refers to the same visible match before and after
+      // scrolling; filtering obscured elements must not silently shift it.
+      const candidates = step.index === undefined ? found.filter(element => !actionable || receivesPointer(element)) : found;
+      const target = selectMatch(step, candidates, typing);
+      if (target && (!actionable || receivesPointer(target))) return target;
       await sleep(200);
     }
-    throw new Error(`Element not actionable or not found: ${step.locator || step.selector}`);
+    throw new Error(`Element not actionable or not found: ${step.locator || step.selector}${step.index === undefined ? '' : ` (index ${step.index}; ${matchCount} visible matches)`}`);
   }
 
   function describe(element) {
@@ -257,7 +274,8 @@
     return element.contains(selection.anchorNode) && element.contains(selection.focusNode);
   }
   async function typeText(step) {
-    const target = await find(step);
+    let target = await find(step, false, false, true);
+    const targetName = nameOf(target), originalDialog = activeDialog();
     const previousFocus = document.activeElement;
     let element = editableFor(target);
     const clickTarget = element || target;
@@ -274,6 +292,16 @@
       // Clicking a placeholder can replace it or open a separate editor.
       if (active && (active !== previousFocus || target.contains(active) || active.contains(target))) element = active;
       else if (target.isConnected) element = editableFor(target);
+      else {
+        const scope = originalDialog?.isConnected ? originalDialog : activeDialog();
+        const scoped = candidates => candidates.filter(candidate => !scope || scope.contains(candidate));
+        let replacement = selectMatch(step, scoped(matches(step)), true);
+        if (!replacement && targetName) {
+          const labelled = {locatorType: 'label', locator: targetName, index: step.index};
+          replacement = selectMatch(labelled, scoped(matches(labelled)), true);
+        }
+        if (replacement) { target = replacement; element = editableFor(target); }
+      }
       if (element?.isConnected && visible(element) && positionCaret(element, step.clear !== false)) {
         const response = await send({ type: 'input', kind: 'text', text: String(step.text ?? ''), clear: step.clear !== false });
         if (!response?.ok) throw new Error(response?.error || 'Typing failed');

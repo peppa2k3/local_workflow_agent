@@ -24,6 +24,16 @@ try {
   assert.equal(prepared.steps[3].ms, 25);
   assert.equal(store.prepare({ variables: { count: 12 }, steps: [{ action: 'type', selector: '#count', text: '{{count}}' }] }).steps[0].text, '12');
   assert.equal(scenario.steps[0].value, '{{day}}', 'templates remain saved');
+  const click = {action: 'click', selector: '#next', completion: {state: 'visible', locatorType: 'text'}};
+  const preparedClick = store.prepare({steps: [click]}).steps[0];
+  assert.equal(preparedClick.settleMs, 0, 'click must not wait for unrelated DOM mutations by default');
+  assert.equal(preparedClick.completion, undefined, 'unfinished completion is not a result condition');
+  assert.equal(click.settleMs, undefined, 'defaults only affect prepared copies');
+  assert.deepEqual(click.completion, {state: 'visible', locatorType: 'text'}, 'saved JSON remains untouched');
+  assert.equal(store.prepareStep({...click, settleMs: '350'}).settleMs, 350, 'explicit DOM settling remains supported');
+  assert.deepEqual(store.prepareStep({...click, completion: {selector: '#ready', state: 'visible'}}).completion, {selector: '#ready', state: 'visible'});
+  assert.throws(() => store.prepareStep({action: 'type', selector: '#input', text: 'caption', index: 0.5}), /index must be a nonnegative integer/);
+  assert.equal(store.prepareStep({action: 'type', locatorType: 'role', role: 'presentation', locator: 'Caption', index: '1', text: 'caption'}).index, 1);
   assert.throws(() => store.prepare({ ...scenario, variables: { ...scenario.variables, day: '2026-02-30' } }), /valid YYYY-MM-DD/);
   assert.throws(() => store.prepare({ ...scenario, variables: { ...scenario.variables, hour: '24:30' } }), /HH:mm/);
   assert.throws(() => store.prepare({ ...scenario, variables: { ...scenario.variables, delay: '{{caption}}', caption: '{{delay}}' } }), /Circular variable/);

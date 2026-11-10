@@ -18,6 +18,7 @@ function validateStep(step, uploadPath = '') {
     if (step[key] !== undefined && (!Number.isFinite(step[key]) || step[key] < 0 || step[key] > 300000)) throw new Error(`Invalid ${key}`);
   }
   if (step.clear === 'true' || step.clear === 'false') step.clear = step.clear === 'true';
+  if (step.index !== undefined && !Number.isInteger(step.index)) throw new Error('index must be a nonnegative integer (0-based)');
   if (step.action === 'setDate') {
     const value = String(step.value ?? '');
     const date = new Date(`${value}T00:00:00Z`);
@@ -33,6 +34,12 @@ function validateStep(step, uploadPath = '') {
     if (!['http:', 'https:'].includes(url.protocol)) throw new Error('openUrl requires http or https');
   }
   if (step.completion?.state && !['visible', 'hidden', 'enabled'].includes(step.completion.state)) throw new Error('Invalid completion state');
+  // The dashboard may leave an unfinished condition with only type/state.
+  // It is not a result condition until a locator is provided.
+  if (step.completion && !String(step.completion.locator || '').trim() && !String(step.completion.selector || '').trim()) delete step.completion;
+  // A click can succeed while its button remains and video/progress keeps the
+  // page mutating. Navigation and explicit result conditions still wait below.
+  if (step.action === 'click' && step.settleMs === undefined) step.settleMs = 0;
   if (step.action !== 'upload') return step;
   validateUploadMetadata(step);
   const inputPath = uploadPath || step.filePath ||

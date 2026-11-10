@@ -55,12 +55,13 @@ async function pageMessage(tabId, message) {
 
 async function waitForPage(job, step, notBefore = 0) {
   const timeoutMs = step.navigationTimeoutMs ?? 30000;
-  const settleMs = step.settleMs ?? (step.completion?.locator ? 0 : 350);
+  const settleMs = step.settleMs ?? (step.action === 'click' || step.completion?.locator || step.completion?.selector ? 0 : 350);
   const deadline = Date.now() + timeoutMs;
-  let lastUrl = '', stableSince = Date.now();
+  let lastUrl = '', stableSince = Date.now(), pageReady = false;
   while (Date.now() < deadline) {
     await checkRunning(job);
     const tab = await chrome.tabs.get(job.tabId);
+    pageReady = false;
     if (tab.url !== lastUrl || tab.status !== 'complete') { lastUrl = tab.url; stableSince = Date.now(); }
     if (tab.status === 'complete') {
       let ready;
@@ -69,11 +70,13 @@ async function waitForPage(job, step, notBefore = 0) {
         // Existing tabs may predate extension installation/reload.
         try { await chrome.scripting.executeScript({ target: { tabId: job.tabId }, files: ['content.js'] }); } catch { /* Retry until timeout. */ }
       }
-      if (ready?.readyState === 'complete' && Date.now() >= notBefore &&
+      pageReady = ready?.readyState === 'complete';
+      if (pageReady && Date.now() >= notBefore &&
           Date.now() - stableSince >= settleMs && ready.quietForMs >= settleMs) return;
     }
     await sleep(100);
   }
+  if (pageReady && settleMs > 0) throw new Error(`Page DOM did not settle for ${settleMs} ms within ${timeoutMs} ms. Set settleMs to 0 or use a completion locator.`);
   throw new Error(`Page did not finish loading within ${timeoutMs} ms`);
 }
 

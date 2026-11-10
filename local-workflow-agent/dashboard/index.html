@@ -149,7 +149,8 @@
         ['completion.state', 'Trạng thái cần chờ', 'conditionState']
       );
     }
-    for (const action of ['openUrl', 'click']) actions[action].fields.push(['settleMs', 'DOM ổn định (ms, mặc định 350; 0 để bỏ qua)', 'number']);
+    actions.openUrl.fields.push(['settleMs', 'DOM ổn định (ms, mặc định 350; 0 để bỏ qua)', 'number']);
+    actions.click.fields.push(['settleMs', 'DOM ổn định sau click (ms, mặc định 0)', 'number']);
     actions.upload.fields.push(
       ['pageId', 'UUID page trong Content Manager (nếu có)', 'text'],
       ['pageName', 'Tên page đích (khuyến nghị)', 'text'],
@@ -386,6 +387,16 @@
           body.append(inspect);
         }
         const fields = document.createElement('div'); fields.className = 'fields';
+        if (step.action === 'click') {
+          const hint = document.createElement('p'); hint.style.gridColumn = '1 / -1';
+          hint.textContent = 'Nút có thể vẫn hiển thị sau khi click. Nếu cần chờ chuyển bước hoặc dữ liệu tải xong, điền Chờ phần tử kết quả hoặc thêm bước Chờ phần tử.';
+          fields.append(hint);
+        }
+        if (step.action === 'type') {
+          const hint = document.createElement('p'); hint.style.gridColumn = '1 / -1';
+          hint.textContent = 'Chọn input, textarea hoặc vùng soạn thảo. Vị trí tính từ 0; nên để trống khi chỉ có một ô nhập khớp. Nếu trang thay editor sau click, tác vụ sẽ tìm lại ô cùng tên và đặt focus/con trỏ trước khi nhập.';
+          fields.append(hint);
+        }
         if (step.action === 'downloadVideo') {
           const hint = document.createElement('p');
           hint.style.gridColumn = '1 / -1';
