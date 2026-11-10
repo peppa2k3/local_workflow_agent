@@ -23,7 +23,7 @@ tools/                       Binary local, Git ignore
 deploy/                      Docker, Traefik, systemd, nginx
 scripts/                     Đóng gói, publish image, startup, wrapper cũ
 tests/                       Fixture và Chrome tách biệt
-docs/, prompts/, legacy/     Tài liệu, kế hoạch, thử nghiệm cũ
+docs/, prompts/             Tài liệu và kế hoạch
 ```
 
 ## Ranh giới

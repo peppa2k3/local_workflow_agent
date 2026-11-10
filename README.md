@@ -36,9 +36,8 @@ Lịch sử từng bước được lưu qua restart tại `data/agent/`. URL đ
 | `tests/` | Kiểm tra luồng dialog và upload. |
 | `docs/` | Hướng dẫn, context và tiến độ. |
 | `prompts/completed`, `prompts/processing`, `prompts/planed` | Yêu cầu đã làm, đang làm và dự kiến. |
-| `legacy/facebook-feed.js` | Thử nghiệm Playwright ban đầu; quy trình hiện tại dùng Local Agent + Extension. |
 
-Xem [cú pháp kịch bản](docs/SCENARIOS.md), [context dự án](docs/PROJECT_CONTEXT.md) và [tiến độ](docs/PROGRESS.md).
+Xem [cú pháp kịch bản](docs/SCENARIOS.md), [hướng dẫn CLI](docs/CLI.md), [context dự án](docs/PROJECT_CONTEXT.md) và [tiến độ](docs/PROGRESS.md).
 
 Máy chỉ chạy agent: pull toàn bộ repository, chạy `npm ci --prefix local-workflow-agent --omit=dev`, rồi `node local-agent.js`. Cài extension trong từng Chrome profile và cấu hình `.env` riêng nếu cần. Không cần Playwright hoặc server VPS. Xem [README agent](local-workflow-agent/README.md), [đóng gói extension](chrome-reels-extension/README.md) và [kiến trúc source](docs/ARCHITECTURE.md).
 

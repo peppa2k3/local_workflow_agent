@@ -1,5 +1,14 @@
 # Tiến độ phát triển
 
+## 2026-11-10 — Dọn source không dùng
+
+- Xóa các thư mục rỗng ở gốc (`control-web/`, `dashboard/`, `src/agent/`,
+  `src/remote/`, `src/`) và `legacy/` sau khi kiểm tra nội dung từng thư mục.
+- Bỏ thử nghiệm `legacy/facebook-feed.js` và file chuyển hướng `SCENARIOS.md`
+  ở gốc; chuyển hướng dẫn CLI `guildes.md` thành `docs/CLI.md` và cập nhật link.
+- Giữ nguyên runtime, extension, JSON kịch bản và dữ liệu máy. `npm test` đầy đủ,
+  `node --check` hai entry JS và diff check đạt.
+
 ## 2026-11-10 — Dashboard step thu gọn
 
 - Thu nhỏ khoảng cách/padding của dashboard; step đã lưu mặc định chỉ hiện tên,
