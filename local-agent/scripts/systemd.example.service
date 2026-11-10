@@ -1,0 +1,16 @@
+[Unit]
+Description=RCA Local Runner
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=simple
+User=rca
+WorkingDirectory=/opt/remote-control-agent/local-agent
+ExecStart=/usr/bin/node --env-file=.env src/index.js
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0077
+[Install]
+WantedBy=multi-user.target

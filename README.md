@@ -1,5 +1,9 @@
 # Local Chrome Workflow Agent
 
+**Remote qua terminal agent Socket.IO:** `local-agent/` có bridge dùng API local
+để liệt kê, chạy, theo dõi và dừng scenario từ terminal hoặc panel trên VPS.
+Xem [hướng dẫn kết nối terminal/VPS](local-agent/README.md).
+
 **Remote từ VPS:** web đăng nhập, ghép nối cần cả account và local xác nhận,
 giám sát thiết bị, chạy/dừng kịch bản theo quyền local và lưu tiến độ từng bước.
 Local chạy `node local-agent.js --daemon`, cấu hình tại

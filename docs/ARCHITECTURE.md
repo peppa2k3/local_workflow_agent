@@ -2,6 +2,7 @@
 
 ```text
 chrome-reels-extension/       Extension, gói ZIP riêng
+local-agent/                  Terminal agent Socket.IO và bridge API tới workflow
 local-workflow-agent/
   index.js                   Bootstrap local
   src/

@@ -1,5 +1,19 @@
 # Tiến độ phát triển
 
+## 2026-11-10 — Terminal/VPS workflow bridge
+
+- Thêm client API loopback, CLI và Socket.IO handler vào `local-agent/`, dùng
+  token ở local và cùng workflow engine, có catalog/profile/run/status/history/stop.
+- Source VPS Remote Control Agent tại project riêng đã có relay kiểm tra
+  user/browser/device/lease và panel chọn scenario, biến, theo dõi/dừng.
+- Cập nhật cả runner canonical và `local-agent copy` đang được người dùng sử dụng;
+  không đổi `.env` hoặc credentials thật, không restart runner hoặc deploy VPS.
+- `npm test` đầy đủ repo workflow, terminal-agent và VPS đạt; `npm run build`
+  frontend VPS đạt. Fixture UI kiểm tra login/lease/catalog/biến/run/stop trên
+  desktop/mobile, không lỗi runtime; engine thật đọc được 4 profile/7 scenario.
+- Chạy scenario và retry/stop chỉ trên fixture tách biệt. Engine thật chỉ đọc.
+  API token không rời local; backup credential được ignore Git.
+
 ## 2026-11-10 — Dọn source không dùng
 
 - Xóa các thư mục rỗng ở gốc (`control-web/`, `dashboard/`, `src/agent/`,

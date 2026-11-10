@@ -8,6 +8,7 @@ test-results/
 
 tools/
 data/
+local-agent/data-backup/
 dist/
 .env
 .env.*

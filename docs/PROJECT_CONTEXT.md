@@ -1,5 +1,14 @@
 # Project context
 
+## Terminal agent Socket.IO và workflow API (2026-11-10)
+
+`local-agent/` là agent Socket.IO của VPS Remote Control Agent (repo riêng),
+khác `control-server/` dùng remote polling có sẵn. Bridge mới gọi API v1 loopback
+của engine bằng token local, có CLI `node local-agent/workflow.js ...` và handler
+`workflow:request` kiểm tra lease. VPS repo có relay RBAC/lease và panel scenario.
+Không đổi action/extension hoặc mở public cổng 34719. Cấu hình và vòng đời tại
+`local-agent/README.md`; credentials, `.env`, data-backup không vào Git.
+
 ## Cấu trúc source (2026-11-10)
 
 Runtime/dashboard/công cụ local nằm trong `local-workflow-agent/`, chia workflow,

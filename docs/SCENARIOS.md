@@ -1,5 +1,10 @@
 # Local workflow agent
 
+Socket.IO terminal agent: `node local-agent/workflow.js run --scenario NAME
+--profile "Profile 1" --wait` runs saved scenarios through the same local API.
+The VPS workflow panel uses an active control lease and the same engine. See
+[terminal/VPS bridge setup](../local-agent/README.md).
+
 Source layout: the runtime and dashboard now live in `local-workflow-agent/`;
 saved JSON remains in the repository-root `scenarios/`. Keep using
 `node local-agent.js` and the same actions, variables and legacy CSS `selector`

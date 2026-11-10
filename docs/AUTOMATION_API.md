@@ -1,5 +1,10 @@
 # Chạy kịch bản bằng CLI và API
 
+Agent Socket.IO `local-agent/` gọi chính API này tại loopback. Dùng
+`node local-agent/workflow.js scenarios` hoặc panel workflow trên VPS sau khi
+cấu hình bridge. Xem [terminal/VPS bridge](../local-agent/README.md); không cần
+public cổng 34719.
+
 Agent vẫn khởi động bằng `node local-agent.js`, dashboard ở `http://127.0.0.1:34719`. CLI là client của agent đang chạy; nó không mở thêm server. API chỉ chạy kịch bản JSON đã lưu trong `scenarios/`, cùng bộ điều phối, validation và extension như dashboard. Không có action mới.
 
 ## Bật API
