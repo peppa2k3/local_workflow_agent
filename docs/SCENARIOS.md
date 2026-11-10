@@ -1,5 +1,10 @@
 # Local workflow agent
 
+Extension 4.2.1 uses read-only POST `/api/profiles` for profile discovery so
+Chrome includes the extension Origin when the engine has an API token enabled.
+Restart the updated engine and reload the extension after upgrading. Workflow
+actions and legacy CSS selectors are unchanged.
+
 Socket.IO terminal agent: `node local-agent/workflow.js run --scenario NAME
 --profile "Profile 1" --wait` runs saved scenarios through the same local API.
 The VPS workflow panel uses an active control lease and the same engine. See

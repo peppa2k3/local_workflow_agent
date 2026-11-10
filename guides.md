@@ -80,7 +80,7 @@ Cách này dùng ngay trên máy local, không cần chờ phát hành trên Web
 
 5. Chọn **thư mục**, không chọn riêng `manifest.json` hoặc file ZIP.
 6. Kiểm tra thẻ **Local Workflow Agent Bridge** đã bật. Bản manifest hiện tại
-   là `4.2.0`.
+   là `4.2.1`.
 7. Lặp lại trên từng profile muốn điều khiển. Việc ánh xạ profile thực hiện ở bước 5.
 
 ### 2.2. Đóng ZIP và upload Chrome Web Store — nếu muốn phát hành
@@ -91,7 +91,7 @@ Cách này dùng ngay trên máy local, không cần chờ phát hành trên Web
    npm run package:extension
    ```
 
-   Kết quả hiện tại: `dist/chrome-reels-extension-4.2.0.zip`. Script lấy version
+   Kết quả hiện tại: `dist/chrome-reels-extension-4.2.1.zip`. Script lấy version
    từ manifest và không ghi đè ZIP đã có. Nếu cần đóng lại cùng version, chọn
    thư mục kết quả mới:
 
@@ -411,6 +411,7 @@ thêm `--var "ten_bien=gia_tri"` hoặc `--variables-file file.json`. Dùng `des
 | `Port 34719 is already in use` | Có engine cũ; xác định và dừng đúng terminal cũ trước khi chạy phiên mới. |
 | API `503`/chưa cấu hình workflow | Root `.env` có token hợp lệ; engine đã restart; `WORKFLOW_AGENT_ENV_FILE` trỏ đúng file. |
 | API `401` | Token client khác token engine đang dùng; đọc cùng file và restart engine nếu vừa đổi token. |
+| Options báo `Valid Bearer token or dashboard session required` | Dùng extension 4.2.1 trở lên, restart workflow engine đã cập nhật, Reload extension và mở lại Options. Bản sửa dùng POST discovery; không cần đưa token vào extension. |
 | Không enroll/ghép được máy | Kiểm tra domain `SERVER_URL`, HTTPS, mã mới còn hạn; mã đã dùng cần tạo lại. |
 | Credential thuộc server khác | Kiểm tra lại SERVER_URL của máy đã ghép; không ghi đè/xóa credential đang dùng chỉ để thử domain. |
 | Runner online nhưng không có panel workflow | Backend/frontend VPS và runner đều phải là bản có bridge; cấu hình file env engine rồi restart runner/refresh web. |

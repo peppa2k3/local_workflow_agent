@@ -19,6 +19,11 @@ node local-agent.js
 
 Token phải có 32–256 ký tự ASCII hiển thị, không có khoảng trắng. Thiếu token: API `/api/v1/*` trả 503; dashboard và extension vẫn hoạt động. Token sai: 401. Token sai định dạng khi khởi động: agent từ chối khởi động. Không đưa token vào Git hoặc tham số CLI. Client và agent cần cùng token; khi đổi token phải khởi động lại agent.
 
+Extension Options dùng POST chỉ đọc `/api/profiles` với Origin extension do
+Chrome gửi để discovery profile, không giữ API token. GET có thể thiếu Origin
+và vẫn cần Bearer token hoặc dashboard session. Các API khác tiếp tục kiểm tra
+xác thực như trước.
+
 Trong terminal PowerShell thứ hai, đặt `LOCAL_AGENT_API_TOKEN` thành **cùng giá trị** từ secret manager/môi trường triển khai, rồi chạy các lệnh dưới đây. Không chạy lại lệnh sinh token vì sẽ tạo token khác.
 
 ## CLI

@@ -1,5 +1,14 @@
 # Project context
 
+## Extension discovery và Origin (2026-11-10)
+
+Extension 4.2.1 dùng POST JSON chỉ đọc `/api/profiles` khi tải Options, vì Chrome
+có thể không gửi Origin trên GET từ extension. Server miễn token cho discovery
+GET/POST có Origin extension, giữ kiểm tra Bearer/dashboard ở các API còn lại.
+Không đưa API token vào extension. Khi nâng cấp cần restart engine và Reload
+extension. Test extension thật: `npm run test:extension`, dùng Chromium test
+riêng (`npx playwright install chromium`), không dùng profile đăng nhập.
+
 ## Terminal agent Socket.IO và workflow API (2026-11-10)
 
 `local-agent/` là agent Socket.IO của VPS Remote Control Agent (repo riêng),

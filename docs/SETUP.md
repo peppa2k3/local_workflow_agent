@@ -65,6 +65,7 @@ Thêm `waitFor` cho nút mới trong dialog trước bước click/upload tiếp
 
 - Chạy `npm test` để kiểm tra điều phối nhiều profile, navigation/SPA, dialog và upload mẫu. Kiểm tra này không truy cập Facebook hay profile đăng nhập của bạn.
 - **Extension chưa kết nối:** bảo đảm agent đang chạy, extension đã Reload và Extension options đã chọn đúng thư mục profile. Đúng profile phải chứa extension.
+- **Options báo `Valid Bearer token or dashboard session required`:** cập nhật extension 4.2.1 và engine, restart `node local-agent.js`, Reload extension rồi mở lại Options. Discovery dùng POST chỉ đọc để Chrome gửi Origin extension; token API không cần nhập vào extension.
 - **Another extension is connected as this profile:** kiểm tra `chrome://version` trong từng cửa sổ và sửa ánh xạ profile ở Extension options; không chọn cùng thư mục cho hai profile khác nhau.
 - **Page did not finish loading / Completion condition timed out:** kiểm tra dấu hiệu kết quả và tăng **Timeout tải trang / kết quả**. Với trang liên tục thay đổi DOM, đặt **DOM ổn định** bằng 0 và dùng điều kiện kết quả rõ ràng.
 - **Element not found/actionable:** dùng **Chọn trên trang** khi dialog đã mở; kiểm tra tên nút/role và tăng `timeoutMs` nếu trang tải chậm.

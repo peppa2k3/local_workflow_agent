@@ -106,7 +106,10 @@ const server = http.createServer(async (request, response) => {
     if (route.startsWith('/api/v1/')) return await automation.handle(request, url, json);
     if (route.startsWith('/api/')) {
       const origin = request.headers.origin;
-      const extensionRead = request.method === 'GET' && route === '/api/profiles' && /^chrome-extension:\/\/[a-z]+$/.test(origin || '');
+      // Chrome may omit Origin on extension GETs. Options uses a read-only POST
+      // for discovery so the browser supplies its extension origin explicitly.
+      const profileDiscovery = route === '/api/profiles' && ['GET', 'POST'].includes(request.method);
+      const extensionRead = profileDiscovery && /^chrome-extension:\/\/[a-z]+$/.test(origin || '');
       if (origin && origin !== `http://127.0.0.1:${port}` && !extensionRead) throw new Error('Origin not allowed');
       if (automation.enabled && !extensionRead && !dashboardAuthorized(request) && !automation.authorized(request)) return json(401, { error: 'Valid Bearer token or dashboard session required' });
       if (route.startsWith('/api/content/')) return await content.handle(request, url, json);
@@ -124,7 +127,7 @@ const server = http.createServer(async (request, response) => {
         const run = workflows.getRun(historyMatch[1]);
         return json(run ? 200 : 404, run || { error: 'Run not found' });
       }
-      if (request.method === 'GET' && route === '/api/profiles') {
+      if (profileDiscovery) {
         return json(200, { defaultProfile: profile, automationEnabled: automation.enabled, storage: activity.syncStatus(), capabilities: ['remote-control-v1', 'shared-content-v1', 'activity-history-v1', 'download-cache-v1', 'automation-api-v1', 'variables-v1', 'video-download-v1', 'video-quality-best-v1', 'download-references-v1', 'scenario-management-v1'], performance, profiles: profiles().map(item => ({ ...item, ...workflows.status(item.directory) })) });
       }
       if (request.method === 'POST' && route === '/api/profiles/open') {

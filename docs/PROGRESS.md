@@ -1,5 +1,19 @@
 # Tiến độ phát triển
 
+## 2026-11-10 — Sửa extension Options lỗi Bearer token khi kết nối profile
+
+- Tái hiện trên extension thật: GET discovery thiếu Origin trả 401 khi bật API
+  token; POST có Origin tải profile thành công. Extension 4.2.1 chuyển sang POST
+  chỉ đọc và báo restart engine rõ ràng nếu engine cũ trả 400/401/404.
+- Server chấp nhận discovery POST trong cùng phạm vi miễn token của extension;
+  request thiếu xác thực hoặc Origin website tiếp tục bị chặn. Switch profile
+  kiểm tra lỗi HTTP và không đổi profile đang chạy workflow.
+- `npm test`, `npm run test:extension`, `node --check` các JavaScript thay đổi và
+  diff check đạt. Test Chromium profile tách biệt đã tải/lưu/switch profile,
+  chặn switch khi đang chạy, kiểm tra token không lưu trong extension.
+- ZIP `dist/chrome-reels-extension-4.2.1.zip` đã tạo, đối chiếu bytes với source.
+  Chưa restart engine người dùng hoặc phát hành lên Web Store.
+
 ## 2026-11-10 — Hướng dẫn cài đặt và remote từ đầu đến cuối
 
 - Thêm `guides.md` ở gốc và liên kết từ README: Load unpacked/đóng ZIP/upload

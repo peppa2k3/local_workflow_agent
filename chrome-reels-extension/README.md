@@ -11,6 +11,18 @@ Extension Chrome Manifest V3, chạy trong từng profile muốn kết nối v�
 
 Load unpacked bằng chính thư mục này. Hướng dẫn: [SETUP](../docs/SETUP.md).
 
+Bản 4.2.1 sửa discovery profile khi engine có API token: Options dùng POST
+chỉ đọc để Chrome gửi Origin extension, không yêu cầu nhập token vào extension.
+Sau nâng cấp cần restart workflow engine, Reload extension rồi mở lại Options.
+
+Test với extension thật trên profile trình duyệt tách biệt (máy phát triển):
+
+```powershell
+npm ci
+npx playwright install chromium
+npm run test:extension
+```
+
 ## Đóng gói
 
 Tại gốc repository trên Windows:
