@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
-const { createDnsConfig } = require('../src/agent/mongo-dns');
-const { safeMongoError } = require('../src/agent/mongo-sync');
+const { createDnsConfig } = require('../local-workflow-agent/src/integrations/mongo/mongo-dns');
+const { safeMongoError } = require('../local-workflow-agent/src/integrations/mongo/mongo-sync');
 const calls = [];
 const configure = createDnsConfig({ getServers: () => ['127.0.0.1'], setServers: servers => calls.push([...servers]) });
 assert.deepEqual(configure(), { dnsMode: 'system' }); assert.equal(calls.length, 0);

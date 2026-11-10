@@ -5,7 +5,7 @@ const os = require('node:os');
 const http = require('node:http');
 const { spawn } = require('node:child_process');
 const { randomBytes } = require('node:crypto');
-const { resolveVariables } = require('../src/agent/variables');
+const { resolveVariables } = require('../local-workflow-agent/src/workflow/variables');
 const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '..');
 

@@ -3,12 +3,12 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
-const { createActivityStore, uuid5, URL_NAMESPACE, pythonArray, canonicalUrl } = require('../src/agent/activity-store');
-const { createCachedDownloader } = require('../src/agent/download-cache');
-const { createMongoSync, bsonDates } = require('../src/agent/mongo-sync');
-const { casefold } = require('../src/agent/casefold');
-const { createWorkflows } = require('../src/agent/workflows');
-const { createScenarioStore } = require('../src/agent/scenario-store');
+const { createActivityStore, uuid5, URL_NAMESPACE, pythonArray, canonicalUrl } = require('../local-workflow-agent/src/storage/activity-store');
+const { createCachedDownloader } = require('../local-workflow-agent/src/storage/download-cache');
+const { createMongoSync, bsonDates } = require('../local-workflow-agent/src/integrations/mongo/mongo-sync');
+const { casefold } = require('../local-workflow-agent/src/storage/casefold');
+const { createWorkflows } = require('../local-workflow-agent/src/workflow/workflows');
+const { createScenarioStore } = require('../local-workflow-agent/src/workflow/scenario-store');
 const tick = () => new Promise(resolve => setTimeout(resolve, 10));
 async function until(test) { for (let i = 0; i < 100 && !test(); i++) await tick(); assert(test(), 'operation did not settle'); }
 

@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { createScenarioStore } = require('../src/agent/scenario-store');
+const { createScenarioStore } = require('../local-workflow-agent/src/workflow/scenario-store');
 
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'workflow-features-'));
 try {

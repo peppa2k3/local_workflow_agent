@@ -1,8 +1,8 @@
-const path = require('node:path');
+const { envFile: defaultEnvFile } = require('./paths');
 const fs = require('node:fs');
 const { parseEnv } = require('node:util');
 const inherited = new Set(Object.keys(process.env).map(key => process.platform === 'win32' ? key.toUpperCase() : key));
-let envFile = process.env.LOCAL_AGENT_ENV_FILE || path.resolve(__dirname, '../../.env');
+let envFile = process.env.LOCAL_AGENT_ENV_FILE || defaultEnvFile;
 
 function loadProjectEnv(file = envFile) {
   envFile = file;

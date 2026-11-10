@@ -2,9 +2,9 @@
 
 ## 1. Chuẩn bị
 
-1. Cài Node.js và Google Chrome trên Windows.
-2. Mở PowerShell tại thư mục dự án `D:\[you-path]\playwright_test`.
-3. Chạy `npm ci` để cài dependency theo `package-lock.json`.
+1. Cài Node.js 22 trở lên và Google Chrome trên Windows (server VPS dùng Node.js 24).
+2. Clone/pull toàn bộ repository và mở PowerShell tại thư mục dự án.
+3. Chạy `npm ci --prefix local-workflow-agent --omit=dev` để chỉ cài runtime local. Máy phát triển chạy `npm ci` ở gốc để có thêm Playwright cho test. Nếu cần cấu hình Atlas/API, tạo `.env` từ `.env.example` khi chưa có và điền giá trị riêng của máy.
 4. Dashboard cho phép chọn nhiều Chrome profile. Mặc định CLI/API dùng `Profile 2`; đổi mặc định bằng `$env:CHROME_PROFILE = 'Profile 1'` trước khi khởi động agent. Có thể đặt `$env:CHROME_PATH` nếu Chrome không ở `C:\Program Files\Google\Chrome\Application\chrome.exe`, và `$env:CHROME_USER_DATA_DIR` nếu dùng thư mục dữ liệu Chrome riêng. Cần Chrome 120 trở lên.
 
 Không dùng `legacy/facebook-feed.js` cho quy trình này: nó là thử nghiệm Playwright cũ. Agent và extension thao tác trên profile Chrome hiện có.

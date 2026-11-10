@@ -5,11 +5,11 @@ const path = require('node:path');
 const http = require('node:http');
 const { randomUUID } = require('node:crypto');
 const { chromium } = require('playwright');
-const { createActivityStore } = require('../src/agent/activity-store');
-const { createMongoSync } = require('../src/agent/mongo-sync');
-const { createContentApi } = require('../src/agent/content-api');
-const { createWorkflows } = require('../src/agent/workflows');
-const { createScenarioStore } = require('../src/agent/scenario-store');
+const { createActivityStore } = require('../local-workflow-agent/src/storage/activity-store');
+const { createMongoSync } = require('../local-workflow-agent/src/integrations/mongo/mongo-sync');
+const { createContentApi } = require('../local-workflow-agent/src/http/content-api');
+const { createWorkflows } = require('../local-workflow-agent/src/workflow/workflows');
+const { createScenarioStore } = require('../local-workflow-agent/src/workflow/scenario-store');
 const { createMemoryMongo } = require('./helpers/memory-mongo');
 const tick = () => new Promise(resolve => setTimeout(resolve, 10));
 async function until(test) { for (let i = 0; i < 100 && !test(); i++) await tick(); assert(test()); }
@@ -67,7 +67,7 @@ async function until(test) { for (let i = 0; i < 100 && !test(); i++) await tick
     memory.setOffline(false); await mongo.ping();
     server = http.createServer(async (request, response) => {
       const json = (status, data) => { response.writeHead(status, { 'Content-Type': 'application/json' }); response.end(JSON.stringify(data)); };
-      if (request.url === '/content') { response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); response.end(fs.readFileSync(path.join(__dirname, '../dashboard/content.html'), 'utf8').replaceAll('__LOCAL_AGENT_DASHBOARD_TOKEN__', 'fixture-session')); return; }
+      if (request.url === '/content') { response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); response.end(fs.readFileSync(path.join(__dirname, '../local-workflow-agent/dashboard/content.html'), 'utf8').replaceAll('__LOCAL_AGENT_DASHBOARD_TOKEN__', 'fixture-session')); return; }
       try { await content.handle(request, new URL(request.url, 'http://localhost'), json); }
       catch (failure) { json(failure.status || 400, { error: failure.message }); }
     });

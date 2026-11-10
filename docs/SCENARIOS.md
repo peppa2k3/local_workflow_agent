@@ -1,5 +1,10 @@
 # Local workflow agent
 
+Source layout: the runtime and dashboard now live in `local-workflow-agent/`;
+saved JSON remains in the repository-root `scenarios/`. Keep using
+`node local-agent.js` and the same actions, variables and legacy CSS `selector`
+steps. See [source architecture and local installation](ARCHITECTURE.md).
+
 Remote control: use `node local-agent.js --daemon` for an always-on local agent,
 and `/remote` to grant saved scenario/profile/variable permissions and approve a
 VPS account. The VPS web UI runs/stops only those granted saved scenarios through

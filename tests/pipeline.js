@@ -2,8 +2,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { createScenarioStore } = require('../src/agent/scenario-store');
-const { createWorkflows } = require('../src/agent/workflows');
+const { createScenarioStore } = require('../local-workflow-agent/src/workflow/scenario-store');
+const { createWorkflows } = require('../local-workflow-agent/src/workflow/workflows');
 (async () => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'download-pipeline-'));
   try {

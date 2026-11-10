@@ -1,6 +1,6 @@
 const path = require('node:path');
-const { canonicalUrl } = require('./activity-store');
-const { casefold } = require('./casefold');
+const { canonicalUrl } = require('../storage/activity-store');
+const { casefold } = require('../storage/casefold');
 
 // Serialize media checks through acknowledgement so two local profiles cannot pass
 // the same preflight before the first operation is recorded.

@@ -12,8 +12,8 @@ const { chromium } = require('playwright');
     await navigation.route('https://navigation.test/**', async route => {
       const pathname = new URL(route.request().url()).pathname;
       const file = { '/': 'index.html', '/content': 'content.html', '/remote': 'remote.html' }[pathname];
-      if (file) return route.fulfill({ contentType: 'text/html', body: fs.readFileSync(path.join(__dirname, '../dashboard', file), 'utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '') });
-      if (pathname === '/remote.css') return route.fulfill({ contentType: 'text/css', body: fs.readFileSync(path.join(__dirname, '../control-web/style.css'), 'utf8') });
+      if (file) return route.fulfill({ contentType: 'text/html', body: fs.readFileSync(path.join(__dirname, '../local-workflow-agent/dashboard', file), 'utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '') });
+      if (pathname === '/remote.css') return route.fulfill({ contentType: 'text/css', body: fs.readFileSync(path.join(__dirname, '../local-workflow-agent/dashboard/remote.css'), 'utf8') });
       return route.fulfill({ status: 404, body: '' });
     });
     for (const width of [1280, 390]) {
@@ -35,7 +35,7 @@ const { chromium } = require('playwright');
     await page.route('https://control.test/**', async route => {
       const req = route.request(), url = new URL(req.url());
       if (['/', '/app.js', '/style.css'].includes(url.pathname)) return route.fulfill({ contentType: url.pathname === '/' ? 'text/html' : url.pathname.endsWith('.js') ? 'text/javascript' : 'text/css',
-        body: fs.readFileSync(path.join(__dirname, '../control-web', url.pathname === '/' ? 'index.html' : url.pathname.slice(1)), 'utf8') });
+        body: fs.readFileSync(path.join(__dirname, '../control-server/web', url.pathname === '/' ? 'index.html' : url.pathname.slice(1)), 'utf8') });
       if (req.method() === 'POST') { assert.equal(req.headers()['x-csrf-token'], url.pathname === '/api/login' ? '' : 'fixture-csrf'); posted.push({ path: url.pathname, data: req.postDataJSON() }); }
       if (url.pathname === '/api/login') { loggedIn = true; return route.fulfill({ json: { email: 'user@example.test', csrf: 'fixture-csrf' } }); }
       if (url.pathname === '/api/me') return route.fulfill({ status: loggedIn ? 200 : 401, json: loggedIn ? { email: 'user@example.test', csrf: 'fixture-csrf' } : { error: 'Login required' } });
@@ -61,8 +61,8 @@ const { chromium } = require('playwright');
       available: { profiles: [{ directory: 'Default', name: 'Fixture' }], scenarios: [{ name: 'sample', variables: ['caption'] }] } };
     await page.route('https://local.test/**', async route => {
       const req = route.request(), endpoint = new URL(req.url()).pathname;
-      if (endpoint === '/remote') return route.fulfill({ contentType: 'text/html', body: fs.readFileSync(path.join(__dirname, '../dashboard/remote.html'), 'utf8').replaceAll('__LOCAL_AGENT_DASHBOARD_TOKEN__', 'local-fixture') });
-      if (['/remote.js', '/issues.js', '/remote.css'].includes(endpoint)) return route.fulfill({ contentType: endpoint.endsWith('js') ? 'text/javascript' : 'text/css', body: fs.readFileSync(path.join(__dirname, endpoint.endsWith('js') ? '../dashboard' + endpoint : '../control-web/style.css'), 'utf8') });
+      if (endpoint === '/remote') return route.fulfill({ contentType: 'text/html', body: fs.readFileSync(path.join(__dirname, '../local-workflow-agent/dashboard/remote.html'), 'utf8').replaceAll('__LOCAL_AGENT_DASHBOARD_TOKEN__', 'local-fixture') });
+      if (['/remote.js', '/issues.js', '/remote.css'].includes(endpoint)) return route.fulfill({ contentType: endpoint.endsWith('js') ? 'text/javascript' : 'text/css', body: fs.readFileSync(path.join(__dirname, endpoint.endsWith('js') ? '../local-workflow-agent/dashboard' + endpoint : '../local-workflow-agent/dashboard/remote.css'), 'utf8') });
       assert.equal(req.headers()['x-local-agent-session'], 'local-fixture');
       if (req.method() === 'POST') {
         posted.push({ path: endpoint, data: req.postDataJSON() });

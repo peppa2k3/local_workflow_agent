@@ -1,7 +1,7 @@
 const http = require('node:http');
 const assert = require('node:assert/strict');
-const { createStore } = require('../../src/remote/store');
-const { createControlServer, addUser } = require('../../src/remote/server');
+const { createStore } = require('../../control-server/src/store');
+const { createControlServer, addUser } = require('../../control-server/src/server');
 async function fixture(commandFactory) {
   const probe = http.createServer(); await new Promise(r => probe.listen(0, '127.0.0.1', r));
   const port = probe.address().port; await new Promise(r => probe.close(r));

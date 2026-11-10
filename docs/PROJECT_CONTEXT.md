@@ -1,5 +1,17 @@
 # Project context
 
+## Cấu trúc source (2026-11-10)
+
+Runtime/dashboard/công cụ local nằm trong `local-workflow-agent/`, chia workflow,
+HTTP, storage và integrations (Chrome/video/MongoDB/remote). Server VPS và web
+nằm trong `control-server/`; giao thức chung ở `shared/remote-protocol.js`.
+Giữ entry `node local-agent.js`, `node remote-control.js`, cổng 34719 và đường dẫn
+`chrome-reels-extension/`, `.env`, `scenarios/`, `tools/`, `data/agent/` ở gốc.
+Máy chỉ chạy agent dùng `npm ci --prefix local-workflow-agent --omit=dev` sau khi
+pull toàn bộ repo, không cần Playwright/server VPS. Lockfile runtime riêng giữ
+cùng phiên bản dependency với package gốc. Đóng ZIP extension qua
+`npm run package:extension`; không tự publish. Xem docs/ARCHITECTURE.md.
+
 ## Chống trùng media (2026-10-24)
 
 main.js gắn media-guard vào download/upload: kiểm tra local và MongoDB nếu enabled, DB lỗi thì dừng. Workflow vẫn state running nhưng paused/confirmation cho UI; chỉ dashboard session xác nhận qua /api/confirm, kèm execution UUID và confirmation UUID. Media lock trong process giữ đến kết quả upload hoặc kết thúc download. upload_events có pending trước dispatch và uploaded sau acknowledgement; sync collection này dùng $set để đổi trạng thái. Assets/publications vẫn insert-only. Popup dùng textContent trên dashboard; VPS báo chờ xác nhận local. Không tự replay sau restart.

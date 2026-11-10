@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { chromium } = require('playwright');
-const { createProfileCache } = require('../src/agent/profiles');
+const { createProfileCache } = require('../local-workflow-agent/src/integrations/chrome/profiles');
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 (async () => {
   let clock = 0, reads = 0, finishRead, failRead = false;
@@ -31,7 +31,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     let requests = 0, inFlight = 0, maxInFlight = 0, failed = false, connected = true, running = false, hold = false, release;
     await page.route('http://dashboard.test/**', async route => {
       const request = route.request(), endpoint = new URL(request.url()).pathname;
-      if (endpoint === '/') return route.fulfill({ contentType: 'text/html; charset=utf-8', body: fs.readFileSync(path.join(__dirname, '../dashboard/index.html'), 'utf8') });
+      if (endpoint === '/') return route.fulfill({ contentType: 'text/html; charset=utf-8', body: fs.readFileSync(path.join(__dirname, '../local-workflow-agent/dashboard/index.html'), 'utf8') });
       if (endpoint === '/api/profiles') {
         requests++; inFlight++; maxInFlight = Math.max(maxInFlight, inFlight);
         try {

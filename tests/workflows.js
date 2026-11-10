@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
-const { createWorkflows } = require('../src/agent/workflows');
-const { createScenarioStore } = require('../src/agent/scenario-store');
+const { createWorkflows } = require('../local-workflow-agent/src/workflow/workflows');
+const { createScenarioStore } = require('../local-workflow-agent/src/workflow/scenario-store');
 
 (async () => {
   const workflows = createWorkflows({

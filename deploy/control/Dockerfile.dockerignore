@@ -1,11 +1,10 @@
 # Send only the control application to the image builder.
 **
 !remote-control.js
-!src/
-!src/remote/
-!src/remote/**
-!control-web/
-!control-web/**
+!control-server/
+!control-server/**
+!shared/
+!shared/**
 !deploy/
 !deploy/control/
 !deploy/control/Dockerfile

@@ -1,6 +1,6 @@
 const { randomUUID } = require('node:crypto');
-const { canonicalUrl } = require('./activity-store');
-const { casefold } = require('./casefold');
+const { canonicalUrl } = require('../storage/activity-store');
+const { casefold } = require('../storage/casefold');
 const error = (status, message) => Object.assign(new Error(message), { status });
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const catalogs = {

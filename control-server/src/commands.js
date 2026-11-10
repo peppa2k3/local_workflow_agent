@@ -1,4 +1,4 @@
-const c = require('./common');
+const c = require('../../shared/remote-protocol');
 const ACTIVE = ['queued', 'dispatched', 'running'];
 const TERMINAL = ['succeeded', 'failed', 'cancelled', 'interrupted', 'rejected', 'unknown', 'expired'];
 function metadata(value) {

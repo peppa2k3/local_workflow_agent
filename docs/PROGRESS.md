@@ -1,5 +1,22 @@
 # Tiến độ phát triển
 
+## 2026-11-10 — Tách source extension, agent local và control server
+
+- Gom runtime/dashboard/công cụ local vào `local-workflow-agent/`, chia workflow,
+  HTTP, storage và tích hợp Chrome/video/MongoDB/remote; giao thức chung ở `shared/`.
+- Tách server VPS/web UI thành `control-server/`, cập nhật Docker COPY/healthcheck;
+  giữ entry cũ, cổng 34719, `.env`, data/tools/scenarios và CSS selector cũ.
+- Package/lockfile local riêng chỉ cài MongoDB driver; Playwright thuộc môi trường
+  phát triển. Cài mới trong thư mục sạch đã khởi động HTTP và dashboard thành công.
+- Thêm `npm run package:extension`, tạo ZIP 4.2.0 theo allowlist năm file runtime;
+  test mở ZIP đối chiếu bytes và loại khóa giả, không ghi đè artifact cũ.
+- `npm test` đầy đủ đạt; test layout bổ sung đạt cho agent và server triển khai
+  riêng, đường dẫn mặc định và hai lockfile. `node --check`, PowerShell AST và
+  `git diff --check` đạt. Không dùng profile đăng nhập hoặc dữ liệu Atlas thật.
+- Docker Engine hiện không chạy nên chưa build lại image; đã chạy fixture bằng
+  đúng nhóm source Docker COPY. Chưa upload/publish Chrome Web Store hoặc VPS.
+- Các kịch bản đang có thay đổi của người dùng được giữ nguyên, không đưa vào commit.
+
 ## 2026-10-24 — Chống trùng download/upload và popup
 
 - Guard URL, filepath/filename/SHA-256 dựa trên local và MongoDB; DB lỗi thì dừng.

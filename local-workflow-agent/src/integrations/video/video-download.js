@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
-const toolsDir = path.resolve(__dirname, '../../tools');
+const { toolsDir } = require('../../paths');
 function binary(name, variable) {
   const local = path.join(toolsDir, `${name}.exe`);
   return process.env[variable] || (fs.existsSync(local) ? local : name);

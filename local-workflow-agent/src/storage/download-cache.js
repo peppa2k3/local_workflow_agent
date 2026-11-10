@@ -1,5 +1,5 @@
 const { canonicalUrl } = require('./activity-store');
-const { validateVideo } = require('./video-download');
+const { validateVideo } = require('../integrations/video/video-download');
 
 function createCachedDownloader(store, downloadVideo) {
   const locks = new Map();

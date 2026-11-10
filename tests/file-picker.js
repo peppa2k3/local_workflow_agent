@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
-const { chooseFile } = require('../src/agent/file-picker');
+const { chooseFile } = require('../local-workflow-agent/src/integrations/chrome/file-picker');
 
 function fakeLaunch(output, code = 0) {
   return (command, args, options) => {

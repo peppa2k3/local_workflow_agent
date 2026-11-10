@@ -4,7 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
 const { spawnSync, spawn } = require('node:child_process');
-const envModule = path.resolve(__dirname, '../src/agent/env.js');
+const envModule = path.resolve(__dirname, '../local-workflow-agent/src/env.js');
 
 (async () => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-env-'));

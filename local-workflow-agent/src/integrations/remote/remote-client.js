@@ -1,5 +1,5 @@
 const path = require('node:path');
-const c = require('../remote/common');
+const c = require('../../../../shared/remote-protocol');
 const { randomUUID } = require('node:crypto');
 const { createRemoteExecutor } = require('./remote-executor');
 function createRemoteClient({ dataDir, profiles, scenarios, workflows, performance = () => ({}) , allowHttp = false }) {

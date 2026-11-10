@@ -2,7 +2,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
-const c = require('./common');
+const c = require('../../shared/remote-protocol');
 const { createClientIp } = require('./proxy');
 async function addUser(store, email, password) {
   email = c.text(email, 254).toLowerCase();
@@ -47,7 +47,7 @@ function createControlServer({ store, publicUrl, allowHttp = false, trustProxy =
       const url = new URL(req.url, publicUrl), route = url.pathname;
       if (route === '/health' && req.method === 'GET') return json(200, { ok: true });
       if (req.method === 'GET' && ['/', '/app.js', '/style.css'].includes(route)) {
-        const file = path.resolve(__dirname, '../../control-web', route === '/' ? 'index.html' : route.slice(1));
+        const file = path.resolve(__dirname, '../web', route === '/' ? 'index.html' : route.slice(1));
         if (!fs.existsSync(file)) { res.writeHead(200, { ...headers, 'content-type': 'text/plain; charset=utf-8' }); return res.end('Control core ready. Web UI follows in feature 04.'); }
         res.writeHead(200, { ...headers, 'content-type': route === '/' ? 'text/html; charset=utf-8' : route.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/css; charset=utf-8' });
         return res.end(fs.readFileSync(file));

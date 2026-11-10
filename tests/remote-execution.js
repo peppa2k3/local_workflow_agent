@@ -4,12 +4,12 @@ const os = require('node:os');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { fixture } = require('./helpers/remote');
-const { createCommandApi } = require('../src/remote/commands');
-const { createRemoteClient } = require('../src/agent/remote-client');
-const { createRemoteExecutor } = require('../src/agent/remote-executor');
-const { createWorkflows } = require('../src/agent/workflows');
-const { createScenarioStore } = require('../src/agent/scenario-store');
-const c = require('../src/remote/common');
+const { createCommandApi } = require('../control-server/src/commands');
+const { createRemoteClient } = require('../local-workflow-agent/src/integrations/remote/remote-client');
+const { createRemoteExecutor } = require('../local-workflow-agent/src/integrations/remote/remote-executor');
+const { createWorkflows } = require('../local-workflow-agent/src/workflow/workflows');
+const { createScenarioStore } = require('../local-workflow-agent/src/workflow/scenario-store');
+const c = require('../shared/remote-protocol');
 (async () => {
   const f = await fixture(createCommandApi), dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remote-execution-'));
   const runs = new Map(); let started = 0, stopped = 0;

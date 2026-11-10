@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
-const { createMediaGuard } = require('../src/agent/media-guard');
-const { createWorkflows } = require('../src/agent/workflows');
+const { createMediaGuard } = require('../local-workflow-agent/src/workflow/media-guard');
+const { createWorkflows } = require('../local-workflow-agent/src/workflow/workflows');
 const { chromium } = require('playwright');
 const path = require('node:path');
 const tick = () => new Promise(resolve => setImmediate(resolve));
@@ -58,7 +58,7 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
     });
     await page.goto('https://popup.test/');
     await page.setContent('<meta name="local-agent-session" content="fixture"><body></body>');
-    await page.addScriptTag({ path: path.resolve(__dirname, '../dashboard/issues.js') });
+    await page.addScriptTag({ path: path.resolve(__dirname, '../local-workflow-agent/dashboard/issues.js') });
     await page.route('https://popup.test/api/profiles', route => route.fulfill({ json: { profiles: [{ ...run, confirmation: { ...run.confirmation, message: '<img src=x> duplicate' } }] } }));
     await page.evaluate(() => fetch('/api/profiles'));
     await page.getByRole('dialog').waitFor(); assert.equal(await page.locator('dialog img').count(), 0);

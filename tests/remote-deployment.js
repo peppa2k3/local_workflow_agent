@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const http = require('node:http');
-const { createClientIp } = require('../src/remote/proxy');
-const { check } = require('../src/remote/healthcheck');
+const { createClientIp } = require('../control-server/src/proxy');
+const { check } = require('../control-server/src/healthcheck');
 (async () => {
   const request = (peer, forwarded) => ({ socket: { remoteAddress: peer }, headers: { 'x-forwarded-for': forwarded } });
   const ip = createClientIp({ trustedProxyIps: '172.20.0.2,2001:db8::2' });

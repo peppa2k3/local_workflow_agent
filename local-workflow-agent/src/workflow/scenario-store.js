@@ -1,8 +1,8 @@
 const fs = require('fs');
 const path = require('path');
-const { validateVideo } = require('./video-download');
+const { validateVideo } = require('../integrations/video/video-download');
 const { resolveVariables, hasRuntime, resolveRuntime } = require('./variables');
-const { validateUploadMetadata } = require('./activity-store');
+const { validateUploadMetadata } = require('../storage/activity-store');
 
 function validateStep(step, uploadPath = '') {
   if (!['downloadVideo', 'openUrl', 'openFolder', 'wait', 'waitFor', 'click', 'type', 'setDate', 'setTime', 'scroll', 'upload'].includes(step.action)) throw new Error(`Unsupported action: ${step.action}`);

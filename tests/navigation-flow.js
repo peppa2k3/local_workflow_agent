@@ -5,8 +5,8 @@ const http = require('node:http');
 const vm = require('node:vm');
 const os = require('node:os');
 const { chromium } = require('playwright');
-const { createWorkflows } = require('../src/agent/workflows');
-const { createScenarioStore } = require('../src/agent/scenario-store');
+const { createWorkflows } = require('../local-workflow-agent/src/workflow/workflows');
+const { createScenarioStore } = require('../local-workflow-agent/src/workflow/scenario-store');
 
 // Real isolated Chrome pages + CDP input exercise the production worker and
 // content script. The Chrome extension API adapter supplies only browser APIs.
@@ -203,7 +203,7 @@ const { createScenarioStore } = require('../src/agent/scenario-store');
       const endpoint = new URL(request.url()).pathname;
       let data = {};
       if (endpoint === '/') {
-        return route.fulfill({ contentType: 'text/html', body: fs.readFileSync(path.join(__dirname, '../dashboard/index.html'), 'utf8') });
+        return route.fulfill({ contentType: 'text/html', body: fs.readFileSync(path.join(__dirname, '../local-workflow-agent/dashboard/index.html'), 'utf8') });
       }
       if (endpoint === '/api/profiles') data = { defaultProfile: 'Profile 1', capabilities: legacyAgent ? [] : ['variables-v1'], performance: { cpuPercent: 0.5, memoryMb: 42, eventLoopP95Ms: 20.1 }, profiles: ['Profile 1', 'Profile 2'].map(directory => ({ directory, profile: directory, name: directory, extensionConnected: true, running: false, elapsedMs: 1200, lastStepMs: 230 })) };
       if (endpoint === '/api/scenarios') data = { names: Object.keys(fixtures) };

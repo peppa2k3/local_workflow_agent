@@ -5,20 +5,20 @@ const readline = require('readline');
 const { spawn } = require('child_process');
 const { monitorEventLoopDelay } = require('perf_hooks');
 const { randomBytes, timingSafeEqual } = require('crypto');
-const { port, scenariosDir, dashboardPath, chromePath, profile, userDataDir } = require('./config');
-const { createScenarioStore } = require('./scenario-store');
-const { chooseFile } = require('./file-picker');
-const { createProfileCache } = require('./profiles');
-const { inspectVideo, downloadVideo } = require('./video-download');
-const { createWorkflows } = require('./workflows');
-const { createAutomationApi } = require('./automation-api');
-const { createActivityStore } = require('./activity-store');
-const { createCachedDownloader } = require('./download-cache');
-const { createMongoSync } = require('./mongo-sync');
+const { port, dataDir, scenariosDir, dashboardPath, chromePath, profile, userDataDir } = require('./config');
+const { createScenarioStore } = require('./workflow/scenario-store');
+const { chooseFile } = require('./integrations/chrome/file-picker');
+const { createProfileCache } = require('./integrations/chrome/profiles');
+const { inspectVideo, downloadVideo } = require('./integrations/video/video-download');
+const { createWorkflows } = require('./workflow/workflows');
+const { createAutomationApi } = require('./http/automation-api');
+const { createActivityStore } = require('./storage/activity-store');
+const { createCachedDownloader } = require('./storage/download-cache');
+const { createMongoSync } = require('./integrations/mongo/mongo-sync');
 const { mongoSettings } = require('./env');
-const { createContentApi } = require('./content-api');
-const { createMediaGuard } = require('./media-guard');
-const { createRemoteClient } = require('./remote-client');
+const { createContentApi } = require('./http/content-api');
+const { createMediaGuard } = require('./workflow/media-guard');
+const { createRemoteClient } = require('./integrations/remote/remote-client');
 const daemon = process.argv[2] === '--daemon' || process.env.LOCAL_AGENT_DAEMON === '1';
 
 const scenarios = createScenarioStore(scenariosDir);
@@ -30,7 +30,7 @@ let filePickerPending = false;
 // Request handlers only read an in-memory snapshot; metadata I/O is asynchronous.
 const profileCache = createProfileCache(userDataDir, profile);
 const profiles = profileCache.get;
-const activity = createActivityStore(process.env.LOCAL_AGENT_DATA_DIR || path.resolve(__dirname, '../../data/agent'));
+const activity = createActivityStore(dataDir);
 const mongoSync = createMongoSync(activity, { settings: mongoSettings });
 const content = createContentApi({ mongo: mongoSync, activity, readBody });
 const mediaGuard = createMediaGuard({ activity, mongo: mongoSync });
@@ -67,7 +67,7 @@ function readBody(request) {
 }
 const automation = createAutomationApi({ workflows, scenarios, profiles, readBody });
 const dashboardToken = randomBytes(32).toString('hex');
-const remote = createRemoteClient({ dataDir: process.env.LOCAL_AGENT_DATA_DIR || path.resolve(__dirname, '../../data/agent'),
+const remote = createRemoteClient({ dataDir: dataDir,
   profiles, scenarios, workflows, performance: () => performance, allowHttp: process.env.LOCAL_AGENT_REMOTE_ALLOW_HTTP_LOOPBACK === '1' });
 function dashboardAuthorized(request) {
   const candidate = request.headers['x-local-agent-session'];
@@ -89,7 +89,7 @@ const server = http.createServer(async (request, response) => {
   if (origin && origin !== `http://127.0.0.1:${port}` && !/^chrome-extension:\/\/[a-z]+$/.test(origin)) return json(403, { error: 'Origin not allowed' });
   if (request.method === 'GET' && ['/remote.js', '/remote.css', '/issues.js'].includes(route)) {
     response.writeHead(200, { 'Content-Type': route.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/css; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
-    response.end(fs.readFileSync(route.endsWith('.js') ? path.join(path.dirname(dashboardPath), route.slice(1)) : path.resolve(__dirname, '../../control-web/style.css'))); return;
+    response.end(fs.readFileSync(route.endsWith('.js') ? path.join(path.dirname(dashboardPath), route.slice(1)) : path.join(path.dirname(dashboardPath), 'remote.css'))); return;
   }
   if (request.method === 'GET' && ['/', '/content', '/content/', '/remote', '/remote/'].includes(route)) {
     response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });

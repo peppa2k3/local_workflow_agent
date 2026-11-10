@@ -8,11 +8,11 @@ LABEL org.opencontainers.image.title="Local Agent Remote Control" \
 WORKDIR /app
 # Control uses only Node builtins; no Playwright, Mongo driver or browser on the VPS.
 COPY --chown=node:node remote-control.js ./
-COPY --chown=node:node src/remote ./src/remote
-COPY --chown=node:node control-web ./control-web
+COPY --chown=node:node control-server ./control-server
+COPY --chown=node:node shared ./shared
 RUN mkdir /data && chown node:node /data
 USER node
 VOLUME ["/data"]
 EXPOSE 34800
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 CMD ["node", "src/remote/healthcheck.js"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 CMD ["node", "control-server/src/healthcheck.js"]
 CMD ["node", "remote-control.js"]

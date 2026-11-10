@@ -2,8 +2,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { createStore } = require('../src/remote/store');
-const c = require('../src/remote/common');
+const { createStore } = require('../control-server/src/store');
+const c = require('../shared/remote-protocol');
 (async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remote-core-'));
   try {

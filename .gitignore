@@ -8,6 +8,7 @@ test-results/
 
 tools/
 data/
+dist/
 .env
 .env.*
 !.env.example

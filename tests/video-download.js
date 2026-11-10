@@ -3,11 +3,11 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
-const { validateVideo, inspectVideo, downloadVideo, run, selectionArgs, publishVideo } = require('../src/agent/video-download');
-const { createScenarioStore } = require('../src/agent/scenario-store');
-const { createWorkflows } = require('../src/agent/workflows');
-const { createActivityStore } = require('../src/agent/activity-store');
-const { createCachedDownloader } = require('../src/agent/download-cache');
+const { validateVideo, inspectVideo, downloadVideo, run, selectionArgs, publishVideo } = require('../local-workflow-agent/src/integrations/video/video-download');
+const { createScenarioStore } = require('../local-workflow-agent/src/workflow/scenario-store');
+const { createWorkflows } = require('../local-workflow-agent/src/workflow/workflows');
+const { createActivityStore } = require('../local-workflow-agent/src/storage/activity-store');
+const { createCachedDownloader } = require('../local-workflow-agent/src/storage/download-cache');
 (async () => {
   for (const url of ['file:///C:/a.mp4', 'ftp://example.test/a', 'https://user:secret@example.test/']) assert.throws(() => validateVideo({ url }));
   const url = 'https://example.test/video';
@@ -56,7 +56,7 @@ const { createCachedDownloader } = require('../src/agent/download-cache');
       await page.route('http://127.0.0.1:34719/**', async route => {
         const request = route.request(), pathname = new URL(request.url()).pathname;
         let data = {};
-        if (pathname === '/') return route.fulfill({ contentType: 'text/html; charset=utf-8', body: fs.readFileSync(path.resolve(__dirname, '../dashboard/index.html'), 'utf8') });
+        if (pathname === '/') return route.fulfill({ contentType: 'text/html; charset=utf-8', body: fs.readFileSync(path.resolve(__dirname, '../local-workflow-agent/dashboard/index.html'), 'utf8') });
         if (pathname === '/api/profiles') data = { defaultProfile: 'Default', capabilities: ['variables-v1', 'video-download-v1', 'video-quality-best-v1', 'download-references-v1', 'scenario-management-v1'], profiles: [{ directory: 'Default', name: 'Test', extensionConnected: false, running: false, download: { title, filePath: 'D:/Videos/sample.mp4', width: 1440, height: 1920, fps: 60, videoCodec: 'vp9' } }] };
         else if (pathname === '/api/scenarios') data = { names: deleted ? [] : ['video-download'] };
         else if (pathname === '/api/scenarios/my-workflow' && request.method() === 'PUT') { saved = request.postDataJSON(); data = { ok: true }; }

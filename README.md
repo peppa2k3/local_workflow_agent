@@ -28,9 +28,10 @@ Lịch sử từng bước được lưu qua restart tại `data/agent/`. URL đ
 | Đường dẫn | Vai trò |
 | --- | --- |
 | `local-agent.js` | Điểm chạy ổn định (`npm start` hoặc `node local-agent.js`). |
-| `src/agent/` | Cấu hình, quản lý kịch bản và agent HTTP/CLI. |
-| `chrome-reels-extension/` | Extension cài bằng **Load unpacked** vào Chrome profile hiện có. |
-| `dashboard/index.html` | Giao diện tại `http://127.0.0.1:34719`. |
+| `local-workflow-agent/` | Runtime local, dashboard, storage, tích hợp Chrome/video/MongoDB/VPS và dependency riêng. |
+| `chrome-reels-extension/` | Extension cài **Load unpacked**; `npm run package:extension` tạo ZIP trong `dist/`. |
+| `control-server/` | Server VPS và giao diện điều khiển; entry cũ `remote-control.js` vẫn hoạt động. |
+| `shared/` | Giao thức dùng chung giữa agent và VPS. |
 | `scenarios/` | Các kịch bản JSON do dashboard lưu. |
 | `tests/` | Kiểm tra luồng dialog và upload. |
 | `docs/` | Hướng dẫn, context và tiến độ. |
@@ -38,6 +39,8 @@ Lịch sử từng bước được lưu qua restart tại `data/agent/`. URL đ
 | `legacy/facebook-feed.js` | Thử nghiệm Playwright ban đầu; quy trình hiện tại dùng Local Agent + Extension. |
 
 Xem [cú pháp kịch bản](docs/SCENARIOS.md), [context dự án](docs/PROJECT_CONTEXT.md) và [tiến độ](docs/PROGRESS.md).
+
+Máy chỉ chạy agent: pull toàn bộ repository, chạy `npm ci --prefix local-workflow-agent --omit=dev`, rồi `node local-agent.js`. Cài extension trong từng Chrome profile và cấu hình `.env` riêng nếu cần. Không cần Playwright hoặc server VPS. Xem [README agent](local-workflow-agent/README.md), [đóng gói extension](chrome-reels-extension/README.md) và [kiến trúc source](docs/ARCHITECTURE.md).
 
 ## Tải video qua URL
 

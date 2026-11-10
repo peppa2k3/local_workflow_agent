@@ -1,0 +1,18 @@
+{
+  "name": "local-workflow-agent",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "start:daemon": "node index.js --daemon",
+    "check:mongo": "node scripts/check-mongodb.js",
+    "setup:video": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-video.ps1"
+  },
+  "dependencies": {
+    "mongodb": "^7.7.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

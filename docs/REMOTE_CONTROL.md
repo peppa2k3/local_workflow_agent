@@ -100,7 +100,7 @@ File Compose dùng volume để giữ SQLite, chạy bằng người dùng khôn
 
 #### Dịch vụ chạy trực tiếp
 
-Sao chép `remote-control.js`, `src/remote/` và `control-web/` vào `/opt/local-agent-control`. Tạo người dùng hệ thống riêng `local-agent-control`. Lưu cấu hình theo file mẫu tại `/etc/local-agent-control.env` và chỉ cho người dùng đó đọc. Cài và điều chỉnh `deploy/control/local-agent-control.service`; đường dẫn Node trong file đang giả định là `/usr/bin/node`. Tạo `/var/lib/local-agent-control` và giao quyền sở hữu cho người dùng đó. Sau đó chạy lệnh tạo tài khoản bằng chính người dùng này, với `CONTROL_ENV_FILE=/etc/local-agent-control.env` và `CONTROL_DATABASE=/var/lib/local-agent-control/control.sqlite`. Cài nginx/TLS như trên rồi bật và chạy dịch vụ systemd.
+Sao chép `remote-control.js`, `control-server/` và `shared/` vào `/opt/local-agent-control`, giữ cấu trúc tương đối. Tạo người dùng hệ thống riêng `local-agent-control`. Lưu cấu hình theo file mẫu tại `/etc/local-agent-control.env` và chỉ cho người dùng đó đọc. Cài và điều chỉnh `deploy/control/local-agent-control.service`; đường dẫn Node trong file đang giả định là `/usr/bin/node`. Tạo `/var/lib/local-agent-control` và giao quyền sở hữu cho người dùng đó. Sau đó chạy lệnh tạo tài khoản bằng chính người dùng này, với `CONTROL_ENV_FILE=/etc/local-agent-control.env` và `CONTROL_DATABASE=/var/lib/local-agent-control/control.sqlite`. Cài nginx/TLS như trên rồi bật và chạy dịch vụ systemd.
 
 Chỉ dùng một trong hai cách triển khai cho cùng cổng và cùng cơ sở dữ liệu. Các file trên là mẫu triển khai; trong quá trình phát triển chưa cấp phát hoặc sửa VPS thật.
 

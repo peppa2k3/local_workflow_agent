@@ -3,8 +3,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { fixture } = require('./helpers/remote');
-const c = require('../src/remote/common');
-const { createRemoteClient } = require('../src/agent/remote-client');
+const c = require('../shared/remote-protocol');
+const { createRemoteClient } = require('../local-workflow-agent/src/integrations/remote/remote-client');
 (async () => {
   const f = await fixture(); const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remote-pair-'));
   const client = createRemoteClient({ dataDir: dir, profiles: () => [], scenarios: { list: () => [] }, allowHttp: true });
