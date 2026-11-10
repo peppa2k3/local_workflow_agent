@@ -1,5 +1,9 @@
 # Điều khiển từ xa
 
+**Thử trên cùng một máy trước:** xem [hướng dẫn Remote Control local từng bước](REMOTE_CONTROL_LOCAL.md)
+để cấu hình `.env.control`, bật HTTP loopback ở hai phía, tạo tài khoản và ghép
+workflow engine cổng 34719 với control server cổng 34800.
+
 Dashboard local có navbar chung ở đầu trang để chuyển giữa **Kịch bản** (`/`), **Quản lý nội dung** (`/content`) và **Remote Control** (`/remote`). Mục đang mở được đánh dấu; trang Remote Control dùng để ghép nối VPS và quản lý quyền trên máy này.
 
 ## Tổng quan

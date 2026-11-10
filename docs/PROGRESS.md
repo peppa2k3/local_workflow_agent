@@ -1,5 +1,13 @@
 # Tiến độ phát triển
 
+## 2026-11-10 — Hướng dẫn thử control server trên local
+
+- Thêm `docs/REMOTE_CONTROL_LOCAL.md` và link từ REMOTE_CONTROL: cấu hình
+  `.env.control` cho HTTP loopback, bật cờ HTTP ở engine, tạo user qua stdin,
+  chạy hai server 34800/34719, cấp quyền, ghép máy và thử run/stop scenario wait.
+- Kiểm tra liên kết/cú pháp bảy khối PowerShell; smoke tạo tài khoản, health và
+  login trên control server với cổng/SQLite tạm đạt. Chỉ thay tài liệu.
+
 ## 2026-11-10 — Sửa extension Options lỗi Bearer token khi kết nối profile
 
 - Tái hiện trên extension thật: GET discovery thiếu Origin trả 401 khi bật API
