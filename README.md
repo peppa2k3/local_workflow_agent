@@ -1,5 +1,8 @@
 # Local Chrome Workflow Agent
 
+**Hướng dẫn từ đầu đến cuối:** [guides.md](guides.md) — cài/upload Chrome
+Extension, chạy local agent, cấu hình VPS và chạy scenario qua remote control.
+
 **Remote qua terminal agent Socket.IO:** `local-agent/` có bridge dùng API local
 để liệt kê, chạy, theo dõi và dừng scenario từ terminal hoặc panel trên VPS.
 Xem [hướng dẫn kết nối terminal/VPS](local-agent/README.md).

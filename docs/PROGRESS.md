@@ -1,5 +1,13 @@
 # Tiến độ phát triển
 
+## 2026-11-10 — Hướng dẫn cài đặt và remote từ đầu đến cuối
+
+- Thêm `guides.md` ở gốc và liên kết từ README: Load unpacked/đóng ZIP/upload
+  Web Store, cấu hình engine/API/profile, runner Socket.IO và bản copy đang dùng,
+  ghép VPS, cấp phiên, chạy/theo dõi/dừng scenario, cập nhật và tra lỗi.
+- Đối chiếu quy trình Web Store với tài liệu Chrome chính thức; kiểm tra liên
+  kết nội bộ, script npm và cú pháp 14 khối PowerShell. Chỉ thay tài liệu.
+
 ## 2026-11-10 — Terminal/VPS workflow bridge
 
 - Thêm client API loopback, CLI và Socket.IO handler vào `local-agent/`, dùng
