@@ -10,8 +10,8 @@
     body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 18% 0%, #1c315b 0, transparent 34%), #0b1020; }
     button, input, select { font: inherit; }
     button { cursor: pointer; border: 0; }
-    .shell { max-width: 1200px; margin: auto; padding: 30px 22px 60px; }
-    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; margin-bottom: 26px; }
+    .shell { max-width: 1200px; margin: auto; padding: 22px 22px 48px; }
+    .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; margin-bottom: 18px; }
     .eyebrow { color: #86a8ff; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .14em; }
     h1 { margin: 7px 0 6px; font-size: clamp(27px, 4vw, 40px); letter-spacing: -.04em; }
     p { margin: 0; color: #9aa8c5; line-height: 1.5; }
@@ -19,7 +19,7 @@
     .dot { height: 8px; width: 8px; border-radius: 50%; background: #f2b84b; }
     .dot.ok { background: #35d6a1; }
     .toolbar, .editor, .step { background: #121c31; border: 1px solid #263653; box-shadow: 0 12px 30px #03071233; }
-    .toolbar { border-radius: 18px; padding: 16px; display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+    .toolbar { border-radius: 16px; padding: 14px; display: flex; align-items: end; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
     label { display: grid; gap: 7px; color: #acbbd6; font-size: 12px; font-weight: 600; }
     input, select { min-height: 40px; color: #eef3ff; background: #0b1426; border: 1px solid #334361; border-radius: 9px; padding: 9px 11px; outline: none; }
     input:focus, select:focus { border-color: #7b9fff; box-shadow: 0 0 0 3px #789cff26; }
@@ -34,23 +34,26 @@
     .btn.success { background: #168c69; }
     .btn.danger { background: #6c3343; }
     .btn.ghost { background: transparent; border: 1px solid #344464; }
-    .editor { border-radius: 18px; padding: 20px; }
-    .editor-head { display: flex; justify-content: space-between; align-items: end; flex-wrap: wrap; gap: 14px; margin-bottom: 18px; }
+    .editor { border-radius: 16px; padding: 16px; }
+    .editor-head { display: flex; justify-content: space-between; align-items: end; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
     h2 { font-size: 20px; margin: 0 0 4px; }
     .editor-head input { width: min(360px, 80vw); }
-    .steps { display: grid; gap: 12px; }
-    .step { border-radius: 13px; padding: 16px; }
-    .step-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .steps { display: grid; gap: 8px; }
+    .step { border-radius: 11px; padding: 10px 12px; }
+    .step-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .step-body { border-top: 1px solid #2b3b58; margin-top: 10px; padding-top: 12px; }
+    .step-controls { display: flex; align-items: center; gap: 5px; margin-left: auto; }
     .number { background: #243a6a; color: #b6c9ff; border-radius: 8px; min-width: 30px; height: 30px; display: grid; place-items: center; font-weight: 800; }
-    .step-title { max-width: 260px; overflow-wrap: anywhere; }
-    .step-head select { min-width: 175px; }
+    .step-title { min-width: 100px; flex: 1 1 170px; overflow-wrap: anywhere; }
+    .step-head select { width: 220px; max-width: 100%; }
+    .step-toggle { white-space: nowrap; min-height: 32px; padding: 5px 10px; font-size: 12px; }
     .spacer { flex: 1; }
-    .icon { background: #25344e; color: #c6d2eb; width: 31px; height: 31px; border-radius: 7px; }
-    .fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .icon { background: #25344e; color: #c6d2eb; width: 32px; height: 32px; border-radius: 7px; }
+    .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     .fields label:first-of-type { grid-column: span 2; }
     .fields input { width: 100%; }
     .fields label { align-content: start; }
-    .add { width: 100%; margin-top: 14px; border: 1px dashed #536b9a; background: #172541; color: #bed0ff; min-height: 46px; border-radius: 10px; font-weight: 700; }
+    .add { width: 100%; margin-top: 10px; border: 1px dashed #536b9a; background: #172541; color: #bed0ff; min-height: 40px; border-radius: 10px; font-weight: 700; }
     .bottom { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 18px; }
     .message { color: #9fbee8; min-height: 21px; font-size: 13px; }
     .message.error { color: #ff9aa7; }
@@ -63,7 +66,7 @@
     .variable-row label { flex: 1; min-width: 160px; }
     .variable-ref { width: 100%; margin-top: 3px; font-size: 12px; min-height: 30px; padding: 4px 8px; }
     .performance { margin: 12px 0; color: #acbbd6; font-size: 13px; }
-    @media (max-width: 700px) { .top { flex-direction: column; } .fields { grid-template-columns: 1fr; } .fields label:first-of-type { grid-column: auto; } .toolbar select, .toolbar input { width: 100%; } .toolbar label { flex: 1 1 100%; } }
+    @media (max-width: 700px) { .shell { padding: 16px 12px 36px; } .top { flex-direction: column; } .editor { padding: 12px; } .fields { grid-template-columns: 1fr; } .fields label:first-of-type { grid-column: auto; } .toolbar select, .toolbar input { width: 100%; } .toolbar label { flex: 1 1 100%; } .step-title { min-width: 70px; flex-basis: 70px; } .step-head select { order: 3; width: 100%; } .step-controls { order: 2; } }
   </style>
 <style>
 .site-nav{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px clamp(16px,3vw,36px);background:#101928;border-bottom:1px solid #2c3c53;font-family:Segoe UI,Arial,sans-serif}
@@ -112,7 +115,7 @@
     <div id="performance" class="performance" aria-label="Hiệu suất agent"></div>
 
     <section class="editor">
-      <div class="editor-head"><div><h2>Các bước thực hiện</h2><p>Kéo luồng theo thứ tự từ trên xuống bằng nút ↑ ↓.</p></div><label>Tên hiển thị<input id="scenarioName" placeholder="Tên kịch bản"></label></div>
+      <div class="editor-head"><div><h2>Các bước thực hiện</h2><p>Dùng ↑ ↓ để đổi thứ tự. Mở chi tiết để sửa từng bước.</p></div><label>Tên hiển thị<input id="scenarioName" placeholder="Tên kịch bản"></label></div>
       <div class="steps" id="steps"></div>
       <button class="add" id="addBtn">＋ Thêm bước</button>
       <div class="bottom"><div class="message" id="message" role="status"></div><span id="stepCount"></span></div>
@@ -319,6 +322,7 @@
       }
       return label;
     }
+    const expandedSteps = new WeakSet();
     function render() {
       $('scenarioName').value = scenario.name || '';
       $('stepCount').textContent = `${scenario.steps.length} bước`;
@@ -334,17 +338,31 @@
           const option = document.createElement('option'); option.value = key; option.textContent = value.label; select.append(option);
         }
         select.value = step.action;
-        select.addEventListener('change', () => { scenario.steps[index] = { action: select.value, ...defaults[select.value] }; render(); });
+        select.addEventListener('change', () => { const replacement = { action: select.value, ...defaults[select.value] }; if (expandedSteps.has(step)) expandedSteps.add(replacement); scenario.steps[index] = replacement; render(); });
         head.append(number, stepTitle, select);
-        const spacer = document.createElement('span'); spacer.className = 'spacer'; head.append(spacer);
-        for (const [label, offset] of [['↑', -1], ['↓', 1]]) {
-          const button = document.createElement('button'); button.className = 'icon'; button.textContent = label;
-          button.title = offset < 0 ? 'Lên' : 'Xuống'; button.disabled = index + offset < 0 || index + offset >= scenario.steps.length;
-          button.addEventListener('click', () => { [scenario.steps[index], scenario.steps[index + offset]] = [scenario.steps[index + offset], scenario.steps[index]]; render(); });
-          head.append(button);
+        const controls = document.createElement('div'); controls.className = 'step-controls';
+        const body = document.createElement('div'); body.className = 'step-body'; body.id = `step-body-${index}`;
+        const toggle = document.createElement('button'); toggle.type = 'button'; toggle.className = 'btn ghost step-toggle';
+        toggle.setAttribute('aria-controls', body.id);
+        function setExpanded(expanded) {
+          if (expanded) expandedSteps.add(step); else expandedSteps.delete(step);
+          body.hidden = !expanded;
+          toggle.setAttribute('aria-expanded', String(expanded));
+          toggle.textContent = expanded ? '▴ Thu' : '▾ Mở';
+          toggle.setAttribute('aria-label', `${expanded ? 'Thu' : 'Mở'} chi tiết bước ${index + 1}`);
         }
-        const remove = document.createElement('button'); remove.className = 'icon'; remove.textContent = '×'; remove.title = 'Xóa bước';
-        remove.addEventListener('click', () => { scenario.steps.splice(index, 1); render(); }); head.append(remove);
+        setExpanded(expandedSteps.has(step));
+        toggle.addEventListener('click', () => setExpanded(body.hidden));
+        controls.append(toggle);
+        for (const [label, offset] of [['↑', -1], ['↓', 1]]) {
+          const button = document.createElement('button'); button.type = 'button'; button.className = 'icon'; button.textContent = label;
+          button.title = offset < 0 ? 'Lên' : 'Xuống'; button.setAttribute('aria-label', `${button.title} bước ${index + 1}`); button.disabled = index + offset < 0 || index + offset >= scenario.steps.length;
+          button.addEventListener('click', () => { [scenario.steps[index], scenario.steps[index + offset]] = [scenario.steps[index + offset], scenario.steps[index]]; render(); });
+          controls.append(button);
+        }
+        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'icon'; remove.textContent = '×'; remove.title = 'Xóa bước'; remove.setAttribute('aria-label', `Xóa bước ${index + 1}`);
+        remove.addEventListener('click', () => { scenario.steps.splice(index, 1); render(); }); controls.append(remove);
+        head.append(controls);
         if (['click', 'waitFor', 'type', 'setDate', 'setTime', 'upload'].includes(step.action)) {
           const pick = document.createElement('button'); pick.className = 'btn ghost'; pick.textContent = '◎ Chọn trên trang';
           pick.addEventListener('click', () => handle(async () => {
@@ -352,7 +370,7 @@
             pickTargetIndex = index; pickId = result.id; scheduleStatus(0);
             notice('Chuyển sang tab cần thao tác, đưa chuột lên phần tử và click. Nhấn Esc để hủy.');
           }));
-          head.append(pick);
+          body.append(pick);
         }
         if (step.action === 'downloadVideo') {
           const inspect = document.createElement('button'); inspect.className = 'btn ghost'; inspect.textContent = 'Phân tích URL / lấy tên';
@@ -365,7 +383,7 @@
             const info = await api('/api/video/inspect', 'POST', { url: expand(step.url) });
             notice(`Tên video: ${info.title} · ID: ${info.id} · File: tiêu đề.ext`);
           })));
-          head.append(inspect);
+          body.append(inspect);
         }
         const fields = document.createElement('div'); fields.className = 'fields';
         if (step.action === 'downloadVideo') {
@@ -398,7 +416,7 @@
           if (value.trim()) step.label = value; else delete step.label;
           stepTitle.textContent = value.trim() || `Bước ${index + 1}`;
         });
-        nameField.style.marginBottom = '12px';
+        nameField.style.margin = '10px 0';
 
         for (const [key, label, type] of actions[step.action].fields) {
           const [parent, child] = key.split('.');
@@ -408,7 +426,7 @@
             if (value === undefined) delete target[child || parent]; else target[child || parent] = value;
           }));
         }
-        card.append(head, nameField, fields); list.append(card);
+        body.append(nameField, fields); card.append(head, body); list.append(card);
       });
     }
     async function refreshNames() {
@@ -486,7 +504,7 @@
       profileState = null; updateButtons();
       pickId = null; pickTargetIndex = null; refreshStatus();
     };
-    $('addBtn').onclick = () => { scenario.steps.push({ action: 'click', ...defaults.click }); render(); };
+    $('addBtn').onclick = () => { const step = { action: 'click', ...defaults.click }; scenario.steps.push(step); expandedSteps.add(step); render(); };
     $('addVariableBtn').onclick = () => { variableDrafts.push({ name: '', value: '' }); renderVariables(); };
     $('scenarioName').oninput = event => { scenario.name = event.target.value; };
     async function updateStatus() {

@@ -73,6 +73,7 @@ const { createCachedDownloader } = require('../local-workflow-agent/src/storage/
       });
       await page.goto('http://127.0.0.1:34719');
       const button = page.getByRole('button', { name: 'Ph\u00e2n t\u00edch URL / l\u1ea5y t\u00ean', exact: true });
+      await page.getByRole('button', { name: 'Mở chi tiết bước 1' }).click();
       await button.waitFor();
       await page.waitForFunction(() => !document.getElementById('runBtn').disabled);
       await button.click();
@@ -93,6 +94,7 @@ const { createCachedDownloader } = require('../local-workflow-agent/src/storage/
       await page.locator('#loadBtn').click();
       await page.waitForFunction(() => document.getElementById('message').textContent.includes('Đã mở'));
       assert.equal(await page.locator('.step-title').textContent(), 'Mở trang Reels');
+      await page.getByRole('button', { name: 'Mở chi tiết bước 1' }).click();
       await stepName.fill('');
       assert.equal(await page.locator('.step-title').textContent(), 'Bước 1');
       const reference = page.getByLabel('Chèn biến: URL', { exact: true });
@@ -108,6 +110,7 @@ const { createCachedDownloader } = require('../local-workflow-agent/src/storage/
       assert.equal(await page.locator('#scenarioSelect option').count(), 0);
       assert.equal(await page.locator('#fileName').inputValue(), 'my-workflow');
       await page.locator('.step-head select').selectOption('upload');
+      await page.getByRole('button', { name: 'Mở chi tiết bước 1' }).click();
       await page.getByRole('button', { name: 'Chọn page từ MongoDB', exact: true }).click();
       await page.getByLabel('Page dùng chung', { exact: true }).selectOption('8d7956a8-cb45-457f-a7f0-094ae1a9362e');
       assert.equal(await page.getByRole('textbox', { name: 'Tên page đích (khuyến nghị)', exact: true }).inputValue(), 'Page dùng chung');

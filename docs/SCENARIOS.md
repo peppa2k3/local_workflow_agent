@@ -5,6 +5,11 @@ saved JSON remains in the repository-root `scenarios/`. Keep using
 `node local-agent.js` and the same actions, variables and legacy CSS `selector`
 steps. See [source architecture and local installation](ARCHITECTURE.md).
 
+In the dashboard, saved steps initially show a compact header with step name,
+action, ↑ ↓ and delete. Use **▾ Mở** to edit all fields or **▴ Thu** to hide them.
+New steps open for editing automatically. Moving a step keeps its expanded state;
+expand/collapse does not change the scenario JSON or action behavior.
+
 Remote control: use `node local-agent.js --daemon` for an always-on local agent,
 and `/remote` to grant saved scenario/profile/variable permissions and approve a
 VPS account. The VPS web UI runs/stops only those granted saved scenarios through

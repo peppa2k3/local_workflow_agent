@@ -1,5 +1,16 @@
 # Tiến độ phát triển
 
+## 2026-11-10 — Dashboard step thu gọn
+
+- Thu nhỏ khoảng cách/padding của dashboard; step đã lưu mặc định chỉ hiện tên,
+  action, nút mở chi tiết, ↑ ↓ và xóa. Step mới mở sẵn để nhập.
+- Giữ trạng thái mở/thu theo từng step khi đổi thứ tự hoặc action; trạng thái này
+  không lưu vào JSON. Công cụ chọn phần tử/phân tích URL nằm trong phần chi tiết.
+- Test Chrome tách biệt kiểm tra mở/thu, sửa tên, đổi action, di chuyển, xóa,
+  thêm bước, lưu JSON và bố cục 1100/390/320px; ảnh QA trong test-results.
+- `npm test` đầy đủ, `node --check` các JavaScript thay đổi và diff check đạt.
+  Không dùng Chrome profile đã đăng nhập.
+
 ## 2026-11-10 — Tách source extension, agent local và control server
 
 - Gom runtime/dashboard/công cụ local vào `local-workflow-agent/`, chia workflow,

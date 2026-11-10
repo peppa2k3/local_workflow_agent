@@ -223,6 +223,7 @@ const { createScenarioStore } = require('../local-workflow-agent/src/workflow/sc
     const dashboard = await browserContext.newPage();
     await dashboard.goto('http://dashboard.test/');
     await dashboard.getByLabel('Chrome profile', { exact: true }).selectOption('Profile 2');
+    await dashboard.getByRole('button', { name: 'Mở chi tiết bước 1' }).click();
     await dashboard.getByLabel('Chờ phần tử kết quả (tùy chọn)', { exact: true }).fill('#ready');
     await dashboard.getByLabel('Trạng thái cần chờ', { exact: true }).selectOption('hidden');
     await Promise.all([
@@ -236,6 +237,7 @@ const { createScenarioStore } = require('../local-workflow-agent/src/workflow/sc
     console.log('Dashboard profile selection and completion condition persistence: OK');
     await dashboard.locator('#scenarioSelect').selectOption('typing');
     await dashboard.waitForFunction(() => document.getElementById('scenarioName').value === 'Typing test' && !document.getElementById('runBtn').disabled);
+    await dashboard.getByRole('button', { name: 'Mở chi tiết bước 1' }).click();
     await dashboard.getByLabel('Chèn biến: Nội dung nhập', { exact: true }).selectOption('tenphimn');
     await dashboard.getByLabel('Giá trị biến 1', { exact: true }).fill('Giá trị navbar đã sửa trước khi chạy');
     await Promise.all([
@@ -250,6 +252,7 @@ const { createScenarioStore } = require('../local-workflow-agent/src/workflow/sc
     await dashboard.locator('#scenarioSelect').selectOption('schedule');
     await dashboard.getByLabel('Tên hiển thị', { exact: true }).waitFor();
     await dashboard.waitForFunction(() => document.getElementById('scenarioName').value === 'Schedule test' && !document.getElementById('runBtn').disabled);
+    await dashboard.getByRole('button', { name: 'Mở chi tiết bước 1' }).click();
     await dashboard.getByLabel('Giá trị biến 1', { exact: true }).fill('2026-11-20');
     await dashboard.getByLabel('Chèn biến: Ngày (YYYY-MM-DD hoặc biến)', { exact: true }).selectOption('day');
     await Promise.all([

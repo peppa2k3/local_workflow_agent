@@ -30,7 +30,7 @@ Không dùng `legacy/facebook-feed.js` cho quy trình này: nó là thử nghi�
 ## 4. Tạo và chạy kịch bản
 
 1. Nhập **Tên file mới** bằng chữ thường, số, `-` hoặc `_`, rồi bấm **Tạo mới**. Hoặc chọn kịch bản đã lưu và bấm **Mở**.
-2. Bấm **＋ Thêm bước**, chọn action, điền trường của bước đó. Dùng nút ↑ ↓ để đổi thứ tự.
+2. Bấm **＋ Thêm bước** để tạo bước mới với phần chi tiết mở sẵn. Các bước đã lưu mặc định thu gọn; bấm **▾ Mở** trên từng bước để sửa tên, locator và các trường khác, bấm **▴ Thu** khi xong. Tên bước, action, nút ↑ ↓ và × luôn nằm trên đầu bước để đổi thứ tự hoặc xóa nhanh. Trạng thái mở/thu chỉ thuộc giao diện, không ghi vào JSON.
 3. Thường bắt đầu bằng `openUrl`, rồi `waitFor` nút cần xuất hiện, sau đó `click`, `type`, `scroll` hoặc `upload`. `openUrl` và `click` tự chờ trang tải xong/DOM ổn định. Với AJAX, upload hoặc điều hướng trễ, điền **Chờ phần tử kết quả** và trạng thái **Xuất hiện/Biến mất/Có thể tương tác** để xác định khi thao tác hoàn tất; xem [cú pháp và ví dụ completion](SCENARIOS.md#waiting-for-actions-to-finish).
 4. Với `click`, `waitFor`, `type`, `upload`, bấm **◎ Chọn trên trang**, chuyển sang tab mục tiêu, di chuột lên phần tử và click. Locator sẽ được điền vào bước. Nhấn Esc để hủy.
 5. Chọn profile, bấm **Lưu**, rồi **▶ Chạy kịch bản**. Thanh **Trạng thái** hiển thị bước hiện tại hoặc lỗi. **Dừng** chỉ dừng profile đang chọn. Có thể chuyển profile và chạy kịch bản khác đồng thời.
