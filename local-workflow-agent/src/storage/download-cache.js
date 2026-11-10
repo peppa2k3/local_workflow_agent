@@ -1,5 +1,5 @@
 const { canonicalUrl } = require('./activity-store');
-const { validateVideo } = require('../integrations/video/video-download');
+const { validateVideo, videoOptions } = require('../integrations/video/video-download');
 
 function createCachedDownloader(store, downloadVideo) {
   const locks = new Map();
@@ -20,12 +20,13 @@ function createCachedDownloader(store, downloadVideo) {
       });
       combined.throwIfAborted();
       const cached = await store.cachedDownload(key, combined);
-      if (cached) return cached;
+      const options = videoOptions(step);
+      if (cached && cached.downloadOptions?.quality === options.quality && cached.downloadOptions?.language === options.language) return cached;
       const result = await downloadVideo(step, combined);
       combined.throwIfAborted();
       if (result.verified !== true || !result.filePath) throw new Error('Download must finish final-file verification before continuing');
       const file = await store.registerFile(result.filePath, { duration: result.duration, tag: step.folderTag || 'automation', signal: combined });
-      const saved = store.rememberDownload(key, result, file);
+      const saved = store.rememberDownload(key, { ...result, downloadOptions: options }, file);
       return { ...saved, reused: false };
     } finally {
       // Keep the chain intact if a queued waiter is cancelled before its predecessor.

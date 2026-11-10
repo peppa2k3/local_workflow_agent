@@ -44,3 +44,6 @@ npm run package:extension
 Kết quả: `dist/chrome-reels-extension-<version>.zip`, với `manifest.json` ngay ở gốc ZIP. Script chỉ đưa năm file runtime trong bảng vào gói; README, source agent, cấu hình máy và khóa ký không nằm trong gói. Có thể chỉ định thư mục kết quả: `npm run package:extension -- -OutputDirectory D:\releases\bridge`.
 
 Script không ghi đè bản ZIP đã có. Khi phát hành bản mới, cập nhật `version` trong manifest và kiểm tra extension. Nếu thêm asset mới, cập nhật danh sách file trong `scripts/package-extension.ps1` và test đóng gói. ZIP là artifact để upload thủ công; lệnh trên không tự gửi hoặc xuất bản lên Chrome Web Store.
+# Tùy chọn tải video
+
+Ngôn ngữ audio và độ phân giải được chọn tại dashboard, xử lý bằng yt-dlp trong agent local. Mặc định tiếng Việt / Full HD 1080p; không cần quyền Chrome mới. Nếu nguồn không có audio tiếng Việt thì dùng audio có sẵn, không tự dịch. Khởi động lại agent và refresh dashboard sau khi cập nhật.

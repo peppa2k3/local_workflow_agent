@@ -55,4 +55,4 @@ Chạy `npm run setup:video`, rồi `node local-agent.js`. Mở http://127.0.0.1
 Mẫu nối toàn bộ luồng: chọn `download-upload-reels` để tải clip → upload Reels → điền tên phim từ URL. Sửa URL/thư mục/trang Reels và locator theo giao diện của bạn. Dùng `{{download_file_path}}` cho upload, `{{download_title}}` cho mô tả; agent chờ file hoàn tất và FFprobe xác nhận trước khi chạy bước sau. Mẫu dừng trước Đăng. Dashboard có tên riêng cho từng bước và nút xóa kịch bản.
 
 
-Tải video hiện ưu tiên FPS → độ phân giải → bitrate, không giới hạn 1080p. Tên file hoàn tất là `tiêu đề.mp4` (hoặc định dạng nguồn), trùng tên thêm `(2)`, `(3)`…; không ghi đè clip cũ. JSON có quality số vẫn chạy theo chính sách cao nhất mới.
+Tải video có lựa chọn ngôn ngữ audio và độ phân giải; mặc định tiếng Việt (`language: "vi"`) và Full HD (`quality: 1080`). Nếu thiếu audio tiếng Việt thì dùng audio nguồn. Chọn độ phân giải gần nhất không vượt mức; nếu nguồn chỉ có bản cao hơn thì dùng bản thấp nhất có sẵn. `quality: "best"` chọn độ phân giải cao nhất. Tên file là `tiêu đề.mp4` (hoặc định dạng nguồn), trùng tên thêm `(2)`, `(3)`…; không ghi đè clip cũ.

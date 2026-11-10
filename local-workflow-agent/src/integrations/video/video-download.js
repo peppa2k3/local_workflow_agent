@@ -11,6 +11,7 @@ function validateVideo(step) {
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error('Video URL requires http/https without credentials');
   if (step.directory !== undefined && (typeof step.directory !== 'string' || !step.directory.trim() || !path.isAbsolute(step.directory))) throw new Error('Video directory must be an absolute path');
   if (step.quality !== undefined && step.quality !== 'best' && ![360, 480, 720, 1080, 1440, 2160].includes(Number(step.quality))) throw new Error('Invalid video quality');
+  if (step.language !== undefined && (typeof step.language !== 'string' || !/^(auto|[a-z]{2,3}(?:-[a-zA-Z0-9]{2,8})*)$/.test(step.language))) throw new Error('Invalid audio language (use vi, en, ja, zh, ko or auto)');
   if (step.downloadTimeoutMs !== undefined && (!Number.isInteger(Number(step.downloadTimeoutMs)) || Number(step.downloadTimeoutMs) < 1000 || Number(step.downloadTimeoutMs) > 7200000)) throw new Error('Invalid downloadTimeoutMs (1000-7200000)');
 }
 function run(command, args, { signal, limit = 4 * 1024 * 1024, cwd } = {}) {
@@ -49,9 +50,18 @@ async function inspectVideo(url, signal) {
   validateVideo({ url });
   return metadata(url, AbortSignal.any([AbortSignal.timeout(60000), ...(signal ? [signal] : [])]));
 }
-// Prefer FPS first, then the short edge (portrait-safe), bitrate and codec.
-// No resolution cap, including for legacy scenarios with a numeric quality field.
-const selectionArgs = ['--format', 'bv*+ba/b', '--format-sort-force', '--format-sort', 'fps,res,vbr,abr,tbr,vcodec,acodec'];
+function videoOptions(step = {}) {
+  return { quality: String(step.quality ?? 1080), language: step.language ?? 'vi' };
+}
+function selectionArgs(step = {}) {
+  const { quality, language } = videoOptions(step);
+  const audio = language === 'auto' ? 'ba' : `(ba[language^=${language}]/ba)`;
+  const combined = language === 'auto' ? 'b' : `b[language^=${language}]/b`;
+  // res uses the short edge for portrait videos. Prefer <= target, then the
+  // smallest higher source if no lower source exists; never upscale/transcode.
+  return ['--format', `bv+${audio}/${combined}/bv`, '--format-sort-force', '--format-sort',
+    `${quality === 'best' ? 'res' : `res:${quality}`},fps,vbr,abr,tbr,vcodec,acodec`];
+}
 async function publishVideo(source, directory) {
   const ext = path.extname(source), stem = path.basename(source, ext);
   for (let suffix = 1; suffix < 10000; suffix++) {
@@ -79,7 +89,7 @@ async function downloadVideo(step, signal) {
   try {
     const output = await run(binary('yt-dlp', 'YTDLP_PATH'), [...baseArgs,
       '--no-simulate', '--no-overwrites', ...(fs.existsSync(ffmpeg) ? ['--ffmpeg-location', ffmpeg] : []),
-      ...selectionArgs,
+      ...selectionArgs(step),
       '--merge-output-format', 'mp4', '--paths', staging,
       '--output', '%(title).150B.%(ext)s',
       '--print', 'after_move:%(filepath)j', '--', step.url], { signal: combined });
@@ -98,7 +108,7 @@ async function downloadVideo(step, signal) {
     if (combined.aborted) throw new Error('Video operation cancelled or timed out');
     const filePath = await publishVideo(stagedPath, directory);
     const [numerator, denominator = 1] = String(video.avg_frame_rate || '0/1').split('/').map(Number);
-    return { ...info, duration: Number(media.format.duration), verified: true, filePath, name: path.basename(filePath), bytes: stat.size,
+    return { ...info, downloadOptions: videoOptions(step), audioLanguage: audio?.tags?.language || null, duration: Number(media.format.duration), verified: true, filePath, name: path.basename(filePath), bytes: stat.size,
       width: video.width, height: video.height, fps: denominator ? numerator / denominator : 0,
       videoCodec: video.codec_name, audioCodec: audio?.codec_name || null, bitrate: Number(media.format?.bit_rate) || null };
   } finally {
@@ -107,4 +117,4 @@ async function downloadVideo(step, signal) {
     await fs.promises.rm(staging, { recursive: true, force: true });
   }
 }
-module.exports = { validateVideo, inspectVideo, downloadVideo, run, selectionArgs, publishVideo };
+module.exports = { validateVideo, inspectVideo, downloadVideo, run, selectionArgs, videoOptions, publishVideo };

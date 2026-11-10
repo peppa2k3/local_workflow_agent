@@ -160,7 +160,7 @@
       ['folderTag', 'Tag thư mục (mặc định automation)', 'text']
     );
     const defaults = {
-      downloadVideo: { url: '', directory: 'D:\\Videos', quality: 'best', downloadTimeoutMs: 1800000 },
+      downloadVideo: { url: '', directory: 'D:\\Videos', quality: 1080, language: 'vi', downloadTimeoutMs: 1800000 },
       openUrl: { url: 'https://www.facebook.com/' }, openFolder: { path: 'C:\\Users\\Administrator\\Downloads' },
       wait: { ms: 1000 }, waitFor: { locatorType: 'text', locator: 'Tiếp', timeoutMs: 5000 },
       click: { locatorType: 'role', role: 'button', locator: 'Tiếp', timeoutMs: 5000 },
@@ -280,11 +280,12 @@
     function field(labelText, value, type, update) {
       const label = document.createElement('label');
       label.textContent = labelText;
-      const isSelect = ['locatorType', 'conditionState', 'dateFormat'].includes(type);
+      const isSelect = ['locatorType', 'conditionState', 'dateFormat', 'videoQuality', 'audioLanguage'].includes(type);
       const input = document.createElement(isSelect ? 'select' : 'input');
       input.setAttribute('aria-label', labelText);
       if (isSelect) {
-        const options = type === 'dateFormat' ? { 'DD/MM/YYYY': 'Ngày/tháng/năm', 'MM/DD/YYYY': 'Tháng/ngày/năm', 'YYYY-MM-DD': 'Năm-tháng-ngày' } : type === 'conditionState' ? { visible: 'Xuất hiện', hidden: 'Biến mất', enabled: 'Có thể tương tác' } : { role: 'Role + tên', text: 'Chữ hiển thị', label: 'Label', placeholder: 'Placeholder', testid: 'Test ID', xpath: 'XPath', css: 'CSS' };
+        const options = type === 'videoQuality' ? { 360: '360p', 480: '480p', 720: 'HD (720p)', 1080: 'Full HD (1080p)', 1440: '2K (1440p)', 2160: '4K (2160p)', best: 'Cao nhất' } : type === 'audioLanguage' ? { vi: 'Tiếng Việt', en: 'Tiếng Anh', zh: 'Tiếng Trung', ja: 'Tiếng Nhật', ko: 'Tiếng Hàn', auto: 'Theo nguồn' } : type === 'dateFormat' ? { 'DD/MM/YYYY': 'Ngày/tháng/năm', 'MM/DD/YYYY': 'Tháng/ngày/năm', 'YYYY-MM-DD': 'Năm-tháng-ngày' } : type === 'conditionState' ? { visible: 'Xuất hiện', hidden: 'Biến mất', enabled: 'Có thể tương tác' } : { role: 'Role + tên', text: 'Chữ hiển thị', label: 'Label', placeholder: 'Placeholder', testid: 'Test ID', xpath: 'XPath', css: 'CSS' };
+        if (['videoQuality', 'audioLanguage'].includes(type) && value != null && !(value in options)) options[value] = String(value);
         for (const [key, text] of Object.entries(options)) {
           const option = document.createElement('option'); option.value = key; option.textContent = text; input.append(option);
         }
@@ -400,7 +401,9 @@
         if (step.action === 'downloadVideo') {
           const hint = document.createElement('p');
           hint.style.gridColumn = '1 / -1';
-          hint.textContent = 'Chất lượng cao nhất: ưu tiên FPS → độ phân giải → bitrate. Không giới hạn 1080p. Tên file chỉ gồm tiêu đề; trùng tên thêm (2), (3)…';
+          hint.textContent = 'Mặc định tiếng Việt và Full HD (1080p). Ưu tiên audio ngôn ngữ đã chọn; nếu nguồn không có thì dùng audio có sẵn. Chọn độ phân giải gần nhất không vượt mức; nếu chỉ có bản cao hơn thì dùng bản thấp nhất có sẵn. Không tự dịch hoặc nâng độ phân giải. Tên file trùng thêm (2), (3)…';
+          fields.append(field('Ngôn ngữ âm thanh', step.language ?? 'vi', 'audioLanguage', value => { step.language = value; }));
+          fields.append(field('Độ phân giải', step.quality ?? 1080, 'videoQuality', value => { step.quality = value === 'best' ? value : Number(value); }));
           fields.append(hint);
         }
         if (step.action === 'upload') {

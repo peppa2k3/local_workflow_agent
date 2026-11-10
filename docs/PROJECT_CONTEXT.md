@@ -1,5 +1,9 @@
 # Project context
 
+## Tùy chọn video (2026-11-10)
+
+Download mặc định language=vi, quality=1080; dashboard có dropdown audio và độ phân giải. Giá trị best tường minh chọn chất lượng nguồn cao nhất. Sort res trước FPS, res:N ưu tiên cạnh ngắn <= N và fallback bản cao hơn nhỏ nhất nếu cần. Audio ưu tiên mã ngôn ngữ rồi fallback nguồn; không dịch. Cache URL lưu downloadOptions và chỉ reuse khi cả quality/language khớp; cache cũ không có options tải lại. Quyết định này thay thế chính sách FPS trước/không áp dụng quality số ngày 2026-10-20.
+
 ## Extension discovery và Origin (2026-11-10)
 
 Extension 4.2.1 dùng POST JSON chỉ đọc `/api/profiles` khi tải Options, vì Chrome

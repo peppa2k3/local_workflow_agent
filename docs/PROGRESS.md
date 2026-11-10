@@ -1,5 +1,12 @@
 # Tiến độ phát triển
 
+## 2026-11-10: ngôn ngữ audio và độ phân giải yt-dlp
+
+- Thêm dropdown ngôn ngữ và độ phân giải, mặc định vi/1080; áp dụng quality số trong JSON cũ, best chọn độ phân giải cao nhất.
+- Ưu tiên audio ngôn ngữ yêu cầu, fallback nguồn khi thiếu; không dịch/nâng độ phân giải. Độ phân giải theo cạnh ngắn hỗ trợ video dọc.
+- Cache chỉ dùng lại khi downloadOptions khớp; bổ sung kiểm thử đổi tùy chọn và cache legacy.
+- Kiểm chứng: toàn bộ `npm test` pass, gồm yt-dlp/FFmpeg thật trên fixture local, lựa chọn audio/độ phân giải và lưu dropdown; `node --check`, script dashboard và diff whitespace đều pass.
+
 ## 2026-11-10 — Hướng dẫn thử control server trên local
 
 - Thêm `docs/REMOTE_CONTROL_LOCAL.md` và link từ REMOTE_CONTROL: cấu hình

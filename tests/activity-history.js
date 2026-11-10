@@ -68,6 +68,16 @@ async function until(test) { for (let i = 0; i < 100 && !test(); i++) await tick
     const brokenDownloader = createCachedDownloader(activity, async () => ({ filePath: a.filePath, verified: false }));
     await assert.rejects(brokenDownloader({ ...source, url: 'https://example.test/broken' }), /verification/);
     assert.equal(activity.data.downloads['https://example.test/broken'], undefined);
+    const optionSource = { ...source, url: 'https://example.test/options' };
+    await download(optionSource);
+    const beforeOptions = calls;
+    assert.equal((await download({ ...optionSource, quality: '1080', language: 'vi' })).reused, true);
+    await download({ ...optionSource, language: 'en' });
+    await download({ ...optionSource, language: 'en', quality: 720 });
+    assert.equal(calls, beforeOptions + 2, 'language and resolution changes must download again');
+    delete activity.data.downloads[optionSource.url].downloadOptions;
+    await download({ ...optionSource, language: 'en', quality: 720 });
+    assert.equal(calls, beforeOptions + 3, 'legacy cache without options cannot satisfy a new selection');
 
     const store = createScenarioStore(temp), pageId = randomUUID();
     const scenario = { name: 'download-upload-reels-lili', variables: { page_id: pageId, page_name: 'Lili', page_url: 'https://example.test/pages/lili' }, steps: [

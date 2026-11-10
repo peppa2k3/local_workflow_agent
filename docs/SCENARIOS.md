@@ -165,11 +165,12 @@ The Windows file picker runs asynchronously with its console hidden and a foregr
 
 Action `downloadVideo` chạy trong agent, không cần mở Chrome. Dashboard có nút **Phân tích URL / lấy tên** để đọc title/ID trước khi tải, hỗ trợ biến. Chọn profile để theo dõi tác vụ; workflow có bước trình duyệt vẫn cần extension.
 
-Ví dụ: `{"action":"downloadVideo","url":"https://www.youtube.com/watch?v=9qq_Fqp2rnM","directory":"D:\\Videos","quality":"best","downloadTimeoutMs":1800000}`.
+Ví dụ: `{"action":"downloadVideo","url":"https://www.youtube.com/watch?v=9qq_Fqp2rnM","directory":"D:\\Videos","quality":1080,"language":"vi","downloadTimeoutMs":1800000}`.
 
 - `url`: HTTP/HTTPS của một video; không playlist/live, không credentials trong URL.
 - `directory`: đường dẫn tuyệt đối, được tạo nếu chưa có.
-- `quality`: mặc định `"best"`. Luôn chọn từ cao xuống thấp theo FPS → độ phân giải cạnh ngắn → bitrate → codec, không giới hạn 1080p/4K. Cùng FPS mới so độ phân giải; vì vậy 1080p60 được ưu tiên trước 4K30 theo chính sách FPS trước. Giá trị số 360/480/720/1080/1440/2160 trong JSON cũ vẫn được đọc nhưng không còn giới hạn chất lượng. Không cần sửa các kịch bản cũ. FFmpeg ghép hình/tiếng, không ép nén hoặc tăng FPS. Container ghép ưu tiên MP4; một luồng giữ định dạng nguồn.
+- `quality`: mặc định `1080` (Full HD); chọn 360/480/720/1080/1440/2160 hoặc `"best"`. Ưu tiên độ phân giải cạnh ngắn lớn nhất không vượt mức, sau đó FPS/bitrate/codec. Nếu chỉ có bản vượt mức, chọn bản nhỏ nhất có sẵn; không upscale hoặc ép nén. `"best"` chọn độ phân giải cao nhất. Giá trị số trong JSON cũ nay được áp dụng thật.
+- `language`: mặc định `"vi"` (audio tiếng Việt); có thể dùng `en`, `zh`, `ja`, `ko`, mã ngôn ngữ như `pt-BR`, hoặc `"auto"` theo nguồn. Ưu tiên audio khớp mã; nếu thiếu dùng audio nguồn. Không tự dịch/lồng tiếng hoặc tải phụ đề. Cache cũ không có tùy chọn sẽ được tải lại; thay ngôn ngữ/độ phân giải không tái sử dụng file của tùy chọn khác.
 - Tên cuối: `tiêu đề.ext`, không tự gắn `[ID]`. Lấy metadata thật, xử lý ký tự Windows, giới hạn phần tiêu đề theo template 150B của yt-dlp. URL đã tải và còn đúng file/hash thì dùng lại file; trường hợp cần tải mới, trùng tên tạo `tiêu đề (2).ext`, `(3)`… và không ghi đè. ID vẫn có trong metadata và `{{download_id}}`.
 - Timeout tổng phân tích + tải: mặc định 30 phút, 1000–7200000 ms. Nút Dừng hủy cây tiến trình yt-dlp/FFmpeg; file .part hoặc file đã xong trước lúc dừng có thể còn lại.
 
@@ -214,7 +215,7 @@ Khởi động lại `node local-agent.js`, tải lại dashboard và Reload ext
 
 ## Chất lượng và công bố file cuối (2026-10-20)
 
-yt-dlp dùng `bv*+ba/b` và `--format-sort-force --format-sort fps,res,vbr,abr,tbr,vcodec,acodec`. `res` là cạnh ngắn nên video dọc 1440×1920 không bị loại bởi bộ lọc height<=1080 cũ. Ưu tiên được áp dụng trong các định dạng nguồn trả về; URL trực tiếp chỉ có một định dạng thì giữ nguyên. Không thể tạo thêm chi tiết hoặc FPS thật ngoài nguồn. Bitrate giữa các codec khác nhau không là thước đo chất lượng tuyệt đối.
+yt-dlp dùng video tốt nhất kết hợp audio ưu tiên theo `language`, rồi fallback audio nguồn/video có sẵn. Sort mặc định `res:1080,fps,vbr,abr,tbr,vcodec,acodec`, với `--format-sort-force`. `res` là cạnh ngắn cho video dọc. URL trực tiếp chỉ có một định dạng thì giữ nguyên. Không thể tạo thêm chi tiết hoặc FPS thật ngoài nguồn. Bitrate giữa các codec khác nhau không là thước đo chất lượng tuyệt đối. Quy tắc: [yt-dlp format selection/sorting](https://github.com/yt-dlp/yt-dlp#format-selection).
 
 Tải/ghép/FFprobe trong thư mục riêng `.video-download-…` dưới thư mục đã chọn. Chỉ sau khi xác nhận file cuối, agent mới công bố tên sạch bằng hard link độc quyền trên cùng filesystem (cần filesystem hỗ trợ hard link, ví dụ NTFS); trùng tên tăng số, kể cả hai profile chạy đồng thời. Thư mục làm việc riêng được dọn sau khi hoàn thành/lỗi/dừng. File hoàn chỉnh đã công bố có thể còn lại nếu dừng ngay sau công bố. Không tự đổi tên/xóa các clip cũ.
 
