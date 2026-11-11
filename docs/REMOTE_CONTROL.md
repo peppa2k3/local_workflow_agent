@@ -49,13 +49,13 @@ Lịch sử VPS có trạng thái/nhãn từng bước, thời gian bắt đầu
 
 ### Docker Hub → VPS có Traefik (cách triển khai chính)
 
-Với VPS đang dùng Traefik, làm theo [hướng dẫn build/push và deploy từng bước](../deploy/control/README.md).
+Với VPS đang dùng Traefik, làm theo [hướng dẫn build/push và deploy từng bước](../control-server/deploy/README.md).
 Máy build đóng gói image và đẩy lên Docker Hub; VPS chỉ cần pull image, không cần
 checkout source hoặc cài Node/nginx. Bộ file gồm:
 
-- [Dockerfile](../deploy/control/Dockerfile) và [script build/push Windows](../scripts/publish-control-image.ps1).
-- [docker-compose.yml](../deploy/control/docker-compose.yml): image từ Docker Hub, volume SQLite, network external và labels Traefik.
-- [.env mẫu cho VPS](../deploy/control/.env.example): copy thành `.env` cạnh `docker-compose.yml`, điền image/tag, domain, network, entrypoint, resolver và IP Traefik.
+- [Dockerfile](../control-server/deploy/Dockerfile) và [script build/push Windows](../scripts/publish-control-image.ps1).
+- [docker-compose.yml](../control-server/deploy/docker-compose.yml): image từ Docker Hub, volume SQLite, network external và labels Traefik.
+- [.env mẫu cho VPS](../control-server/deploy/.env.example): copy thành `.env` cạnh `docker-compose.yml`, điền image/tag, domain, network, entrypoint, resolver và IP Traefik.
 
 Các bước: đăng nhập Docker Hub → build/push tag phiên bản → chép Compose và mẫu env
 lên VPS → điền env → `docker compose --env-file .env -f docker-compose.yml pull`
@@ -90,21 +90,21 @@ Trong bản checkout trên VPS, chạy:
 cp .env.control.example .env.control
 # Sửa CONTROL_PUBLIC_URL thành đúng địa chỉ gốc https:// (không thêm đường dẫn).
 chmod 600 .env.control
-docker compose -f deploy/control/compose.yaml build
+docker compose -f control-server/deploy/compose.yaml build
 # Tạo tài khoản mà không đưa mật khẩu vào tham số lệnh hoặc lịch sử shell:
 read -r -s -p 'Mật khẩu tài khoản mới: ' CONTROL_PASSWORD; printf '\n'
-printf '%s' "$CONTROL_PASSWORD" | docker compose -f deploy/control/compose.yaml run --rm -T control node remote-control.js user you@example.com
+printf '%s' "$CONTROL_PASSWORD" | docker compose -f control-server/deploy/compose.yaml run --rm -T control node remote-control.js user you@example.com
 unset CONTROL_PASSWORD
-docker compose -f deploy/control/compose.yaml up -d
+docker compose -f control-server/deploy/compose.yaml up -d
 ```
 
 Sửa `CONTROL_PUBLIC_URL` trong `.env.control` thành đúng địa chỉ HTTPS công khai, không thêm đường dẫn. Thay `you@example.com` bằng email cần tạo.
 
-File Compose dùng volume để giữ SQLite, chạy bằng người dùng không có quyền quản trị, đặt hệ thống file ứng dụng ở chế độ chỉ đọc và dùng mạng của máy chủ Linux. Dịch vụ chỉ lắng nghe tại `127.0.0.1:34800`; chỉ chạy một bản dịch vụ. Cài và chỉnh `deploy/control/nginx.conf.example`, thay tên miền/đường dẫn chứng chỉ, kiểm tra cấu hình nginx trước khi tải lại. Mở HTTPS cổng 443 và HTTP cổng 80 để chuyển hướng; giữ cổng 34800 và cổng local 34719 ở chế độ riêng tư. URL công khai phải khớp với Host mà nginx chuyển tiếp. nginx ghi đè header IP chuyển tiếp; chỉ bật `CONTROL_TRUST_PROXY=1` khi dùng reverse proxy đáng tin cậy kết nối qua loopback. `/health` chỉ kiểm tra dịch vụ còn hoạt động, không trả thông tin tài khoản/thiết bị. Không cần cấu hình WebSocket.
+File Compose dùng volume để giữ SQLite, chạy bằng người dùng không có quyền quản trị, đặt hệ thống file ứng dụng ở chế độ chỉ đọc và dùng mạng của máy chủ Linux. Dịch vụ chỉ lắng nghe tại `127.0.0.1:34800`; chỉ chạy một bản dịch vụ. Cài và chỉnh `control-server/deploy/nginx.conf.example`, thay tên miền/đường dẫn chứng chỉ, kiểm tra cấu hình nginx trước khi tải lại. Mở HTTPS cổng 443 và HTTP cổng 80 để chuyển hướng; giữ cổng 34800 và cổng local 34719 ở chế độ riêng tư. URL công khai phải khớp với Host mà nginx chuyển tiếp. nginx ghi đè header IP chuyển tiếp; chỉ bật `CONTROL_TRUST_PROXY=1` khi dùng reverse proxy đáng tin cậy kết nối qua loopback. `/health` chỉ kiểm tra dịch vụ còn hoạt động, không trả thông tin tài khoản/thiết bị. Không cần cấu hình WebSocket.
 
 #### Dịch vụ chạy trực tiếp
 
-Sao chép `remote-control.js`, `control-server/` và `shared/` vào `/opt/local-agent-control`, giữ cấu trúc tương đối. Tạo người dùng hệ thống riêng `local-agent-control`. Lưu cấu hình theo file mẫu tại `/etc/local-agent-control.env` và chỉ cho người dùng đó đọc. Cài và điều chỉnh `deploy/control/local-agent-control.service`; đường dẫn Node trong file đang giả định là `/usr/bin/node`. Tạo `/var/lib/local-agent-control` và giao quyền sở hữu cho người dùng đó. Sau đó chạy lệnh tạo tài khoản bằng chính người dùng này, với `CONTROL_ENV_FILE=/etc/local-agent-control.env` và `CONTROL_DATABASE=/var/lib/local-agent-control/control.sqlite`. Cài nginx/TLS như trên rồi bật và chạy dịch vụ systemd.
+Sao chép `remote-control.js`, `control-server/` và `shared/` vào `/opt/local-agent-control`, giữ cấu trúc tương đối. Tạo người dùng hệ thống riêng `local-agent-control`. Lưu cấu hình theo file mẫu tại `/etc/local-agent-control.env` và chỉ cho người dùng đó đọc. Cài và điều chỉnh `control-server/deploy/local-agent-control.service`; đường dẫn Node trong file đang giả định là `/usr/bin/node`. Tạo `/var/lib/local-agent-control` và giao quyền sở hữu cho người dùng đó. Sau đó chạy lệnh tạo tài khoản bằng chính người dùng này, với `CONTROL_ENV_FILE=/etc/local-agent-control.env` và `CONTROL_DATABASE=/var/lib/local-agent-control/control.sqlite`. Cài nginx/TLS như trên rồi bật và chạy dịch vụ systemd.
 
 Chỉ dùng một trong hai cách triển khai cho cùng cổng và cùng cơ sở dữ liệu. Các file trên là mẫu triển khai; trong quá trình phát triển chưa cấp phát hoặc sửa VPS thật.
 

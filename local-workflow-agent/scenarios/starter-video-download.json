@@ -1,0 +1,5 @@
+{
+  "name": "Tải video tiếng Việt / Full HD",
+  "variables": { "video_url": "https://example.com/video.mp4", "thu_muc_tai": "D:\\Videos" },
+  "steps": [{ "action": "downloadVideo", "url": "{{video_url}}", "directory": "{{thu_muc_tai}}", "language": "vi", "quality": 1080, "downloadTimeoutMs": 1800000 }]
+}

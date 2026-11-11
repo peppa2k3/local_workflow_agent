@@ -257,4 +257,4 @@ Mất mạng không tự dừng một lượt đã bắt đầu; khi có mạng,
    và thông tin Atlas vẫn ở máy local.
 
 Xem bước deploy thực tế tại [REMOTE_CONTROL](REMOTE_CONTROL.md) và
-[Docker Hub/Traefik](../deploy/control/README.md).
+[Docker Hub/Traefik](../control-server/deploy/README.md).

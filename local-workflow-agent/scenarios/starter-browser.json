@@ -1,0 +1,5 @@
+{
+  "name": "Mở trang mẫu",
+  "variables": { "page_url": "https://example.com" },
+  "steps": [{ "action": "openUrl", "url": "{{page_url}}" }]
+}

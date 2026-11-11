@@ -1,5 +1,5 @@
 const path = require('node:path');
-const c = require('../../../../shared/remote-protocol');
+const c = require('../../../shared/remote-protocol');
 function createRemoteExecutor({ dataDir, workflows, scenarios, getPolicy }) {
   const file = path.join(dataDir, 'remote-journal.json');
   const journal = c.readJson(file, {});

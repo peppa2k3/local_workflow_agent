@@ -2,7 +2,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
-const c = require('../../shared/remote-protocol');
+const c = require('../shared/remote-protocol');
 const { createClientIp } = require('./proxy');
 async function addUser(store, email, password) {
   email = c.text(email, 254).toLowerCase();

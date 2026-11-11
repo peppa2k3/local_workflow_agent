@@ -1,0 +1,11 @@
+**
+!index.js
+!src/
+!src/**
+!web/
+!web/**
+!shared/
+!shared/**
+!deploy/
+!deploy/Dockerfile
+!deploy/Dockerfile.dockerignore

@@ -1,5 +1,13 @@
 # Tiến độ phát triển
 
+## 2026-11-11: ba app có thể triển khai độc lập
+
+- Local đóng đủ runtime/protocol/docs/scripts/scenario mẫu; extension đóng gói riêng; server sở hữu Docker/Compose/deploy và protocol.
+- Bỏ phụ thuộc runtime vào shared gốc; test parity hai bản protocol, standalone app và launcher/path legacy.
+- Giữ config/data đang dùng vì agent đang hoạt động; thêm migration có port guard và collision preflight, kiểm thử giữ nguyên identity/config/tools/scenarios.
+- Toàn bộ npm test pass; migration fixture chạy riêng pass. Không deploy VPS hoặc điều khiển Chrome profile đăng nhập.
+- Compose Traefik validate pass; Docker daemon chưa chạy nên chưa build image. JavaScript/PowerShell syntax và link tài liệu đã kiểm tra.
+
 ## 2026-11-10: ngôn ngữ audio và độ phân giải yt-dlp
 
 - Thêm dropdown ngôn ngữ và độ phân giải, mặc định vi/1080; áp dụng quality số trong JSON cũ, best chọn độ phân giải cao nhất.

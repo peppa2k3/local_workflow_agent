@@ -11,6 +11,8 @@ Extension Chrome Manifest V3, chạy trong từng profile muốn kết nối v�
 
 Load unpacked bằng chính thư mục này. Hướng dẫn: [SETUP](../docs/SETUP.md).
 
+Thư mục này triển khai độc lập. Đóng ZIP ngay tại đây bằng `powershell -NoProfile -ExecutionPolicy Bypass -File package.ps1`; kết quả trong `dist/`. Chỉ năm file runtime được đóng gói, không chứa script/README/token. Script không tự publish Chrome Web Store. Khi chạy `npm run package:extension` ở gốc repo, wrapper vẫn xuất ZIP vào `dist/` ở gốc để tương thích.
+
 Bản 4.2.2 sửa timeout sau click trên trang có video/progress cập nhật DOM liên
 tục. Click mặc định không chờ DOM đứng yên (`settleMs: 0`), vẫn chờ tải trang và
 completion đã chỉ định. Nút vẫn tồn tại sau click không bị coi là thất bại.

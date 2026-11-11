@@ -1,0 +1,10 @@
+{
+  "name": "workflow-control-server",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "node index.js",
+    "user": "node index.js user"
+  },
+  "engines": { "node": ">=24" }
+}

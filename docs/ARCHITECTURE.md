@@ -1,62 +1,56 @@
-# Cấu trúc source và triển khai
-
-Bản đồ chi tiết từng module, luồng chạy và cấu trúc đích đề xuất để tích hợp dự án lớn: [SOURCE_MAP.md](SOURCE_MAP.md). Workspace hiện dùng tên `local-agent-corebase/` cho bridge Socket.IO; một số đường dẫn Git/tài liệu cũ còn là `local-agent/`.
+# Ba ứng dụng triển khai độc lập
 
 ```text
-chrome-reels-extension/       Extension, gói ZIP riêng
-local-agent-corebase/         Terminal agent Socket.IO và bridge API tới workflow (tên cũ: local-agent/)
-local-workflow-agent/
-  index.js                   Bootstrap local
-  src/
-    workflow/                Kịch bản, biến, điều phối
-    http/                    Automation/content API
-    storage/                 Catalog, lịch sử, cache, outbox
-    integrations/
-      chrome/                Profile metadata, file picker
-      video/                 yt-dlp + FFmpeg
-      mongo/                 Atlas + DNS
-      remote/                Outbound VPS client
-  dashboard/                 UI tại 127.0.0.1:34719
-  scripts/                   Setup video, check MongoDB
-control-server/              VPS HTTP/SQLite + web UI
-shared/                      Giao thức agent ↔ VPS, Node builtins
-scenarios/                   JSON người dùng, giữ đường dẫn cũ
-data/                        Runtime local/control, Git ignore
-tools/                       Binary local, Git ignore
-deploy/                      Docker, Traefik, systemd, nginx
-scripts/                     Đóng gói, publish image, startup, wrapper cũ
-tests/                       Fixture và Chrome tách biệt
-docs/, prompts/             Tài liệu và kế hoạch
+local-agent-work-flow/
+├── local-workflow-agent/       Copy riêng sang máy local
+│   ├── index.js, package.json, package-lock.json, .env.example
+│   ├── src/                   Workflow, HTTP, storage, integrations
+│   ├── dashboard/             UI loopback 127.0.0.1:34719
+│   ├── shared/                Protocol HTTP đi kèm local app
+│   ├── scenarios/             Mẫu và JSON cấu hình local
+│   ├── scripts/               Setup/check/startup/migrate
+│   └── docs/                  Setup, API, scenario, storage
+├── chrome-reels-extension/     Cài/đóng gói Chrome MV3 riêng
+│   ├── manifest.json, background.js, content.js
+│   ├── options.html, options.js
+│   └── package.ps1            ZIP whitelist
+├── control-server/             Copy riêng sang VPS/build Docker
+│   ├── index.js, package.json, .env.example
+│   ├── src/, web/, shared/
+│   ├── scripts/publish-image.ps1
+│   └── deploy/                Compose, Docker, proxy, service
+├── local-agent.js              Launcher tương thích → local app
+├── remote-control.js           Launcher tương thích → server app
+├── scripts/                    Wrapper cũ/công cụ dev
+├── tests/                      Test chung trong repo
+├── docs/, prompts/             Kiến trúc/ngữ cảnh phát triển
+└── scenarios/, tools/, data/    Installation cũ nếu chưa migrate
 ```
 
-## Ranh giới
+Mỗi app chứa toàn bộ source runtime. Không import `shared/` bên ngoài. Hai bản `shared/remote-protocol.js` được test byte-for-byte; khi sửa protocol phải cập nhật cả hai. Đây là hợp đồng truyền tin, không phải import source app bên cạnh.
 
-`local-agent.js` chuyển tiếp tới `local-workflow-agent/index.js`; `remote-control.js` chuyển tiếp tới `control-server/index.js`. Hai điểm vào cũ tiếp tục hoạt động. Server VPS không import runtime local. Agent không đọc source hoặc asset của server VPS; dashboard có CSS riêng. Hai phía dùng `shared/remote-protocol.js`.
+## Luồng chạy
 
-Agent ghép service tại `src/main.js`; các module workflow/storage/integrations giữ API và hành vi cũ. Giao thức extension, action, API dashboard, cổng 34719 và các locator/selector cũ không thay đổi. Không tự chuyển đổi hoặc ghi lại kịch bản.
-
-## Cài trên máy khác
-
-Clone/pull toàn bộ repository, cài Node.js và Chrome trên Windows, rồi chạy:
-
-```powershell
-npm ci --prefix local-workflow-agent --omit=dev
-node local-agent.js
+```mermaid
+flowchart LR
+  SERVER[control-server: web + queue] <-->|HTTP outbound polling| LOCAL[local-workflow-agent: engine]
+  UI[Dashboard / CLI / API] --> LOCAL
+  LOCAL <-->|bước và kết quả loopback| EXT[chrome-reels-extension]
+  LOCAL --> VIDEO[yt-dlp + FFmpeg + FFprobe local]
+  EXT --> CHROME[Chrome profile]
+  LOCAL --> STORE[Local history / catalog / outbox]
 ```
 
-Các dependency runtime chỉ gồm MongoDB driver; Playwright là devDependency của package gốc để chạy test. Package local có lockfile riêng dùng cùng phiên bản runtime với lockfile gốc; khi nâng dependency cần cập nhật cả hai. Cài `.env` riêng nếu cần Atlas/API và cài extension cho profile của máy đó. Không cần server VPS cho workflow chạy local. Chi tiết tại [README agent](../local-workflow-agent/README.md).
+Engine local điều phối duy nhất. VPS không tải video hoặc thao tác DOM. Extension dùng Chrome Debugger/content script; Playwright chỉ dùng trong test. Không public cổng 34719.
 
-## Source và dữ liệu
+## Tương thích
 
-`src/paths.js` xác định gốc repository từ vị trí source, không dùng thư mục terminal. `.env`, `scenarios/`, `tools/` và `data/agent/` giữ vị trí trước refactor. `LOCAL_AGENT_ENV_FILE`, `LOCAL_AGENT_SCENARIOS_DIR`, `LOCAL_AGENT_DATA_DIR` và đường dẫn công cụ từ môi trường vẫn có hiệu lực. Mỗi máy tự tạo machine ID và lịch sử; media gốc vẫn ở đường dẫn được chọn, không được sao chép vào Git hoặc MongoDB.
+Không tự move kho runtime đang có thể được process khác ghi. Local nhận path legacy khi launcher gốc và dữ liệu cũ còn tồn tại; standalone dùng `.env`, `scenarios/`, `tools/`, `data/` trong app. Migration chạy sau khi dừng agent. Không mang credential/machine ID sang máy khác.
 
-MongoDB là tích hợp metadata dùng chung hiện có; tài liệu trong `prompts/processing/DATA_STRUCTURE_BLUEPRINT.md` là blueprint tham khảo, không phải triển khai kho object/S3. Xem [lưu trữ](ACTIVITY_STORAGE.md) và [Atlas](MONGODB_ATLAS.md).
+Control ưu tiên `.env` riêng, fallback `.env.control` cũ; database cũ được dùng nếu còn tồn tại. Env override tiếp tục có ưu tiên.
 
-## Build và kiểm tra
+## Kiểm chứng
 
-- Agent production: `npm ci --prefix local-workflow-agent --omit=dev`.
-- Môi trường phát triển: `npm ci` ở gốc, rồi `npm test`.
-- Extension: `npm run package:extension`; xem [README extension](../chrome-reels-extension/README.md).
-- VPS: Dockerfile chỉ lấy `remote-control.js`, `control-server/`, `shared/`; xem [deploy](../deploy/control/README.md).
+`tests/project-layout.js` chạy từng app từ cây tạm độc lập/cwd khác, kiểm tra UI/scenario, legacy data, protocol parity và extension ZIP whitelist. `npm test` kiểm tra thêm remote, storage, video, API và Chrome fixture. Playwright chỉ ở package dev gốc.
 
-`tests/project-layout.js` dựng cây runtime tạm không có server VPS, chạy cả entry cũ và mới từ thư mục terminal khác, kiểm tra `.env`/data/scenarios mặc định, asset dashboard và ZIP trên Windows. Các test còn lại kiểm tra workflow, API, trình duyệt và tích hợp như trước.
+Hướng dẫn: [local](../local-workflow-agent/README.md), [extension](../chrome-reels-extension/README.md), [server](../control-server/README.md), [module map](SOURCE_MAP.md).

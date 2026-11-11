@@ -3,7 +3,7 @@ const { parseArgs } = require('node:util');
 const { randomUUID } = require('node:crypto');
 const { setTimeout: delay } = require('node:timers/promises');
 
-const help = `Usage: node local-agent.js <command> [options]
+const help = `Usage: node index.js <command> [options] (or node local-agent.js from the repository root)
   profiles                         List Chrome directories and connection status
   scenarios                        List saved scenario names
   describe --scenario NAME         Show scenario variables and step count
@@ -14,7 +14,7 @@ const help = `Usage: node local-agent.js <command> [options]
   stop --run-id UUID                Stop only that run
 Options: --base-url http://127.0.0.1:34719 (loopback only), --help
 Set LOCAL_AGENT_API_TOKEN in both the server and client environments.
-Run node local-agent.js without arguments to start the agent.
+Run node index.js without arguments to start the agent (legacy root launcher: node local-agent.js).
 Output: JSON. Exit: 0 success/accepted, 1 error/failure, 2 cancelled, 124 wait timeout.
 Timeout does not stop the run unless --stop-on-timeout is supplied.`;
 

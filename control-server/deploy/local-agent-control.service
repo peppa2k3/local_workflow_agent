@@ -10,7 +10,7 @@ Group=local-agent-control
 WorkingDirectory=/opt/local-agent-control
 Environment=CONTROL_ENV_FILE=/etc/local-agent-control.env
 Environment=CONTROL_DATABASE=/var/lib/local-agent-control/control.sqlite
-ExecStart=/usr/bin/node /opt/local-agent-control/remote-control.js
+ExecStart=/usr/bin/node /opt/local-agent-control/index.js
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=25

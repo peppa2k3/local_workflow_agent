@@ -7,7 +7,9 @@
     "start": "node index.js",
     "start:daemon": "node index.js --daemon",
     "check:mongo": "node scripts/check-mongodb.js",
-    "setup:video": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-video.ps1"
+    "setup:video": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-video.ps1",
+    "install:startup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-remote-startup.ps1",
+    "migrate:legacy": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/migrate-legacy.ps1"
   },
   "dependencies": {
     "mongodb": "^7.7.0"

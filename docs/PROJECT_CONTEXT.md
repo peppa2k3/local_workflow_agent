@@ -1,5 +1,9 @@
 # Project context
 
+## Ba app độc lập (2026-11-11)
+
+Runtime, docs, scripts, mẫu scenario và protocol local đều trong local-workflow-agent; server có protocol và deploy/scripts riêng; extension có package.ps1 độc lập. Không còn shared/ bên ngoài runtime. Protocol hai app phải đồng nhất, test layout kiểm tra. Root launcher/wrapper và path dữ liệu cũ được giữ tương thích; standalone dùng env/scenarios/tools/data trong app. Cổng agent đang chạy nên không move runtime trong lần refactor; migrate:legacy là bước chuyển có kiểm tra port/collision. Bridge Socket.IO cũ đã vắng trong workspace trước refactor; remote hiện tại là HTTP polling. Hướng dẫn ARCHITECTURE/SOURCE_MAP thay thế mô tả layout cũ bên dưới.
+
 ## Tùy chọn video (2026-11-10)
 
 Download mặc định language=vi, quality=1080; dashboard có dropdown audio và độ phân giải. Giá trị best tường minh chọn chất lượng nguồn cao nhất. Sort res trước FPS, res:N ưu tiên cạnh ngắn <= N và fallback bản cao hơn nhỏ nhất nếu cần. Audio ưu tiên mã ngôn ngữ rồi fallback nguồn; không dịch. Cache URL lưu downloadOptions và chỉ reuse khi cả quality/language khớp; cache cũ không có options tải lại. Quyết định này thay thế chính sách FPS trước/không áp dụng quality số ngày 2026-10-20.

@@ -1,10 +1,17 @@
 const path = require('node:path');
+const fs = require('node:fs');
 const { createStore } = require('./src/store');
 const { createControlServer, addUser } = require('./src/server');
 const { createCommandApi } = require('./src/commands');
-try { process.loadEnvFile(process.env.CONTROL_ENV_FILE || path.join(__dirname, '../.env.control')); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+const legacyRoot = path.resolve(__dirname, '..');
+const legacyCheckout = fs.existsSync(path.join(legacyRoot, 'remote-control.js'));
+const appEnv = path.join(__dirname, '.env');
+const envFile = fs.existsSync(appEnv) || !legacyCheckout ? appEnv : path.join(legacyRoot, '.env.control');
+const legacyData = path.join(legacyRoot, 'data/control/control.sqlite');
+const defaultDatabase = legacyCheckout && fs.existsSync(legacyData) ? legacyData : path.join(__dirname, 'data/control.sqlite');
+try { process.loadEnvFile(process.env.CONTROL_ENV_FILE || envFile); } catch (e) { if (e.code !== 'ENOENT') throw e; }
 async function main() {
-  const store = createStore(process.env.CONTROL_DATABASE || path.join(__dirname, '../data/control/control.sqlite'));
+  const store = createStore(process.env.CONTROL_DATABASE || defaultDatabase);
   if (process.argv[2] === 'user') {
     try {
       const email = process.argv[3];

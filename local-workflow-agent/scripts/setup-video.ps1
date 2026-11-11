@@ -1,6 +1,10 @@
 ﻿$ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-$destination = Join-Path ([IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))) 'tools'
+$appDir = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$destination = Join-Path $appDir 'tools'
+# Keep an existing installation's tools in use; fresh standalone apps use tools/ here.
+$legacyTools = Join-Path $appDir '../tools'
+if ((Test-Path -LiteralPath (Join-Path $appDir '../local-agent.js')) -and (Test-Path -LiteralPath $legacyTools)) { $destination = [IO.Path]::GetFullPath($legacyTools) }
 New-Item -ItemType Directory -Force -Path $destination | Out-Null
 Invoke-WebRequest -UseBasicParsing 'https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe' -OutFile (Join-Path $destination 'yt-dlp.exe')
 $archive = Join-Path $destination 'ffmpeg.zip'

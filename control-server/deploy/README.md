@@ -8,10 +8,10 @@ checkout mã nguồn, cài Node hay cài nginx. Traefik hiện có chịu trách
 
 | File | Dùng ở đâu | Vai trò |
 | --- | --- | --- |
-| `deploy/control/Dockerfile` | Máy build | Image Node 24, chỉ đóng gói ứng dụng control |
-| `scripts/publish-control-image.ps1` | Máy Windows | Build local hoặc build/push Docker Hub |
-| `deploy/control/docker-compose.yml` | VPS | Pull image, volume SQLite, network và labels Traefik |
-| `deploy/control/.env.example` → `.env` | Cùng thư mục Compose trên VPS | Image, domain và cấu hình Traefik |
+| `deploy/Dockerfile` | Máy build | Image Node 24, chỉ đóng gói ứng dụng control |
+| `scripts/publish-image.ps1` | Máy Windows | Build local hoặc build/push Docker Hub |
+| `deploy/docker-compose.yml` | VPS | Pull image, volume SQLite, network và labels Traefik |
+| `deploy/.env.example` → `.env` | Cùng thư mục Compose trên VPS | Image, domain và cấu hình Traefik |
 | `.env` tại gốc project local | Máy chạy Chrome | MongoDB và cấu hình local hiện có |
 | `.env.control.example` → `.env.control` | Chỉ khi chạy control trực tiếp bằng Node | Không dùng cho bộ Compose Traefik này |
 
@@ -24,16 +24,16 @@ Các giá trị `your-dockerhub-user`, `control.example.com`, `traefik-public`,
 
 ## 2. Build và push từ máy Windows
 
-Tại gốc repository, dùng Docker Desktop ở chế độ Linux containers. Tạo repository
+Tại thư mục control-server, dùng Docker Desktop ở chế độ Linux containers. Tạo repository
 `local-agent-control` trên Docker Hub trong namespace của bạn, rồi đăng nhập:
 
 ```powershell
 docker login
 # Thay mydockeruser bằng Docker Hub username hoặc organization thực tế.
 # Build trước trên máy local; chưa push:
-powershell -NoProfile -File scripts/publish-control-image.ps1 -Repository mydockeruser/local-agent-control -Tag 1.0.0
+powershell -NoProfile -File scripts/publish-image.ps1 -Repository mydockeruser/local-agent-control -Tag 1.0.0
 # Build và push image lên Docker Hub:
-powershell -NoProfile -File scripts/publish-control-image.ps1 -Repository mydockeruser/local-agent-control -Tag 1.0.0 -Push
+powershell -NoProfile -File scripts/publish-image.ps1 -Repository mydockeruser/local-agent-control -Tag 1.0.0 -Push
 ```
 
 Script dừng nếu build/push lỗi. Mặc định build `linux/amd64`. VPS ARM64 dùng
@@ -43,16 +43,16 @@ Script dừng nếu build/push lỗi. Mặc định build `linux/amd64`. VPS ARM
 # Tạo builder này một lần; nếu đã có, dùng docker buildx use control-builder.
 docker buildx create --name control-builder --driver docker-container --use
 docker buildx inspect --bootstrap
-powershell -NoProfile -File scripts/publish-control-image.ps1 -Repository mydockeruser/local-agent-control -Tag 1.0.0 -Platforms "linux/amd64,linux/arm64" -Push
+powershell -NoProfile -File scripts/publish-image.ps1 -Repository mydockeruser/local-agent-control -Tag 1.0.0 -Platforms "linux/amd64,linux/arm64" -Push
 docker buildx imagetools inspect mydockeruser/local-agent-control:1.0.0
 ```
 
-Nếu build trên Linux, chạy ở gốc repository:
+Nếu build trên Linux, chạy ở thư mục control-server:
 
 ```bash
 docker login
 docker buildx build --platform linux/amd64 \
-  -f deploy/control/Dockerfile \
+  -f deploy/Dockerfile \
   --build-arg VERSION=1.0.0 \
   --build-arg REVISION="$(git rev-parse HEAD)" \
   -t mydockeruser/local-agent-control:1.0.0 --push .
@@ -99,7 +99,7 @@ Từ máy có source (thay `user@VPS` bằng SSH đích của bạn):
 
 ```powershell
 ssh user@VPS 'mkdir -p ~/local-agent-control'
-scp deploy/control/docker-compose.yml deploy/control/.env.example user@VPS:~/local-agent-control/
+scp deploy/docker-compose.yml deploy/.env.example user@VPS:~/local-agent-control/
 ```
 
 Trên VPS:

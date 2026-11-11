@@ -9,7 +9,7 @@ const { createRemoteClient } = require('../local-workflow-agent/src/integrations
 const { createRemoteExecutor } = require('../local-workflow-agent/src/integrations/remote/remote-executor');
 const { createWorkflows } = require('../local-workflow-agent/src/workflow/workflows');
 const { createScenarioStore } = require('../local-workflow-agent/src/workflow/scenario-store');
-const c = require('../shared/remote-protocol');
+const c = require('../control-server/shared/remote-protocol');
 (async () => {
   const f = await fixture(createCommandApi), dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remote-execution-'));
   const runs = new Map(); let started = 0, stopped = 0;

@@ -1,12 +1,12 @@
 services:
   control:
     build:
-      context: ../..
-      dockerfile: deploy/control/Dockerfile
+      context: ..
+      dockerfile: deploy/Dockerfile
     restart: unless-stopped
     # Linux VPS: loopback stays private and host nginx remains a trusted loopback peer.
     network_mode: host
-    env_file: ../../.env.control
+    env_file: ../.env
     environment:
       CONTROL_DATABASE: /data/control.sqlite
       CONTROL_BIND: 127.0.0.1
