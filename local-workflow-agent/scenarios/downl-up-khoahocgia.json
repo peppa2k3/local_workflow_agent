@@ -1,0 +1,113 @@
+{
+  "name": "Tải clip → upload Reels và điền tên phim (bản sao)",
+  "variables": {
+    "video_url": "https://www.youtube.com/watch?v=rNuIdmS3iUU",
+    "thu_muc_tai": "D:\\Videos",
+    "reels_url": "https://www.facebook.com/profile.php?id=61594335706080&sk=reels_tab",
+    "ten_phim": "{{download_title}}",
+    "ten_file": "{{download_file_name}}"
+  },
+  "steps": [
+    {
+      "action": "downloadVideo",
+      "label": "Tải clip và xác nhận file hoàn tất",
+      "url": "{{video_url}}",
+      "directory": "{{thu_muc_tai}}",
+      "quality": 1080,
+      "downloadTimeoutMs": 1800000
+    },
+    {
+      "action": "openUrl",
+      "label": "Mở trang Reels",
+      "url": "{{reels_url}}",
+      "completion": {
+        "locatorType": "text",
+        "locator": "Tạo thước phim",
+        "state": "visible"
+      },
+      "navigationTimeoutMs": 60000
+    },
+    {
+      "action": "click",
+      "locatorType": "role",
+      "role": "button",
+      "locator": "Tạo thước phim",
+      "timeoutMs": 5000,
+      "label": "Click Tạo thước fim"
+    },
+    {
+      "action": "wait",
+      "ms": 5000,
+      "label": "Chờ 5s"
+    },
+    {
+      "action": "upload",
+      "label": "Upload chính clip vừa tải",
+      "locatorType": "role",
+      "locator": "Tải video lên cho Thước phim",
+      "filePath": "{{download_file_path}}",
+      "timeoutMs": 30000,
+      "navigationTimeoutMs": 300000,
+      "completion": {
+        "locatorType": "role",
+        "role": "button",
+        "locator": "Tiếp",
+        "state": "enabled"
+      },
+      "role": "button"
+    },
+    {
+      "action": "wait",
+      "ms": 5000,
+      "label": "Wait 5s for upload"
+    },
+    {
+      "action": "click",
+      "locatorType": "text",
+      "role": "button",
+      "locator": "Tiếp",
+      "timeoutMs": 5000,
+      "label": "Click Tiếp 2",
+      "completion": {
+        "state": "visible",
+        "locatorType": "text"
+      }
+    },
+    {
+      "action": "click",
+      "locatorType": "role",
+      "role": "button",
+      "locator": "Tiếp",
+      "timeoutMs": 5000,
+      "label": "Click Tiếp 1"
+    },
+    {
+      "action": "wait",
+      "ms": 5000,
+      "label": "wait 5s"
+    },
+    {
+      "action": "type",
+      "locatorType": "role",
+      "locator": "Mô tả thước phim của bạn...",
+      "text": "{{ten_phim}}",
+      "clear": true,
+      "role": "presentation",
+      "index": 1,
+      "label": "nhap ten phim"
+    },
+    {
+      "action": "click",
+      "locatorType": "role",
+      "role": "button",
+      "locator": "Đăng",
+      "timeoutMs": 30000,
+      "completion": {
+        "locatorType": "label",
+        "locator": "Mô tả thước phim của bạn...",
+        "state": "visible"
+      },
+      "label": "Đăng"
+    }
+  ]
+}

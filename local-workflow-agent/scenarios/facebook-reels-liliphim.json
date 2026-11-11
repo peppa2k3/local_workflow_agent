@@ -1,0 +1,43 @@
+{
+  "name": "facebook-reels-liliphim",
+  "steps": [
+    {
+      "action": "openUrl",
+      "url": "https://www.facebook.com/profile.php?id=61583720522404&sk=reels_tab"
+    },
+    {
+      "action": "upload",
+      "locatorType": "role",
+      "locator": "Tạo thước phim",
+      "filePath": "",
+      "role": "button"
+    },
+    {
+      "action": "click",
+      "locatorType": "role",
+      "role": "presentation",
+      "locator": "Mô tả thước phim của bạn...",
+      "timeoutMs": 5000,
+      "index": 1
+    },
+    {
+      "action": "type",
+      "locatorType": "role",
+      "locator": "Mô tả thước phim của bạn...",
+      "text": "{{tenphim}}",
+      "clear": true,
+      "role": "presentation",
+      "index": 1
+    },
+    {
+      "action": "click",
+      "locatorType": "role",
+      "role": "button",
+      "locator": "Tiếp",
+      "timeoutMs": 5000
+    }
+  ],
+  "variables": {
+    "tenphim": "Pria Miskin Beli Kapal Rongsok, Dihina Gila, Ternyata Telinga Dewa Dengar Ikan Dan Ubah Nasib"
+  }
+}

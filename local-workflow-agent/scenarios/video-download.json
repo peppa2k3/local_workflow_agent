@@ -1,0 +1,16 @@
+{
+  "name": "Tải video từ URL (yt-dlp + FFmpeg)",
+  "variables": {
+    "video_url": "https://www.youtube.com/watch?v=2B2tvtM7Dyw",
+    "thu_muc_tai": "D:\\Videos-dowload"
+  },
+  "steps": [
+    {
+      "action": "downloadVideo",
+      "url": "{{video_url}}",
+      "directory": "{{thu_muc_tai}}",
+      "quality": 1080,
+      "downloadTimeoutMs": 1800000
+    }
+  ]
+}
