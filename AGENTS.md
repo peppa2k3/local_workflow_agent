@@ -9,3 +9,5 @@ Commmit change to git
 For new or changed actions, update the agent, extension, dashboard, [SCENARIOS.md](local-workflow-agent/docs/SCENARIOS.md), and a meaningful test when behavior can be verified locally. Run `npm test` and `node --check` on changed JavaScript.
 
 Do not add Chrome profile data, `node_modules`, `.pem` keys, or `.crx` packages to Git. Do not use the user's logged-in Chrome profile for automated tests.
+
+CodeGraph is available through project MCP (`codegraph_explore`) and CLI; commands/evaluation are in [docs/README.md](docs/README.md#codegraph). Use it for JavaScript symbol/call context, and verify callback/injected relationships against source. HTML inline scripts and PowerShell are outside this project's graph; use text search for those. Keep `.codegraph/` local and telemetry disabled.

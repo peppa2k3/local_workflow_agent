@@ -1,0 +1,15 @@
+{
+  "exclude": [
+    "ref/",
+    "pass.ps1",
+    ".env",
+    "**/.env",
+    "**/.env.*",
+    "**/data/",
+    "**/data-backup/",
+    "**/tools/",
+    "test-results/",
+    "dist/",
+    ".facebook-chrome-profile/"
+  ]
+}

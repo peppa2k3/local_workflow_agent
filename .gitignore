@@ -11,6 +11,7 @@ data/
 local-agent/data-backup/
 **/data-backup/
 dist/
+.codegraph/
 .env
 .env.*
 !.env.example
