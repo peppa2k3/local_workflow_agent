@@ -30,6 +30,8 @@ Lịch sử từng bước được lưu qua restart tại `data/agent/`. URL đ
 
 **Bắt đầu:** [Hướng dẫn cài đặt và chạy từng bước](docs/SETUP.md).
 
+**Chuẩn bị refactor/tích hợp:** [Bản đồ source, công dụng module, structure tree và ranh giới tích hợp](docs/SOURCE_MAP.md).
+
 ## Cấu trúc
 
 | Đường dẫn | Vai trò |

@@ -1,8 +1,10 @@
 # Cấu trúc source và triển khai
 
+Bản đồ chi tiết từng module, luồng chạy và cấu trúc đích đề xuất để tích hợp dự án lớn: [SOURCE_MAP.md](SOURCE_MAP.md). Workspace hiện dùng tên `local-agent-corebase/` cho bridge Socket.IO; một số đường dẫn Git/tài liệu cũ còn là `local-agent/`.
+
 ```text
 chrome-reels-extension/       Extension, gói ZIP riêng
-local-agent/                  Terminal agent Socket.IO và bridge API tới workflow
+local-agent-corebase/         Terminal agent Socket.IO và bridge API tới workflow (tên cũ: local-agent/)
 local-workflow-agent/
   index.js                   Bootstrap local
   src/
