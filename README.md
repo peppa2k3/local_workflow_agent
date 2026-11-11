@@ -35,4 +35,4 @@ Bridge Socket.IO `local-agent/`/`local-agent-corebase/` đã không còn trong w
 
 Tại gốc repo: `npm ci`, `npm test`, `npm run test:extension`. Playwright chỉ dùng để test trên Chrome riêng. `npm run package:extension` đóng ZIP về `dist/`; extension cũng có script đóng gói riêng. Hai bản protocol trong hai app phải đồng nhất; test layout kiểm tra điều này.
 
-Tài liệu: [setup từng bước](local-workflow-agent/docs/SETUP.md), [module/tree](docs/SOURCE_MAP.md), [kiến trúc](docs/ARCHITECTURE.md), [API](local-workflow-agent/docs/AUTOMATION_API.md), [hướng dẫn tổng thể](guides.md).
+Tài liệu: [lệnh vận hành và cấu trúc source](docs/README.md), [setup chi tiết](local-workflow-agent/docs/SETUP.md), [API](local-workflow-agent/docs/AUTOMATION_API.md).

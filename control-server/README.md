@@ -9,7 +9,7 @@ if (!(Test-Path .env)) { Copy-Item .env.example .env }
 node index.js
 ```
 
-Tạo user bằng `node index.js user email@example.com`, mật khẩu truyền qua stdin. Không đặt mật khẩu trên command line. Chi tiết tại [hướng dẫn remote](../docs/REMOTE_CONTROL.md).
+Tạo user bằng `node index.js user email@example.com`, mật khẩu truyền qua stdin. Không đặt mật khẩu trên command line. Chi tiết tại [hướng dẫn remote](../docs/README.md).
 
 ```text
 control-server/

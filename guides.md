@@ -27,7 +27,7 @@ Copy `control-server/` sang server Node.js 24. Tạo `.env` từ `.env.example`,
 
 Mở `/remote` trên dashboard local, nhập URL server, tạo mã ghép. Đăng nhập web control server để nhận máy, quay lại local xác nhận tài khoản và cấp allowlist profile/scenario/biến. Khi máy kết nối, chạy/dừng scenario từ server. Agent chủ động lấy lệnh outbound, engine local thực thi và báo kết quả.
 
-Thử loopback trước và cấu hình HTTPS khi lên VPS: [REMOTE_CONTROL_LOCAL](docs/REMOTE_CONTROL_LOCAL.md), [REMOTE_CONTROL](docs/REMOTE_CONTROL.md). Các lệnh launcher ở gốc trong tài liệu cũ còn được hỗ trợ; source/deploy chuẩn nằm trong ba app.
+Lệnh thử remote local và triển khai VPS: [tài liệu tổng hợp](docs/README.md). Các launcher gốc vẫn tương thích; source/deploy nằm trong ba app.
 
 ## 5. Chuyển installation cũ
 

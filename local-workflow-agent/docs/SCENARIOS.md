@@ -20,7 +20,7 @@ Remote control: use `node index.js --daemon` for an always-on local agent,
 and `/remote` to grant saved scenario/profile/variable permissions and approve a
 VPS account. The VPS web UI runs/stops only those granted saved scenarios through
 the existing workflow engine, with durable command IDs and per-step history. See
-[remote setup and deployment](../../docs/REMOTE_CONTROL.md). Remote run defaults to a
+[remote setup and deployment](../../docs/README.md). Remote run defaults to a
 one-hour timeout; queue start deadlines are five minutes. Browser actions still
 need the corresponding Chrome profile and extension online.
 

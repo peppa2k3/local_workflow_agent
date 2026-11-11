@@ -6,6 +6,6 @@ Preserve these user-facing entry points: `node local-agent.js`, `http://127.0.0.
 
 Commmit change to git
 
-For new or changed actions, update the agent, extension, dashboard, [docs/SCENARIOS.md](docs/SCENARIOS.md), and a meaningful test when behavior can be verified locally. Run `npm test` and `node --check` on changed JavaScript.
+For new or changed actions, update the agent, extension, dashboard, [SCENARIOS.md](local-workflow-agent/docs/SCENARIOS.md), and a meaningful test when behavior can be verified locally. Run `npm test` and `node --check` on changed JavaScript.
 
 Do not add Chrome profile data, `node_modules`, `.pem` keys, or `.crx` packages to Git. Do not use the user's logged-in Chrome profile for automated tests.
