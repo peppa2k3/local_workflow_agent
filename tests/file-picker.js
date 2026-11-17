@@ -21,8 +21,16 @@ function fakeLaunch(output, code = 0) {
   };
 }
 
-(async () => {
+async function main() {
+  if (process.platform !== 'win32') {
+    await assert.rejects(chooseFile(), /File picker requires Windows/);
+    console.log('File picker platform guard on non-Windows: OK');
+    return;
+  }
+
   assert.equal(await chooseFile('C:\\Uploads', fakeLaunch('C:\\Uploads\\ảnh.jpg\n')), 'C:\\Uploads\\ảnh.jpg');
   assert.equal(await chooseFile('C:\\Uploads', fakeLaunch('')), null);
   console.log('Windows file picker selection and cancellation: OK');
-})().catch(error => { console.error(error); process.exitCode = 1; });
+}
+
+main().catch(error => { console.error(error); process.exitCode = 1; });
