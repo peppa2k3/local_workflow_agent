@@ -20,3 +20,15 @@ jobs:
           cache-dependency-path: package-lock.json
       - run: npm ci
       - run: npm test
+      - name: Validate VPS source deployment Compose
+        env:
+          APP_SOURCE_ROOT: ${{ github.workspace }}/control-server
+          RELEASE_TAG: ${{ github.sha }}
+        run: >-
+          docker compose --project-directory "$GITHUB_WORKSPACE"
+          --env-file control-server/deploy/source.env.example
+          -f control-server/deploy/docker-compose.source.yml config --quiet
+      - name: Build control-server image
+        run: docker build --pull --file control-server/deploy/Dockerfile --tag "local-agent-control-ci:$GITHUB_SHA" control-server
+      - name: Check VPS deploy script syntax
+        run: bash -n control-server/deploy/deploy-container.sh

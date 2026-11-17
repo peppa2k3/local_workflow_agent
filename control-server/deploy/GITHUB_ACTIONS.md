@@ -1,95 +1,120 @@
-# Deploy source bằng GitHub Actions
+# Build/deploy control server bằng GitHub Actions
 
-Workflow deploy source code trong `control-server/` lên VPS Linux qua SSH, rồi khởi động lại service systemd. Pull request chạy `npm test`; push vào `main` chạy kiểm tra trước khi deploy. Có thể chạy lại bằng **Actions → Deploy control server → Run workflow** trên nhánh `main`.
+Workflow chỉ chuyển thư mục `control-server/` lên VPS. VPS build Docker image từ source release rồi chạy bằng Docker Compose. Source releases và file `.env` nằm dưới `/opt/agent-local`; engine local và Chrome extension không được đưa lên VPS.
 
-Luồng này không build image và không cần registry. Cấu hình ứng dụng, database SQLite và TLS vẫn được quản lý trên VPS; GitHub chỉ giữ thông tin kết nối deploy.
+Pull request chạy `npm test`. Push vào `main` chạy kiểm tra rồi deploy; có thể chạy lại ở **Actions → Deploy control server → Run workflow** trên nhánh `main`. VPS cần Docker Engine, Docker Compose v2 và Docker network Traefik đã có.
 
-## 1. Tạo GitHub Environment và điền thông tin
+## 1. GitHub Environment
 
-Vào **Settings → Environments → New environment**, tạo tên `production`. Trong environment này, đặt các mục sau ở **Environment secrets** và **Environment variables**.
+Vào **Settings → Environments → New environment**, tạo environment tên `production`. Thêm các mục sau vào environment:
 
 | Loại | Tên | Giá trị |
 | --- | --- | --- |
-| Secret | `VPS_SSH_PRIVATE_KEY` | Private key SSH của user deploy, gồm cả các dòng `BEGIN/END` |
-| Secret | `VPS_SSH_KNOWN_HOSTS` | Dòng host key đã xác minh của VPS; xem phần 2 |
+| Secret | `VPS_SSH_PRIVATE_KEY` | Private key SSH của user deploy, gồm cả dòng `BEGIN/END` |
+| Secret | `VPS_SSH_KNOWN_HOSTS` | Host key VPS đã xác minh |
 | Variable | `VPS_HOST` | Hostname hoặc IPv4 của VPS |
-| Variable | `VPS_PORT` | SSH port, thường là `22`; có thể bỏ qua nếu dùng `22` |
-| Variable | `VPS_USER` | User SSH deploy, ví dụ `deploy` |
-| Variable | `CONTROL_PUBLIC_URL` | Origin HTTPS, ví dụ `https://agent.dangngochai.io.vn`, không thêm path hoặc dấu `/` cuối |
-| Variable | `CONTROL_PORT` | Cổng control server trên VPS; thường là `34800`, phải khớp file env của server |
+| Variable | `VPS_PORT` | SSH port, thường là `22` |
+| Variable | `VPS_USER` | SSH user có quyền chạy Docker Compose |
 
-Không tạo GitHub secret cho `.env` của ứng dụng. Workflow không truyền file này lên VPS.
+Không đưa app `.env`, domain, Traefik IP hoặc cấu hình runtime vào GitHub. Các giá trị này nằm trong `/opt/agent-local/.env` trên VPS.
 
-Tạo một SSH key riêng, không có passphrase, cho deploy. Thêm **public key** vào `~deploy/.ssh/authorized_keys` trên VPS; lưu **private key** vào secret `VPS_SSH_PRIVATE_KEY`. Lấy host key bằng `ssh-keyscan -p 22 your-vps-host`, đối chiếu fingerprint với VPS qua một kênh tin cậy, rồi lưu dòng đã xác minh vào `VPS_SSH_KNOWN_HOSTS`. Nếu SSH dùng port khác, đổi `22` tương ứng.
+Tạo SSH key riêng, không có passphrase. Thêm public key vào `~deploy/.ssh/authorized_keys`; lưu private key vào `VPS_SSH_PRIVATE_KEY`. Lấy host key bằng `ssh-keyscan -p 22 your-vps-host`, xác minh fingerprint từ VPS qua kênh tin cậy rồi mới lưu kết quả vào `VPS_SSH_KNOWN_HOSTS`. Đổi port trong lệnh nếu SSH không dùng `22`.
 
 ## 2. Chuẩn bị VPS một lần
 
-Các lệnh dưới đây dùng Ubuntu/Debian, user SSH `deploy`, Node.js 24 tại `/usr/bin/node`, `curl` và reverse proxy HTTPS đã có. Server không cần Chrome, MongoDB, Docker hay cài npm dependencies. Reverse proxy cần chuyển HTTPS tới `127.0.0.1:34800`; mẫu Nginx có trong [`nginx.conf.example`](nginx.conf.example). Nếu Node nằm ở đường dẫn khác, sửa `ExecStart` trong unit systemd cho khớp.
-
-Tạo user chạy app và các thư mục. User SSH cần ghi được vào `/opt/agent-local` để tạo release và đổi symlink; database do user service sở hữu:
+User SSH phải chạy được `docker compose` và ghi được vào `/opt/agent-local`. Thêm user vào group `docker` nếu cần, sau đó đăng nhập lại:
 
 ```bash
-sudo useradd --system --user-group --home /nonexistent --shell /usr/sbin/nologin local-agent-control
+sudo usermod -aG docker deploy
+```
+
+Tạo thư mục source và đưa mẫu env lên VPS. Chạy `scp` từ checkout repo:
+
+```bash
 sudo install -d -o deploy -g deploy -m 0755 /opt/agent-local
 sudo install -d -o deploy -g deploy -m 0755 /opt/agent-local/releases
-sudo install -d -o local-agent-control -g local-agent-control -m 0750 /var/lib/local-agent-control
+scp -P 22 control-server/deploy/source.env.example deploy@your-vps-host:/opt/agent-local/.env
+ssh -p 22 deploy@your-vps-host 'chmod 0600 /opt/agent-local/.env'
 ```
 
-Tạo `/etc/local-agent-control.env` bằng editor trên VPS, điền đúng domain và thiết lập proxy theo hạ tầng của bạn:
+Sửa `/opt/agent-local/.env` trên VPS. Điền network và IP thật của Traefik; `CONTROL_DOMAIN` phải trùng domain HTTPS đang trỏ tới VPS:
 
 ```dotenv
-CONTROL_PUBLIC_URL=https://control.example.com
-CONTROL_BIND=127.0.0.1
-CONTROL_PORT=34800
-CONTROL_DATABASE=/var/lib/local-agent-control/control.sqlite
-CONTROL_TRUST_PROXY=1
-CONTROL_TRUSTED_PROXY_IPS=
-CONTROL_ALLOW_HTTP_LOOPBACK=0
+COMPOSE_PROJECT_NAME=local-agent-control
+CONTROL_DOMAIN=agent.dangngochai.io.vn
+TRAEFIK_NETWORK=traefik-public
+TRAEFIK_HTTPS_ENTRYPOINT=websecure
+TRAEFIK_CERT_RESOLVER=letsencrypt
+CONTROL_ROUTER=local-agent-control
+CONTROL_TRUSTED_PROXY_IPS=172.20.0.2
+CONTROL_VOLUME_NAME=local-agent-control-data
 ```
 
-`CONTROL_TRUST_PROXY=1` chỉ phù hợp khi proxy cùng máy và kết nối qua loopback. Với proxy ở container/host khác, để giá trị này bằng `0` và đặt đúng IP proxy trong `CONTROL_TRUSTED_PROXY_IPS`. Bảo vệ file env để chỉ root và user service đọc được:
+Network phải là Docker network external mà Traefik đang dùng. Lấy IP của container Traefik trên network đó bằng `docker inspect`; điền đúng IP, không điền CIDR hoặc `*`. Nếu certificate đã được cấu hình sẵn thay vì ACME resolver, để `TRAEFIK_CERT_RESOLVER=` rỗng. Giữ nguyên `CONTROL_VOLUME_NAME` giữa các lần deploy để giữ database SQLite.
+
+Nếu VPS đang chạy bản cũ bằng systemd (`local-agent-control-source.service`), dừng service trước khi chuyển để không chạy hai server cùng lúc:
 
 ```bash
-sudo chown root:local-agent-control /etc/local-agent-control.env
-sudo chmod 0640 /etc/local-agent-control.env
+sudo systemctl disable --now local-agent-control-source.service
 ```
 
-Cài unit systemd riêng cho source deploy. Nếu VPS đang chạy một control server khác trên cùng cổng hoặc database, hãy dừng deployment cũ trước khi chuyển sang workflow này. Chạy `scp` từ máy có checkout repo; thay user/host/port theo máy của bạn:
+Nếu cần giữ database từ bản systemd, copy dữ liệu vào Docker volume trước lần deploy đầu tiên, sau khi đã dừng service. Bỏ qua bước này nếu đã có Docker volume chứa dữ liệu hoặc chưa có database cũ:
 
 ```bash
-scp -P 22 control-server/deploy/local-agent-control-source.service deploy@your-vps-host:/tmp/local-agent-control-source.service
-ssh -p 22 deploy@your-vps-host 'sudo install -o root -g root -m 0644 /tmp/local-agent-control-source.service /etc/systemd/system/local-agent-control-source.service && rm -f /tmp/local-agent-control-source.service && sudo systemctl daemon-reload && sudo systemctl enable local-agent-control-source.service'
+docker volume create local-agent-control-data
+sudo docker run --rm --user 0 --entrypoint sh \
+  -v local-agent-control-data:/data \
+  -v /var/lib/local-agent-control:/source:ro \
+  node:24-bookworm-slim -c 'for f in /source/control.sqlite*; do [ -e "$f" ] && cp -a "$f" /data/; done; chown -R node:node /data'
 ```
 
-Cho phép user deploy chỉ gọi các lệnh systemd mà workflow cần. Thay `deploy` nếu dùng tên khác:
+## 3. Deploy và cấu hình app
+
+Push lên `main`. Workflow chuyển source của commit vào `/opt/agent-local/releases/<commit-sha>`. Script build image ngay trên VPS bằng Docker Compose, chờ health check container đạt rồi cập nhật symlink `/opt/agent-local/current`. Nếu container mới không khỏe, script thử khôi phục container từ release trước hoặc image đang chạy trước đó.
+
+File `.env` ở `/opt/agent-local/.env` không bị ghi đè khi source được cập nhật. Compose tạo `CONTROL_PUBLIC_URL=https://<CONTROL_DOMAIN>`, cổng container `34800` và kết nối database qua volume. Traefik nhận traffic HTTPS; engine local kết nối tới domain này qua outbound polling. Không public cổng dashboard local `34719`.
+
+Thay đổi `.env` không tự kích hoạt workflow. Sau khi sửa env, tạo lại container bằng release hiện tại:
 
 ```bash
-echo 'deploy ALL=(root) NOPASSWD: /usr/bin/systemctl restart local-agent-control-source.service, /usr/bin/systemctl is-active --quiet local-agent-control-source.service, /usr/bin/systemctl stop local-agent-control-source.service' | sudo tee /etc/sudoers.d/local-agent-control-deploy
-sudo chmod 0440 /etc/sudoers.d/local-agent-control-deploy
-sudo visudo -cf /etc/sudoers.d/local-agent-control-deploy
+source_dir="$(readlink -f /opt/agent-local/current)"
+release_tag="$(basename "$source_dir")"
+APP_SOURCE_ROOT="$source_dir" RELEASE_TAG="$release_tag" \
+  docker compose --project-directory /opt/agent-local \
+  --env-file /opt/agent-local/.env \
+  -f "$source_dir/deploy/docker-compose.source.yml" \
+  up -d --no-deps --force-recreate --no-build --wait --wait-timeout 180 control
 ```
 
-## 3. Chạy deploy
-
-Giá trị `CONTROL_PUBLIC_URL` và `CONTROL_PORT` trong GitHub Variables phải khớp chính xác với `/etc/local-agent-control.env`. Commit/push lên `main`. Workflow chạy kiểm tra trước, sau đó chỉ chuyển thư mục `control-server/` của commit đó vào `/opt/agent-local/releases/<commit-sha>`, đổi symlink `current`, restart systemd và gọi `/health` nội bộ. Nếu service không khỏe, script tự chuyển symlink về release trước và restart lại.
-
-Dashboard và máy local tiếp tục dùng `CONTROL_PUBLIC_URL`. Local engine kết nối outbound; không mở cổng `34719` ra Internet. SQLite lưu tại `/var/lib/local-agent-control/` nên các release mới không ghi đè database.
-
-Sau lần deploy đầu tiên, tạo tài khoản web trên VPS. Nhập mật khẩu tương tác để không đưa mật khẩu vào command history:
+Sau deploy đầu tiên, tạo tài khoản web qua container. Mật khẩu cần ít nhất 12 ký tự và được nhập tương tác:
 
 ```bash
+source_dir="$(readlink -f /opt/agent-local/current)"
+release_tag="$(basename "$source_dir")"
 read -r -s -p 'Mật khẩu tài khoản: ' CONTROL_PASSWORD; printf '\n'
-printf '%s' "$CONTROL_PASSWORD" | sudo -u local-agent-control env \
-  CONTROL_ENV_FILE=/etc/local-agent-control.env \
-  CONTROL_DATABASE=/var/lib/local-agent-control/control.sqlite \
-  /usr/bin/node /opt/agent-local/current/index.js user you@example.com
+APP_SOURCE_ROOT="$source_dir" RELEASE_TAG="$release_tag" \
+  docker compose --project-directory /opt/agent-local \
+  --env-file /opt/agent-local/.env \
+  -f "$source_dir/deploy/docker-compose.source.yml" \
+  exec -T control node index.js user you@example.com <<< "$CONTROL_PASSWORD"
 unset CONTROL_PASSWORD
 ```
 
 ## Gỡ lỗi
 
-- Workflow báo thiếu secrets/variables: kiểm tra chúng được tạo bên trong Environment tên `production`.
-- Lỗi SSH hoặc host key: kiểm tra `VPS_HOST`, `VPS_PORT`, public key trong `authorized_keys` và host key đã xác minh.
-- `sudo: a password is required`: kiểm tra sudoers cho đúng user deploy và chạy `visudo -cf`.
-- Health check thất bại: xem `sudo journalctl -u local-agent-control-source.service -n 100 --no-pager`, kiểm tra `/etc/local-agent-control.env`, `CONTROL_PORT` và proxy HTTPS.
-- Workflow chỉ deploy khi ref là `main`; với `workflow_dispatch`, chọn nhánh `main`.
+- Thiếu `VPS_*`: đặt secrets/variables trong Environment tên `production`.
+- `docker compose` không tìm thấy: cài Docker Compose v2 và đăng nhập lại sau khi thêm user vào group `docker`.
+- External network không tồn tại: sửa `TRAEFIK_NETWORK` theo network thật của Traefik.
+- Build thành công nhưng health check lỗi, xem log service `control`:
+
+  ```bash
+  source_dir="$(readlink -f /opt/agent-local/current)"
+  release_tag="$(basename "$source_dir")"
+  APP_SOURCE_ROOT="$source_dir" RELEASE_TAG="$release_tag" \
+    docker compose --project-directory /opt/agent-local \
+    --env-file /opt/agent-local/.env \
+    -f "$source_dir/deploy/docker-compose.source.yml" logs --tail=100 control
+  ```
+
+  Script giữ source release trước để có thể deploy lại.
+- Workflow chỉ deploy ref `main`; khi chạy thủ công hãy chọn nhánh `main`.

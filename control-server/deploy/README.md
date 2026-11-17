@@ -1,5 +1,7 @@
 # Build Docker Hub và deploy VPS qua Traefik
 
+Muốn GitHub Actions chuyển source lên VPS và build image ngay tại `/opt/agent-local`, xem [hướng dẫn deploy source](GITHUB_ACTIONS.md). Hướng dẫn bên dưới là lựa chọn deploy image đã build sẵn.
+
 Luồng triển khai: **máy build → Docker Hub → VPS pull image → Traefik HTTPS → control**.
 VPS chỉ cần Docker Engine/Compose, file `docker-compose.yml` và `.env`; không cần
 checkout mã nguồn, cài Node hay cài nginx. Traefik hiện có chịu trách nhiệm TLS.

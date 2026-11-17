@@ -39,30 +39,22 @@ jobs:
           printf '%s\n' "$DEPLOY_KEY" > "$HOME/.ssh/id_ed25519"
           printf '%s\n' "$KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
-      - name: Upload source and restart control server
+      - name: Upload source and build the control container on VPS
         env:
           VPS_HOST: ${{ vars.VPS_HOST }}
           VPS_USER: ${{ vars.VPS_USER }}
           VPS_PORT: ${{ vars.VPS_PORT }}
-          CONTROL_PUBLIC_URL: ${{ vars.CONTROL_PUBLIC_URL }}
-          CONTROL_PORT: ${{ vars.CONTROL_PORT }}
         shell: bash
         run: |
           set -Eeuo pipefail
           port="${VPS_PORT:-22}"
-          control_port="${CONTROL_PORT:-34800}"
           root=/opt/agent-local
           [[ "$VPS_HOST" =~ ^[A-Za-z0-9.-]+$ ]] || { echo 'Set VPS_HOST to the VPS hostname or IPv4 address'; exit 1; }
           [[ "$VPS_USER" =~ ^[a-z_][a-z0-9_-]*$ ]] || { echo 'Set VPS_USER to the SSH deployment user'; exit 1; }
           [[ "$port" =~ ^[0-9]+$ ]] || { echo 'Invalid VPS_PORT'; exit 1; }
-          [[ "$control_port" =~ ^[0-9]+$ ]] || { echo 'Invalid CONTROL_PORT'; exit 1; }
           port_number=$((10#$port))
-          control_port_number=$((10#$control_port))
           (( port_number >= 1 && port_number <= 65535 )) || { echo 'Invalid VPS_PORT'; exit 1; }
-          (( control_port_number >= 1 && control_port_number <= 65535 )) || { echo 'Invalid CONTROL_PORT'; exit 1; }
           port="$port_number"
-          control_port="$control_port_number"
-          [[ "$CONTROL_PUBLIC_URL" =~ ^https://[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*(:[0-9]{1,5})?$ ]] || { echo 'Set CONTROL_PUBLIC_URL to the HTTPS origin without a path'; exit 1; }
 
           remote="$VPS_USER@$VPS_HOST"
           release="$root/releases/$GITHUB_SHA"
@@ -71,4 +63,4 @@ jobs:
           git archive --format=tar "$GITHUB_SHA" control-server |
             ssh "${ssh_options[@]}" -p "$port" "$remote" "tar -xf - --strip-components=1 -C '$release'"
           ssh "${ssh_options[@]}" -p "$port" "$remote" \
-            "bash '$release/deploy/deploy-source.sh' apply '$root' '$GITHUB_SHA' '$CONTROL_PUBLIC_URL' '$control_port'"
+            "bash '$release/deploy/deploy-container.sh' apply '$root' '$GITHUB_SHA'"
