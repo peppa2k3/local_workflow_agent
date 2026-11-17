@@ -23,7 +23,7 @@ Dashboard: `http://127.0.0.1:34719`. Cài extension riêng vào từng Chrome pr
 
 ## Server
 
-Chỉ cần thư mục `control-server/`, Node.js 24, `.env` cấu hình riêng và `node index.js`. Hoặc build/deploy theo [Docker/Traefik](control-server/deploy/README.md). Server dùng HTTP polling; máy local kết nối outbound, không public cổng 34719.
+Chỉ cần thư mục `control-server/`, Node.js 24, `.env` cấu hình riêng và `node index.js`. Có thể build/deploy theo [Docker/Traefik](control-server/deploy/README.md) hoặc deploy source qua [GitHub Actions](control-server/deploy/GITHUB_ACTIONS.md). Server dùng HTTP polling; máy local kết nối outbound, không public cổng 34719.
 
 ## Installation hiện có
 

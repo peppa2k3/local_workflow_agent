@@ -31,6 +31,8 @@ docker build -f deploy/Dockerfile -t workflow-control:local .
 
 Chỉ source server vào build context; `.env`/SQLite không vào image. Deploy Traefik dùng `deploy/docker-compose.yml` và `deploy/.env.example`; xem [DEPLOY](deploy/README.md). `.env` trong `deploy/` là biến Compose, khác `.env` process trong app.
 
+Muốn deploy trực tiếp source qua SSH/systemd từ GitHub Actions, xem [hướng dẫn GitHub Actions](deploy/GITHUB_ACTIONS.md). Luồng này chỉ cập nhật `control-server/`; cấu hình `.env` và SQLite được giữ riêng trên VPS.
+
 Launcher gốc `node remote-control.js` vẫn hoạt động. App ưu tiên `.env` riêng, fallback `.env.control` cũ. SQLite cũ `data/control/control.sqlite` ở gốc tiếp tục được dùng nếu có; standalone dùng `control-server/data/control.sqlite`. Override bằng `CONTROL_ENV_FILE`, `CONTROL_DATABASE`.
 
 Đây là server HTTP polling, không phải server Socket.IO Corebase. Video/Chrome chạy trên local; server chỉ điều phối.
