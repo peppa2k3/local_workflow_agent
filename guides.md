@@ -21,7 +21,7 @@ Mở đúng Chrome profile → `chrome://extensions` → Developer mode → Load
 
 ## 3. Control server
 
-Copy `control-server/` sang server Node.js 24. Tạo `.env` từ `.env.example`, điền URL/cổng/bind, chạy `node index.js`. Với VPS Traefik/Docker dùng [deploy](control-server/deploy/README.md). Không chạy công cụ video hoặc Chrome trên VPS.
+Chỉ `control-server/` chạy trên VPS Node.js 24. GitHub Actions deploy source vào `/opt/agent-local`; xem [hướng dẫn](control-server/deploy/GITHUB_ACTIONS.md). Phương án Docker/Traefik có [hướng dẫn riêng](control-server/deploy/README.md). `.env` và SQLite giữ trên VPS. `local-workflow-agent/` và `chrome-reels-extension/` chỉ cài/chạy trên máy local; không deploy chúng lên VPS.
 
 ## 4. Ghép máy local với server
 

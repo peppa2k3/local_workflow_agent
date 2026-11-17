@@ -8,8 +8,8 @@ public_url="${4:-}"
 port="${5:-}"
 service=local-agent-control-source.service
 
-[[ "$action" == apply && "$root" == /opt/local-agent-control && "$sha" =~ ^[a-f0-9]{40}$ ]] || {
-  echo 'Usage: deploy-source.sh apply /opt/local-agent-control FULL_COMMIT_SHA HTTPS_ORIGIN PORT' >&2
+[[ "$action" == apply && "$root" == /opt/agent-local && "$sha" =~ ^[a-f0-9]{40}$ ]] || {
+  echo 'Usage: deploy-source.sh apply /opt/agent-local FULL_COMMIT_SHA HTTPS_ORIGIN PORT' >&2
   exit 1
 }
 [[ "$public_url" =~ ^https://[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*(:[0-9]{1,5})?$ ]] || { echo 'Invalid HTTPS origin' >&2; exit 1; }

@@ -15,7 +15,7 @@ Vào **Settings → Environments → New environment**, tạo tên `production`.
 | Variable | `VPS_HOST` | Hostname hoặc IPv4 của VPS |
 | Variable | `VPS_PORT` | SSH port, thường là `22`; có thể bỏ qua nếu dùng `22` |
 | Variable | `VPS_USER` | User SSH deploy, ví dụ `deploy` |
-| Variable | `CONTROL_PUBLIC_URL` | Origin HTTPS, ví dụ `https://control.example.com`, không thêm path hoặc dấu `/` cuối |
+| Variable | `CONTROL_PUBLIC_URL` | Origin HTTPS, ví dụ `https://agent.dangngochai.io.vn`, không thêm path hoặc dấu `/` cuối |
 | Variable | `CONTROL_PORT` | Cổng control server trên VPS; thường là `34800`, phải khớp file env của server |
 
 Không tạo GitHub secret cho `.env` của ứng dụng. Workflow không truyền file này lên VPS.
@@ -26,12 +26,12 @@ Tạo một SSH key riêng, không có passphrase, cho deploy. Thêm **public ke
 
 Các lệnh dưới đây dùng Ubuntu/Debian, user SSH `deploy`, Node.js 24 tại `/usr/bin/node`, `curl` và reverse proxy HTTPS đã có. Server không cần Chrome, MongoDB, Docker hay cài npm dependencies. Reverse proxy cần chuyển HTTPS tới `127.0.0.1:34800`; mẫu Nginx có trong [`nginx.conf.example`](nginx.conf.example). Nếu Node nằm ở đường dẫn khác, sửa `ExecStart` trong unit systemd cho khớp.
 
-Tạo user chạy app và các thư mục. User SSH cần ghi được vào `/opt/local-agent-control` để tạo release và đổi symlink; database do user service sở hữu:
+Tạo user chạy app và các thư mục. User SSH cần ghi được vào `/opt/agent-local` để tạo release và đổi symlink; database do user service sở hữu:
 
 ```bash
 sudo useradd --system --user-group --home /nonexistent --shell /usr/sbin/nologin local-agent-control
-sudo install -d -o deploy -g deploy -m 0755 /opt/local-agent-control
-sudo install -d -o deploy -g deploy -m 0755 /opt/local-agent-control/releases
+sudo install -d -o deploy -g deploy -m 0755 /opt/agent-local
+sudo install -d -o deploy -g deploy -m 0755 /opt/agent-local/releases
 sudo install -d -o local-agent-control -g local-agent-control -m 0750 /var/lib/local-agent-control
 ```
 
@@ -71,7 +71,7 @@ sudo visudo -cf /etc/sudoers.d/local-agent-control-deploy
 
 ## 3. Chạy deploy
 
-Giá trị `CONTROL_PUBLIC_URL` và `CONTROL_PORT` trong GitHub Variables phải khớp chính xác với `/etc/local-agent-control.env`. Commit/push lên `main`. Workflow chạy kiểm tra trước, sau đó chỉ chuyển thư mục `control-server/` của commit đó vào `/opt/local-agent-control/releases/<commit-sha>`, đổi symlink `current`, restart systemd và gọi `/health` nội bộ. Nếu service không khỏe, script tự chuyển symlink về release trước và restart lại.
+Giá trị `CONTROL_PUBLIC_URL` và `CONTROL_PORT` trong GitHub Variables phải khớp chính xác với `/etc/local-agent-control.env`. Commit/push lên `main`. Workflow chạy kiểm tra trước, sau đó chỉ chuyển thư mục `control-server/` của commit đó vào `/opt/agent-local/releases/<commit-sha>`, đổi symlink `current`, restart systemd và gọi `/health` nội bộ. Nếu service không khỏe, script tự chuyển symlink về release trước và restart lại.
 
 Dashboard và máy local tiếp tục dùng `CONTROL_PUBLIC_URL`. Local engine kết nối outbound; không mở cổng `34719` ra Internet. SQLite lưu tại `/var/lib/local-agent-control/` nên các release mới không ghi đè database.
 
@@ -82,7 +82,7 @@ read -r -s -p 'Mật khẩu tài khoản: ' CONTROL_PASSWORD; printf '\n'
 printf '%s' "$CONTROL_PASSWORD" | sudo -u local-agent-control env \
   CONTROL_ENV_FILE=/etc/local-agent-control.env \
   CONTROL_DATABASE=/var/lib/local-agent-control/control.sqlite \
-  /usr/bin/node /opt/local-agent-control/current/index.js user you@example.com
+  /usr/bin/node /opt/agent-local/current/index.js user you@example.com
 unset CONTROL_PASSWORD
 ```
 

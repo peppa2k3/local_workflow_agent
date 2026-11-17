@@ -51,7 +51,7 @@ jobs:
           set -Eeuo pipefail
           port="${VPS_PORT:-22}"
           control_port="${CONTROL_PORT:-34800}"
-          root=/opt/local-agent-control
+          root=/opt/agent-local
           [[ "$VPS_HOST" =~ ^[A-Za-z0-9.-]+$ ]] || { echo 'Set VPS_HOST to the VPS hostname or IPv4 address'; exit 1; }
           [[ "$VPS_USER" =~ ^[a-z_][a-z0-9_-]*$ ]] || { echo 'Set VPS_USER to the SSH deployment user'; exit 1; }
           [[ "$port" =~ ^[0-9]+$ ]] || { echo 'Invalid VPS_PORT'; exit 1; }

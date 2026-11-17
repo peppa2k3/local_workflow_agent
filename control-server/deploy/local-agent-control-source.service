@@ -7,10 +7,10 @@ Wants=network-online.target
 Type=simple
 User=local-agent-control
 Group=local-agent-control
-WorkingDirectory=/opt/local-agent-control/current
+WorkingDirectory=/opt/agent-local/current
 Environment=CONTROL_ENV_FILE=/etc/local-agent-control.env
 Environment=CONTROL_DATABASE=/var/lib/local-agent-control/control.sqlite
-ExecStart=/usr/bin/node /opt/local-agent-control/current/index.js
+ExecStart=/usr/bin/node /opt/agent-local/current/index.js
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=25
