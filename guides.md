@@ -21,7 +21,7 @@ Mở đúng Chrome profile → `chrome://extensions` → Developer mode → Load
 
 ## 3. Control server
 
-Chỉ `control-server/` chạy trên VPS: GitHub Actions chuyển source vào `/opt/agent-local`, build container ngay trên VPS và giữ `.env` ở cùng thư mục. Xem [hướng dẫn](control-server/deploy/GITHUB_ACTIONS.md). `local-workflow-agent/` và `chrome-reels-extension/` chỉ cài/chạy trên máy local; không deploy chúng lên VPS.
+Chỉ `control-server/` chạy trên VPS: GitHub Actions chuyển source vào `/opt/agent-local`, build container ngay trên VPS và giữ `.env` ở cùng thư mục. Container bind loopback `127.0.0.1:34800`; Nginx trên VPS proxy HTTPS vào cổng này. Luồng source deploy không cần Docker network Traefik. Xem [hướng dẫn](control-server/deploy/GITHUB_ACTIONS.md). `local-workflow-agent/` và `chrome-reels-extension/` chỉ cài/chạy trên máy local; không deploy chúng lên VPS.
 
 ## 4. Ghép máy local với server
 

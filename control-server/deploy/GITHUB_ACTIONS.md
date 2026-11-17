@@ -1,64 +1,82 @@
-# Build/deploy control server bằng GitHub Actions
+# Build và deploy control server bằng GitHub Actions
 
-Workflow chỉ chuyển thư mục `control-server/` lên VPS. VPS build Docker image từ source release rồi chạy bằng Docker Compose. Source releases và file `.env` nằm dưới `/opt/agent-local`; engine local và Chrome extension không được đưa lên VPS.
+Workflow chỉ chuyển source trong `control-server/` lên VPS, build Docker image ngay trên VPS, rồi chạy container. Source release, file env và cấu hình deploy nằm dưới `/opt/agent-local`. `local-workflow-agent/` và `chrome-reels-extension/` tiếp tục chạy trên máy local.
 
-Pull request chạy `npm test`. Push vào `main` chạy kiểm tra rồi deploy; có thể chạy lại ở **Actions → Deploy control server → Run workflow** trên nhánh `main`. VPS cần Docker Engine, Docker Compose v2 và Docker network Traefik đã có.
+Container dùng host network nhưng chỉ bind vào `127.0.0.1:34800`. Nginx cài trên VPS nhận HTTPS và proxy tới cổng loopback này. Luồng deploy không cần Docker network external hoặc Traefik.
 
-## 1. GitHub Environment
+## 1. Cấu hình GitHub Actions
 
-Vào **Settings → Environments → New environment**, tạo environment tên `production`. Thêm các mục sau vào environment:
+Trong repository, vào **Settings → Environments**, tạo environment tên `production`. Thêm các giá trị sau:
 
 | Loại | Tên | Giá trị |
 | --- | --- | --- |
-| Secret | `VPS_SSH_PRIVATE_KEY` | Private key SSH của user deploy, gồm cả dòng `BEGIN/END` |
-| Secret | `VPS_SSH_KNOWN_HOSTS` | Host key VPS đã xác minh |
+| Secret | `VPS_SSH_PRIVATE_KEY` | Private SSH key của user deploy, gồm cả dòng BEGIN/END |
+| Secret | `VPS_SSH_KNOWN_HOSTS` | Host key đã xác minh của VPS |
 | Variable | `VPS_HOST` | Hostname hoặc IPv4 của VPS |
 | Variable | `VPS_PORT` | SSH port, thường là `22` |
-| Variable | `VPS_USER` | SSH user có quyền chạy Docker Compose |
+| Variable | `VPS_USER` | SSH user có quyền chạy Docker Compose và ghi vào `/opt/agent-local` |
 
-Không đưa app `.env`, domain, Traefik IP hoặc cấu hình runtime vào GitHub. Các giá trị này nằm trong `/opt/agent-local/.env` trên VPS.
+Không lưu app env, domain hoặc password ứng dụng trong GitHub. Các cấu hình deploy được lưu trên VPS tại `/opt/agent-local/.env`.
 
-Tạo SSH key riêng, không có passphrase. Thêm public key vào `~deploy/.ssh/authorized_keys`; lưu private key vào `VPS_SSH_PRIVATE_KEY`. Lấy host key bằng `ssh-keyscan -p 22 your-vps-host`, xác minh fingerprint từ VPS qua kênh tin cậy rồi mới lưu kết quả vào `VPS_SSH_KNOWN_HOSTS`. Đổi port trong lệnh nếu SSH không dùng `22`.
+Tạo SSH key riêng cho deploy. Thêm public key vào `~deploy/.ssh/authorized_keys`, lưu private key trong secret `VPS_SSH_PRIVATE_KEY`. Lấy host key bằng `ssh-keyscan -p 22 your-vps-host`, xác minh fingerprint qua kênh tin cậy trước khi lưu kết quả vào `VPS_SSH_KNOWN_HOSTS`.
 
-## 2. Chuẩn bị VPS một lần
+Pull request chạy CI. Push vào `main` sẽ deploy; có thể chạy thủ công tại **Actions → Deploy control server → Run workflow**.
 
-User SSH phải chạy được `docker compose` và ghi được vào `/opt/agent-local`. Thêm user vào group `docker` nếu cần, sau đó đăng nhập lại:
+## 2. Chuẩn bị VPS và env
+
+VPS cần Docker Engine, Docker Compose v2, Nginx và domain đã trỏ DNS về VPS. Nếu chưa có Nginx, cài bằng `sudo apt-get update && sudo apt-get install -y nginx`. Mở cổng inbound 80/443; cổng 34800 chỉ dùng loopback, không mở trên firewall. Cần có TLS certificate hợp lệ cho domain trước khi bật server block HTTPS. User SSH phải có quyền Docker:
 
 ```bash
 sudo usermod -aG docker deploy
-```
-
-Tạo thư mục source và đưa mẫu env lên VPS. Chạy `scp` từ checkout repo:
-
-```bash
 sudo install -d -o deploy -g deploy -m 0755 /opt/agent-local
 sudo install -d -o deploy -g deploy -m 0755 /opt/agent-local/releases
+```
+
+Đăng xuất rồi SSH lại sau khi thêm user vào group `docker`. Chép mẫu env từ máy có source:
+
+```powershell
 scp -P 22 control-server/deploy/source.env.example deploy@your-vps-host:/opt/agent-local/.env
 ssh -p 22 deploy@your-vps-host 'chmod 0600 /opt/agent-local/.env'
 ```
 
-Sửa `/opt/agent-local/.env` trên VPS. Điền network và IP thật của Traefik; `CONTROL_DOMAIN` phải trùng domain HTTPS đang trỏ tới VPS:
+Sửa `/opt/agent-local/.env` trên VPS:
 
 ```dotenv
 COMPOSE_PROJECT_NAME=local-agent-control
-CONTROL_DOMAIN=agent.dangngochai.io.vn
-TRAEFIK_NETWORK=traefik-public
-TRAEFIK_HTTPS_ENTRYPOINT=websecure
-TRAEFIK_CERT_RESOLVER=letsencrypt
-CONTROL_ROUTER=local-agent-control
-CONTROL_TRUSTED_PROXY_IPS=172.20.0.2
+CONTROL_DOMAIN=agent.example.com
 CONTROL_VOLUME_NAME=local-agent-control-data
 ```
 
-Network phải là Docker network external mà Traefik đang dùng. Lấy IP của container Traefik trên network đó bằng `docker inspect`; điền đúng IP, không điền CIDR hoặc `*`. Nếu certificate đã được cấu hình sẵn thay vì ACME resolver, để `TRAEFIK_CERT_RESOLVER=` rỗng. Giữ nguyên `CONTROL_VOLUME_NAME` giữa các lần deploy để giữ database SQLite.
+Đổi `CONTROL_DOMAIN` thành hostname HTTPS thật. Giữ nguyên `COMPOSE_PROJECT_NAME` và `CONTROL_VOLUME_NAME` qua các lần deploy để Compose tiếp tục quản lý đúng service và SQLite volume. File này chứa giá trị để Compose dựng URL/domain và đặt volume; các biến runtime còn lại được khai báo trong Compose.
 
-Nếu VPS đang chạy bản cũ bằng systemd (`local-agent-control-source.service`), dừng service trước khi chuyển để không chạy hai server cùng lúc:
+## 3. Cấu hình HTTPS proxy trên VPS
+
+Nginx phải proxy HTTPS tới `http://127.0.0.1:34800`. Mẫu cấu hình nằm ở [nginx.conf.example](nginx.conf.example). Chép mẫu lên VPS, thay `control.example.com` bằng `CONTROL_DOMAIN`, rồi kiểm tra certificate path:
+
+```powershell
+scp -P 22 control-server/deploy/nginx.conf.example deploy@your-vps-host:/tmp/local-agent-control.nginx
+```
+
+Trên VPS, đặt file vào cấu hình Nginx đang dùng, sửa domain và certificate paths, sau đó:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+Certificate phải hợp lệ cho domain và tồn tại ở các đường dẫn trong cấu hình. Nếu VPS đã có Nginx, chỉ thêm server block phù hợp; không tạo cấu hình trùng domain. Mẫu proxy ghi đè `X-Forwarded-For` bằng địa chỉ client do Nginx nhận được. Ứng dụng chỉ tin proxy loopback này.
+
+## 4. Deploy và dữ liệu
+
+Khi workflow chạy, nó tải release vào `/opt/agent-local/releases/<commit-sha>`, build image tại VPS, chạy health check rồi cập nhật symlink `/opt/agent-local/current`. Nếu container mới không khỏe, script thử khôi phục release/image trước. `.env` và volume SQLite không bị thay thế khi upload source.
+
+Nếu VPS đang chạy bản cũ bằng systemd, dừng service trước lần deploy container đầu tiên để tránh chiếm cổng:
 
 ```bash
 sudo systemctl disable --now local-agent-control-source.service
 ```
 
-Nếu cần giữ database từ bản systemd, copy dữ liệu vào Docker volume trước lần deploy đầu tiên, sau khi đã dừng service. Bỏ qua bước này nếu đã có Docker volume chứa dữ liệu hoặc chưa có database cũ:
+Giữ nguyên volume `local-agent-control-data` để giữ tài khoản và thiết bị. Nếu dữ liệu SQLite cũ đang nằm ở `/var/lib/local-agent-control`, sao chép vào volume trước deploy:
 
 ```bash
 docker volume create local-agent-control-data
@@ -68,13 +86,30 @@ sudo docker run --rm --user 0 --entrypoint sh \
   node:24-bookworm-slim -c 'for f in /source/control.sqlite*; do [ -e "$f" ] && cp -a "$f" /data/; done; chown -R node:node /data'
 ```
 
-## 3. Deploy và cấu hình app
+Sau deploy, kiểm tra container và endpoint:
 
-Push lên `main`. Workflow chuyển source của commit vào `/opt/agent-local/releases/<commit-sha>`. Script build image ngay trên VPS bằng Docker Compose, chờ health check container đạt rồi cập nhật symlink `/opt/agent-local/current`. Nếu container mới không khỏe, script thử khôi phục container từ release trước hoặc image đang chạy trước đó.
+```bash
+docker ps --filter name=local-agent-control
+curl --fail https://agent.example.com/health
+```
 
-File `.env` ở `/opt/agent-local/.env` không bị ghi đè khi source được cập nhật. Compose tạo `CONTROL_PUBLIC_URL=https://<CONTROL_DOMAIN>`, cổng container `34800` và kết nối database qua volume. Traefik nhận traffic HTTPS; engine local kết nối tới domain này qua outbound polling. Không public cổng dashboard local `34719`.
+Đổi domain trong lệnh curl theo `CONTROL_DOMAIN`. Tạo tài khoản đầu tiên trong container đang chạy:
 
-Thay đổi `.env` không tự kích hoạt workflow. Sau khi sửa env, tạo lại container bằng release hiện tại:
+```bash
+source_dir="$(readlink -f /opt/agent-local/current)"
+release_tag="$(basename "$source_dir")"
+read -r -s -p 'Mật khẩu tài khoản mới: ' CONTROL_PASSWORD; printf '\n'
+APP_SOURCE_ROOT="$source_dir" RELEASE_TAG="$release_tag" \
+  docker compose --project-directory /opt/agent-local \
+  --env-file /opt/agent-local/.env \
+  -f "$source_dir/deploy/docker-compose.source.yml" \
+  exec -T control node index.js user you@example.com <<< "$CONTROL_PASSWORD"
+unset CONTROL_PASSWORD
+```
+
+## 5. Thay đổi env, log và khắc phục lỗi
+
+Sau khi sửa `/opt/agent-local/.env`, recreate container từ release hiện tại:
 
 ```bash
 source_dir="$(readlink -f /opt/agent-local/current)"
@@ -86,35 +121,23 @@ APP_SOURCE_ROOT="$source_dir" RELEASE_TAG="$release_tag" \
   up -d --no-deps --force-recreate --no-build --wait --wait-timeout 180 control
 ```
 
-Sau deploy đầu tiên, tạo tài khoản web qua container. Mật khẩu cần ít nhất 12 ký tự và được nhập tương tác:
+Xem log container:
 
 ```bash
 source_dir="$(readlink -f /opt/agent-local/current)"
 release_tag="$(basename "$source_dir")"
-read -r -s -p 'Mật khẩu tài khoản: ' CONTROL_PASSWORD; printf '\n'
 APP_SOURCE_ROOT="$source_dir" RELEASE_TAG="$release_tag" \
   docker compose --project-directory /opt/agent-local \
   --env-file /opt/agent-local/.env \
-  -f "$source_dir/deploy/docker-compose.source.yml" \
-  exec -T control node index.js user you@example.com <<< "$CONTROL_PASSWORD"
-unset CONTROL_PASSWORD
+  -f "$source_dir/deploy/docker-compose.source.yml" logs --tail=100 control
 ```
 
-## Gỡ lỗi
+| Lỗi | Kiểm tra |
+| --- | --- |
+| `network traefik-public ... could not be found` | Nếu log này xuất hiện, VPS đang chạy Compose cũ. Chạy lại workflow từ commit có `network_mode: host`; cấu hình mới không khai báo network Traefik. |
+| Cổng 34800 đã được dùng | Dừng service/container control cũ; chỉ để một instance dùng cổng này. |
+| Health check thất bại | Xem log control, kiểm tra Docker daemon và quyền truy cập volume. Script sẽ thử rollback nếu có image/release trước. |
+| Nginx trả 502 | Kiểm tra container healthy và Nginx proxy tới đúng `127.0.0.1:34800`; chạy `curl -i -H 'Host: agent.example.com' http://127.0.0.1:34800/health` trên VPS. |
+| HTTPS hoặc Host không hợp lệ | Kiểm tra DNS, certificate, `CONTROL_DOMAIN` trong `.env`, và server_name trong Nginx. |
 
-- Thiếu `VPS_*`: đặt secrets/variables trong Environment tên `production`.
-- `docker compose` không tìm thấy: cài Docker Compose v2 và đăng nhập lại sau khi thêm user vào group `docker`.
-- External network không tồn tại: sửa `TRAEFIK_NETWORK` theo network thật của Traefik.
-- Build thành công nhưng health check lỗi, xem log service `control`:
-
-  ```bash
-  source_dir="$(readlink -f /opt/agent-local/current)"
-  release_tag="$(basename "$source_dir")"
-  APP_SOURCE_ROOT="$source_dir" RELEASE_TAG="$release_tag" \
-    docker compose --project-directory /opt/agent-local \
-    --env-file /opt/agent-local/.env \
-    -f "$source_dir/deploy/docker-compose.source.yml" logs --tail=100 control
-  ```
-
-  Script giữ source release trước để có thể deploy lại.
-- Workflow chỉ deploy ref `main`; khi chạy thủ công hãy chọn nhánh `main`.
+Không public dashboard local `34719`. Agent trên máy local kết nối tới control server qua HTTPS và chủ động gọi outbound; không deploy engine hoặc extension lên VPS.
