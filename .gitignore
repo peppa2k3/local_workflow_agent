@@ -16,3 +16,5 @@ dist/
 .env.*
 !.env.example
 !.env.control.example
+/ref/*
+scenarios/

@@ -1,8 +1,8 @@
 {
   "name": "Tải video từ URL (yt-dlp + FFmpeg)",
   "variables": {
-    "video_url": "https://www.youtube.com/watch?v=2B2tvtM7Dyw",
-    "thu_muc_tai": "D:\\Videos-dowload"
+    "video_url": "https://www.youtube.com/watch?v=q14iSeDGa1s",
+    "thu_muc_tai": "D:\\Videos\\trangphihay"
   },
   "steps": [
     {

@@ -1,8 +1,8 @@
 {
   "name": "Tải clip → upload Reels và điền tên phim",
   "variables": {
-    "video_url": "https://www.youtube.com/watch?v=ByBeQPMnAgk",
-    "thu_muc_tai": "D:\\Videos",
+    "video_url": "https://www.youtube.com/watch?v=qQ9rK-v1aIM",
+    "thu_muc_tai": "D:\\Videos\\thieugianchoi",
     "reels_url": "https://www.facebook.com/profile.php?id=61583720522404&sk=reels_tab",
     "ten_phim": "{{download_title}}",
     "ten_file": "{{download_file_name}}"
@@ -70,6 +70,10 @@
         "locator": "Mô tả thước phim của bạn...",
         "state": "visible"
       }
+    },
+    {
+      "action": "wait",
+      "ms": 3000
     },
     {
       "action": "click",

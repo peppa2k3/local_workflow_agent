@@ -1,8 +1,8 @@
 {
   "name": "Tải clip → upload Reels và điền tên phim (bản sao)",
   "variables": {
-    "video_url": "https://www.youtube.com/watch?v=J0hPo9khVEc",
-    "thu_muc_tai": "D:\\Videos",
+    "video_url": "https://www.youtube.com/watch?v=xMuWkegV3KQ&pp=ygUIdGjhuqduIHk%3D",
+    "thu_muc_tai": "D:\\Videos\\giangloi",
     "reels_url": "https://www.facebook.com/profile.php?id=61551343781361&sk=reels_tab",
     "ten_phim": "{{download_title}}",
     "ten_file": "{{download_file_name}}"

@@ -1,8 +1,8 @@
 {
   "name": "Tải clip → upload Reels và điền tên phim (bản sao)",
   "variables": {
-    "video_url": "https://www.youtube.com/watch?v=rNuIdmS3iUU",
-    "thu_muc_tai": "D:\\Videos",
+    "video_url": "https://www.youtube.com/watch?v=n0BUkf2iU_A&pp=ygUPY2jhu4sgZMOidSBi4buL",
+    "thu_muc_tai": "D:\\Videos\\khoahoc",
     "reels_url": "https://www.facebook.com/profile.php?id=61594335706080&sk=reels_tab",
     "ten_phim": "{{download_title}}",
     "ten_file": "{{download_file_name}}"
