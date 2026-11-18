@@ -3,13 +3,18 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
-const { validateVideo, inspectVideo, downloadVideo, run, selectionArgs, videoOptions, publishVideo } = require('../local-workflow-agent/src/integrations/video/video-download');
+const { validateVideo, inspectVideo, downloadVideo, run, selectionArgs, videoOptions, publishVideo, transferArgs } = require('../local-workflow-agent/src/integrations/video/video-download');
 const { createScenarioStore } = require('../local-workflow-agent/src/workflow/scenario-store');
 const { createWorkflows } = require('../local-workflow-agent/src/workflow/workflows');
 const { createActivityStore } = require('../local-workflow-agent/src/storage/activity-store');
 const { createCachedDownloader } = require('../local-workflow-agent/src/storage/download-cache');
 (async () => {
   assert.deepEqual(videoOptions(), { quality: '1080', language: 'vi' });
+  assert.deepEqual(transferArgs(''), ['--concurrent-fragments', '4', '--abort-on-unavailable-fragments']);
+  for (const fragments of ['1', ' 6 ', '8']) {
+    assert.deepEqual(transferArgs(fragments), ['--concurrent-fragments', fragments.trim(), '--abort-on-unavailable-fragments']);
+  }
+  for (const value of ['0', '9', '1.5', '3 --ignore-errors']) assert.throws(() => transferArgs(value), /YTDLP_CONCURRENT_FRAGMENTS/);
   for (const url of ['file:///C:/a.mp4', 'ftp://example.test/a', 'https://user:secret@example.test/']) assert.throws(() => validateVideo({ url }));
   const url = 'https://example.test/video';
   for (const extra of [{ directory: '../escape' }, { quality: 0 }, { language: 'vi]/ba' }, { language: '' }, { downloadTimeoutMs: -1 }]) assert.throws(() => validateVideo({ url, ...extra }));
@@ -137,7 +142,7 @@ const { createCachedDownloader } = require('../local-workflow-agent/src/storage/
       console.log('Dashboard preview, runtime reference picker, step label persistence/default and deletion/cancel: OK');
     } finally { await browser.close(); }
 
-    const tools = path.resolve(__dirname, '../tools');
+    const tools = require('../local-workflow-agent/src/paths').toolsDir;
     if (fs.existsSync(path.join(tools, 'yt-dlp.exe')) && fs.existsSync(path.join(tools, 'ffmpeg.exe'))) {
 
       const format = (id, width, height, fps, bitrate) => ({ format_id: id, url: 'http://127.0.0.1/unused-' + id + '.mp4', ext: 'mp4', vcodec: 'avc1.640028', acodec: 'none', width, height, fps, vbr: bitrate, tbr: bitrate });
@@ -167,13 +172,19 @@ const { createCachedDownloader } = require('../local-workflow-agent/src/storage/
       assert.equal(await choose(), '4k30+audio', 'fallback to lower FPS when high FPS is absent, without a 1080 height cap');
       console.log('Real yt-dlp: language preference/fallback, Full HD, portrait, explicit resolution and best: OK');
       const fixture = path.join(directory, 'fixture.mp4');
-      await run(path.join(tools, 'ffmpeg.exe'), ['-v', 'error', '-f', 'lavfi', '-i', 'color=c=blue:s=128x128:d=1', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1', '-c:v', 'libx264', '-c:a', 'aac', '-shortest', fixture]);
-      await run(path.join(tools, 'ffmpeg.exe'), ['-v', 'error', '-i', fixture, '-map', '0:v', '-map', '0:a', '-c', 'copy', '-f', 'dash', '-adaptation_sets', 'id=0,streams=v id=1,streams=a', 'fixture.mpd'], { cwd: directory });
-      let requests = 0;
-      server = http.createServer((req, res) => {
+      await run(path.join(tools, 'ffmpeg.exe'), ['-v', 'error', '-f', 'lavfi', '-i', 'color=c=blue:s=128x128:r=25:d=4', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=4', '-c:v', 'libx264', '-g', '25', '-c:a', 'aac', '-shortest', fixture]);
+      await run(path.join(tools, 'ffmpeg.exe'), ['-v', 'error', '-i', fixture, '-map', '0:v', '-map', '0:a', '-c', 'copy', '-f', 'dash', '-seg_duration', '1', '-adaptation_sets', 'id=0,streams=v id=1,streams=a', 'fixture.mpd'], { cwd: directory });
+      let requests = 0, activeSegments = 0, peakSegments = 0;
+      server = http.createServer(async (req, res) => {
         requests++;
         const file = path.join(directory, path.basename(new URL(req.url, 'http://localhost').pathname));
         if (!fs.existsSync(file) || !fs.statSync(file).isFile()) { res.writeHead(404); res.end(); return; }
+        if (/^chunk-stream0-\d+\.m4s$/.test(path.basename(file))) {
+          activeSegments++;
+          peakSegments = Math.max(peakSegments, activeSegments);
+          res.once('close', () => activeSegments--);
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
         res.writeHead(200, { 'Content-Type': file.endsWith('.mpd') ? 'application/dash+xml' : 'video/mp4', 'Content-Length': fs.statSync(file).size });
         fs.createReadStream(file).pipe(res);
       });
@@ -201,7 +212,16 @@ const { createCachedDownloader } = require('../local-workflow-agent/src/storage/
         assert.equal(fs.readdirSync(path.join(directory, 'saved')).length, 2, 'invalid downloads must not publish or leave staging files');
       } finally { fs.writeFileSync(fixture, sourceBytes); }
 
-      const merged = await downloadVideo({ url: localUrl.replace('.mp4', '.mpd'), directory: path.join(directory, 'merged'), quality: 720 });
+      const savedFragments = process.env.YTDLP_CONCURRENT_FRAGMENTS;
+      let merged;
+      try {
+        process.env.YTDLP_CONCURRENT_FRAGMENTS = '4';
+        merged = await downloadVideo({ url: localUrl.replace('.mp4', '.mpd'), directory: path.join(directory, 'merged'), quality: 720 });
+      } finally {
+        if (savedFragments === undefined) delete process.env.YTDLP_CONCURRENT_FRAGMENTS;
+        else process.env.YTDLP_CONCURRENT_FRAGMENTS = savedFragments;
+      }
+      assert(peakSegments > 1 && peakSegments <= 4, 'download should request multiple video segments within the configured limit');
       const streams = JSON.parse(await run(path.join(tools, 'ffprobe.exe'), ['-v', 'quiet', '-show_streams', '-of', 'json', merged.filePath])).streams;
       assert(streams.some(item => item.codec_type === 'video') && streams.some(item => item.codec_type === 'audio'), 'FFmpeg must merge separate DASH video/audio streams');
       assert.equal(merged.name, 'fixture.mp4');

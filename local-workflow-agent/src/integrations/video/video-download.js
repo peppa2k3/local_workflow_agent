@@ -53,6 +53,11 @@ async function inspectVideo(url, signal) {
 function videoOptions(step = {}) {
   return { quality: String(step.quality ?? 1080), language: step.language ?? 'vi' };
 }
+function transferArgs(value = process.env.YTDLP_CONCURRENT_FRAGMENTS) {
+  const fragments = value?.trim() || '4';
+  if (!/^[1-8]$/.test(fragments)) throw new Error('YTDLP_CONCURRENT_FRAGMENTS must be an integer from 1 to 8');
+  return ['--concurrent-fragments', fragments, '--abort-on-unavailable-fragments'];
+}
 function selectionArgs(step = {}) {
   const { quality, language } = videoOptions(step);
   const audio = language === 'auto' ? 'ba' : `(ba[language^=${language}]/ba)`;
@@ -79,6 +84,7 @@ async function publishVideo(source, directory) {
 async function downloadVideo(step, signal) {
   validateVideo(step);
   if (!step.directory) throw new Error('Video download requires directory');
+  const transfer = transferArgs();
   const combined = AbortSignal.any([AbortSignal.timeout(Number(step.downloadTimeoutMs || 1800000)), ...(signal ? [signal] : [])]);
   const ffmpeg = binary('ffmpeg', 'FFMPEG_PATH');
   await run(ffmpeg, ['-version'], { signal: combined });
@@ -89,7 +95,7 @@ async function downloadVideo(step, signal) {
   try {
     const output = await run(binary('yt-dlp', 'YTDLP_PATH'), [...baseArgs,
       '--no-simulate', '--no-overwrites', ...(fs.existsSync(ffmpeg) ? ['--ffmpeg-location', ffmpeg] : []),
-      ...selectionArgs(step),
+      ...transfer, ...selectionArgs(step),
       '--merge-output-format', 'mp4', '--paths', staging,
       '--output', '%(title).150B.%(ext)s',
       '--print', 'after_move:%(filepath)j', '--', step.url], { signal: combined });
@@ -117,4 +123,4 @@ async function downloadVideo(step, signal) {
     await fs.promises.rm(staging, { recursive: true, force: true });
   }
 }
-module.exports = { validateVideo, inspectVideo, downloadVideo, run, selectionArgs, videoOptions, publishVideo };
+module.exports = { validateVideo, inspectVideo, downloadVideo, run, selectionArgs, videoOptions, publishVideo, transferArgs };

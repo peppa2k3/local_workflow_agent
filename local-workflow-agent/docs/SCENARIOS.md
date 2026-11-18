@@ -172,6 +172,8 @@ Ví dụ: `{"action":"downloadVideo","url":"https://www.youtube.com/watch?v=9qq_
 
 Status trả `download` gồm title, id, name, filePath, bytes, width, height, fps, videoCodec, audioCodec, bitrate; chỉ báo thành công sau hậu xử lý và xác nhận file tồn tại, khác rỗng. API phân tích: POST `/api/video/inspect` với `{"url":"https://..."}`, trả title/id/url/duration, timeout 60 giây.
 
+Với DASH hoặc HLS do yt-dlp tải trực tiếp, agent mặc định tải 4 đoạn song song cho mỗi lượt. Có thể chỉnh `YTDLP_CONCURRENT_FRAGMENTS` từ 1 đến 8 trong `.env` của agent rồi khởi động lại. Nếu yt-dlp vẫn báo thiếu đoạn sau khi thử lại, bước tải thất bại và không xuất file. Tùy chọn tốc độ không đổi cache, độ phân giải hoặc ngôn ngữ.
+
 Dùng mẫu `scenarios/video-download.json`, sửa `video_url` và `thu_muc_tai`. Cài bằng `npm run setup:video`, xem [SETUP](SETUP.md). Không đọc cookies/profile Chrome. Website yêu cầu đăng nhập/chống bot có thể từ chối và lỗi được hiển thị.
 
 Tùy chọn metadata, output template và after_move: https://github.com/yt-dlp/yt-dlp#readme

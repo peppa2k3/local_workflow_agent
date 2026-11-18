@@ -101,6 +101,10 @@ $env:FFPROBE_PATH = 'C:\VideoTools\ffprobe.exe'
 
 Agent ưu tiên biến môi trường, rồi executable trong `tools/`, rồi tìm theo PATH. FFprobe cũng có thể được lấy từ cùng thư mục với FFmpeg. Biến `$env:...` chỉ áp dụng trong terminal đó và có ưu tiên hơn `.env`; mở terminal mới nếu cần bỏ override cũ. Sau khi sửa `.env` hoặc thay công cụ, khởi động lại agent.
 
+### Điều chỉnh tốc độ tải
+
+Thêm `YTDLP_CONCURRENT_FRAGMENTS=4` vào `.env` của agent rồi khởi động lại. Mặc định là 4; có thể thử 6 nếu tải ổn định hoặc giảm về 2 hay 1 nếu nguồn hay báo lỗi. Đây là số đoạn tải đồng thời cho mỗi lượt DASH/HLS mà yt-dlp hỗ trợ; tùy chọn này không tăng số kết nối cho video HTTP tải dưới dạng một file. Khi so sánh tốc độ, dùng cùng nguồn và độ phân giải, tránh kết quả dùng lại từ cache và phân biệt thời gian tải với thời gian ghép video/audio.
+
 ### Cập nhật công cụ
 
 Dừng lượt tải đang chạy, rồi chạy lại `npm run setup:video` từ local-workflow-agent. Lệnh tải lại bản phát hành mới; sau đó kiểm tra phiên bản ba công cụ và khởi động lại agent. Nếu dùng đường dẫn riêng, cập nhật các file ở chính đường dẫn đó.
