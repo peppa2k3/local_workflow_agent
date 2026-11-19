@@ -2,7 +2,7 @@
   "name": "Tải clip → upload Reels và điền tên phim",
   "variables": {
     "video_url": "https://www.youtube.com/watch?v=qQ9rK-v1aIM",
-    "thu_muc_tai": "D:\\Videos\\thieugianchoi",
+    "thu_muc_tai": "D:\\Videos\\liliphim",
     "reels_url": "https://www.facebook.com/profile.php?id=61583720522404&sk=reels_tab",
     "ten_phim": "{{download_title}}",
     "ten_file": "{{download_file_name}}"
