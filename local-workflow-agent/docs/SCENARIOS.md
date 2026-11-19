@@ -178,6 +178,26 @@ Dùng mẫu `scenarios/video-download.json`, sửa `video_url` và `thu_muc_tai`
 
 Tùy chọn metadata, output template và after_move: https://github.com/yt-dlp/yt-dlp#readme
 
+## Chọn clip từ thư mục lưu trữ
+
+- Trong bước **Tải video**, đặt **Thư mục lưu** thành đường dẫn tuyệt đối hoặc tham chiếu như `{{thu_muc_tai}}`. Nhập URL để tải clip mới, hoặc bấm **Chọn clip đã lưu…** để dùng một video có sẵn trong thư mục đó. Agent kiểm tra video bằng FFprobe, dùng file tại chỗ và điền đủ bốn biến `download_*`. Tên clip bỏ phần mở rộng được dùng làm `download_title`, còn tên đầy đủ được dùng làm `download_id`.
+- Trong bước **Upload file**, đặt ô **Thư mục lưu trữ** thành đường dẫn hoặc biến thư mục. Nếu để trống, bộ chọn dùng thư mục của bước **Tải video** gần nhất phía trước. Bấm **Chọn clip đã lưu…** để điền file cho bước này. Lựa chọn này áp dụng riêng cho bước và được ưu tiên trước ô **File upload cho lần chạy**. Nút **Chọn file…** vẫn mở hộp thoại Windows để chọn đường dẫn.
+- Khi ô nguồn hoặc đường dẫn tham chiếu trực tiếp một biến (ví dụ `{{video_url}}`), dùng **Chọn clip đã lưu…** ở dòng biến để giữ nguyên tham chiếu. Các bước dùng chung biến cần cùng một thư mục lưu trữ để chọn theo biến. Tìm theo tên để thu hẹp danh sách nếu có hơn 60 kết quả.
+
+JSON dùng `clip:tên-file.mp4` trong `downloadVideo.url`, `upload.filePath` hoặc giá trị của biến mà các ô này sử dụng. Ví dụ:
+
+```json
+{
+  "variables": { "video_url": "clip:Clip đã lưu.mp4", "thu_muc_tai": "D:\\Videos" },
+  "steps": [
+    { "action": "downloadVideo", "url": "{{video_url}}", "directory": "{{thu_muc_tai}}" },
+    { "action": "upload", "selector": "input[type=file]", "filePath": "{{download_file_path}}" }
+  ]
+}
+```
+
+Để chọn từ control-server, trên trang **Remote Control** của máy agent, cấp quyền chạy scenario và bật **Cho phép xem tên và chọn clip đã lưu từ control-server** cho scenario đó. Nếu cần chọn ở dòng biến, cấp thêm quyền thay giá trị biến tương ứng. Trên control-server, chọn thiết bị đang online, rồi chọn clip theo bước hoặc theo biến. Lựa chọn trên control-server áp dụng cho lượt chạy. Agent chỉ gửi tên clip trong thư mục đã cấu hình của scenario. Clip vẫn nằm trên máy agent và Chrome trên máy đó thực hiện upload.
+
 ## Nối download → mở URL → upload Reels
 
 Mẫu hoàn chỉnh: `scenarios/download-upload-reels.json`. Chọn mẫu trong dashboard, sửa `video_url`, `thu_muc_tai`, `reels_url`, chọn Chrome profile đã kết nối và chạy. Mẫu tải clip, xác nhận file, mở Reels, tạo thước phim, upload chính clip đó, bấm Tiếp và điền mô tả bằng tiêu đề. Mẫu dừng ở màn hình soạn/xem lại, không tự bấm Đăng. Có thể thêm bước click Đăng và điều kiện hoàn tất phù hợp nếu muốn tự xuất bản.
@@ -198,7 +218,7 @@ Ví dụ bước sau download:
 { "action": "upload", "label": "Upload clip vừa tải", "selector": "#upload", "filePath": "{{download_file_path}}" }
 ```
 
-Agent chỉ tạo các tham chiếu sau khi yt-dlp thoát thành công, in đường dẫn ở after_move (sau ghép/hậu xử lý), file cuối tồn tại và khác rỗng, không có đuôi .part/.ytdl/.tmp, FFprobe đọc được video stream và thời lượng dương. Status có `download.verified: true`. Chỉ lúc đó mới chuyển sang openUrl/upload; không suy ra xong từ phần trăm hoặc chờ số giây cố định. FFprobe kiểm tra cấu trúc/metadata media, không giải mã kiểm tra từng frame.
+Với nguồn URL, agent nhận đường dẫn file ở after_move sau khi yt-dlp hoàn thành ghép/hậu xử lý. Với cả URL và clip đã lưu, file phải tồn tại, khác rỗng, có video stream và thời lượng dương theo FFprobe trước khi agent điền các tham chiếu và chuyển sang openUrl/upload. Status có `download.verified: true`. FFprobe kiểm tra cấu trúc/metadata media.
 
 Tham chiếu kết quả phải xuất hiện sau một downloadVideo trong kịch bản. Giá trị được giải quyết và validate ngay trước từng bước; upload kiểm tra lại file tồn tại/khác rỗng. Với filePath tham chiếu kết quả, ô “File upload cho lần chạy” không thay thế clip đã tải. Các upload tĩnh vẫn hỗ trợ đường dẫn override như trước. Mỗi lần chạy/profile có kết quả runtime riêng; downloadVideo có thể tạo kết quả từ cache URL đã xác minh. Download thất bại, kiểm tra lỗi hoặc Dừng sẽ chặn các bước tiếp theo. Nhiều downloadVideo: tham chiếu dùng kết quả gần nhất đã thành công.
 

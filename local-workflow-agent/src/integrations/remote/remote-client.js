@@ -2,6 +2,7 @@ const path = require('node:path');
 const c = require('../../../shared/remote-protocol');
 const { randomUUID } = require('node:crypto');
 const { createRemoteExecutor } = require('./remote-executor');
+const { clipTargets } = require('../../workflow/clip-library');
 function createRemoteClient({ dataDir, profiles, scenarios, workflows, performance = () => ({}) , allowHttp = false }) {
   const file = path.join(dataDir, 'remote.json');
   let config = c.readJson(file, { policy: { profiles: [], scenarios: [], variables: {} } });
@@ -32,16 +33,37 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, performan
       }
       if (config.device) {
         const policy = config.policy;
+        let clipBudget = 12000;
         executor.stopOwned(config.device.id, policy);
         const metadata = { uptime: Math.floor(process.uptime()), performance: performance(),
           profiles: profiles().filter(p => policy.profiles.includes(p.directory)).map(p => ({ directory: p.directory, name: p.name, ...Object.fromEntries(
             ['running', 'extensionConnected'].map(k => [k, workflows.status(p.directory)[k]])) })),
-          scenarios: policy.scenarios.flatMap(name => { try { const s = scenarios.load(name); return [{ name, steps: s.steps.length,
-            variables: (policy.variables[name] || []).filter(v => Object.hasOwn(s.variables || {}, v)) }]; } catch { return []; } }) };
+          scenarios: policy.scenarios.flatMap(name => {
+            try {
+              const s = scenarios.load(name), variables = (policy.variables[name] || []).filter(v => Object.hasOwn(s.variables || {}, v));
+              const entry = { name, steps: s.steps.length, variables };
+              if (policy.clipScenarios?.includes(name)) {
+                try {
+                  const targets = clipTargets(s), foldersByVariable = new Map();
+                  for (const { variable, directory } of targets) {
+                    if (!variables.includes(variable)) continue;
+                    if (!foldersByVariable.has(variable)) foldersByVariable.set(variable, new Set());
+                    foldersByVariable.get(variable).add(directory);
+                  }
+                  entry.clipTargets = targets.flatMap(({ id, index, action, variable }) => {
+                    const target = { id, index, action, variable: foldersByVariable.get(variable)?.size === 1 ? variable : undefined };
+                    clipBudget -= Buffer.byteLength(JSON.stringify(target)) + 1;
+                    return clipBudget >= 0 ? [target] : [];
+                  });
+                } catch { /* An unfinished scenario remains visible without clip targets. */ }
+              }
+              return [entry];
+            } catch { return []; }
+          }) };
         const response = await request('/device/exchange', { id: config.device.id, instanceId, metadata, reports: executor.reports(config.device.id) }, config.token);
         if (closed) return;
         executor.acknowledge(response.ack);
-        if (response.command) executor.execute(response.command, config.device.id);
+        if (response.command) await executor.execute(response.command, config.device.id);
         lastContact = Date.now();
       }
       error = ''; failures = 0; nextAttempt = 0;
@@ -57,13 +79,16 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, performan
       || value.profiles.length > 100 || value.scenarios.length > 200 || Buffer.byteLength(JSON.stringify(value)) > 30000) c.fail('Invalid or oversized local policy');
     const knownProfiles = profiles().map(p => p.directory), knownScenarios = scenarios.list();
     if (value.profiles.some(p => !knownProfiles.includes(p)) || value.scenarios.some(s => !knownScenarios.includes(s))) c.fail('Unknown profile or scenario');
+    const clipScenarios = value.clipScenarios ?? [];
+    if (!Array.isArray(clipScenarios) || clipScenarios.some(name => !value.scenarios.includes(name))) c.fail('Unknown clip scenario in local policy');
     const variables = {};
     for (const name of value.scenarios) {
       const names = value.variables?.[name] || [];
       if (!Array.isArray(names) || names.length > 100 || names.some(v => typeof v !== 'string' || v.length > 100 || !Object.hasOwn(scenarios.load(name).variables || {}, v))) c.fail('Unknown variable in local policy');
       variables[name] = [...new Set(names)];
     }
-    config.policy = { profiles: [...new Set(value.profiles)], scenarios: [...new Set(value.scenarios)], variables }; save();
+    config.policy = { profiles: [...new Set(value.profiles)], scenarios: [...new Set(value.scenarios)], variables,
+      clipScenarios: [...new Set(clipScenarios)] }; save();
     if (config.device) executor.stopOwned(config.device.id, config.policy);
   }
   async function action(route, data) {

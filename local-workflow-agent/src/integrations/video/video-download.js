@@ -2,13 +2,16 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const { toolsDir } = require('../../paths');
+const { clipFile, isClip, prefix } = require('../../workflow/clip-library');
 function binary(name, variable) {
   const local = path.join(toolsDir, `${name}.exe`);
   return process.env[variable] || (fs.existsSync(local) ? local : name);
 }
 function validateVideo(step) {
-  const url = new URL(step.url);
-  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error('Video URL requires http/https without credentials');
+  if (!isClip(step.url) || !step.directory) {
+    const url = new URL(step.url);
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error('Video URL requires http/https without credentials');
+  }
   if (step.directory !== undefined && (typeof step.directory !== 'string' || !step.directory.trim() || !path.isAbsolute(step.directory))) throw new Error('Video directory must be an absolute path');
   if (step.quality !== undefined && step.quality !== 'best' && ![360, 480, 720, 1080, 1440, 2160].includes(Number(step.quality))) throw new Error('Invalid video quality');
   if (step.language !== undefined && (typeof step.language !== 'string' || !/^(auto|[a-z]{2,3}(?:-[a-zA-Z0-9]{2,8})*)$/.test(step.language))) throw new Error('Invalid audio language (use vi, en, ja, zh, ko or auto)');
@@ -81,12 +84,33 @@ async function publishVideo(source, directory) {
   }
   throw new Error('Too many files with the same video title');
 }
+async function probeVideo(filePath, ffmpeg, signal) {
+  const siblingProbe = path.isAbsolute(ffmpeg) ? path.join(path.dirname(ffmpeg), process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe') : '';
+  const probe = process.env.FFPROBE_PATH || (siblingProbe && fs.existsSync(siblingProbe) ? siblingProbe : binary('ffprobe', 'FFPROBE_PATH'));
+  const media = JSON.parse(await run(probe, ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', filePath], { signal }));
+  const video = media.streams?.find(stream => stream.codec_type === 'video' && !stream.disposition?.attached_pic);
+  const audio = media.streams?.find(stream => stream.codec_type === 'audio');
+  const duration = Number(media.format?.duration);
+  if (!video || !(duration > 0)) throw new Error('File is not a complete readable video');
+  signal.throwIfAborted();
+  const [numerator, denominator = 1] = String(video.avg_frame_rate || '0/1').split('/').map(Number);
+  return { audioLanguage: audio?.tags?.language || null, duration, verified: true, width: video.width, height: video.height,
+    fps: denominator ? numerator / denominator : 0, videoCodec: video.codec_name, audioCodec: audio?.codec_name || null,
+    bitrate: Number(media.format?.bit_rate) || null };
+}
 async function downloadVideo(step, signal) {
   validateVideo(step);
   if (!step.directory) throw new Error('Video download requires directory');
-  const transfer = transferArgs();
   const combined = AbortSignal.any([AbortSignal.timeout(Number(step.downloadTimeoutMs || 1800000)), ...(signal ? [signal] : [])]);
   const ffmpeg = binary('ffmpeg', 'FFMPEG_PATH');
+  if (isClip(step.url)) {
+    const name = step.url.slice(prefix.length);
+    const filePath = clipFile(step.directory, name);
+    const info = await probeVideo(filePath, ffmpeg, combined);
+    const bytes = fs.statSync(filePath).size;
+    return { ...info, id: name, title: path.parse(name).name, filePath, name, bytes, reused: true };
+  }
+  const transfer = transferArgs();
   await run(ffmpeg, ['-version'], { signal: combined });
   const info = await metadata(step.url, combined);
   const directory = path.resolve(step.directory);
@@ -105,18 +129,9 @@ async function downloadVideo(step, signal) {
     const stat = await fs.promises.stat(stagedPath);
     if (!stat.isFile() || !stat.size) throw new Error('Downloaded file is missing or empty');
     if (/\.(part|ytdl|tmp)$/i.test(stagedPath)) throw new Error('Download did not produce a final media file');
-    const siblingProbe = path.isAbsolute(ffmpeg) ? path.join(path.dirname(ffmpeg), process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe') : '';
-    const probe = process.env.FFPROBE_PATH || (siblingProbe && fs.existsSync(siblingProbe) ? siblingProbe : binary('ffprobe', 'FFPROBE_PATH'));
-    const media = JSON.parse(await run(probe, ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', stagedPath], { signal: combined }));
-    const video = media.streams?.find(stream => stream.codec_type === 'video');
-    const audio = media.streams?.find(stream => stream.codec_type === 'audio');
-    if (!video || !(Number(media.format?.duration) > 0)) throw new Error('Downloaded file is not a complete readable video');
-    if (combined.aborted) throw new Error('Video operation cancelled or timed out');
+    const media = await probeVideo(stagedPath, ffmpeg, combined);
     const filePath = await publishVideo(stagedPath, directory);
-    const [numerator, denominator = 1] = String(video.avg_frame_rate || '0/1').split('/').map(Number);
-    return { ...info, downloadOptions: videoOptions(step), audioLanguage: audio?.tags?.language || null, duration: Number(media.format.duration), verified: true, filePath, name: path.basename(filePath), bytes: stat.size,
-      width: video.width, height: video.height, fps: denominator ? numerator / denominator : 0,
-      videoCodec: video.codec_name, audioCodec: audio?.codec_name || null, bitrate: Number(media.format?.bit_rate) || null };
+    return { ...info, ...media, downloadOptions: videoOptions(step), filePath, name: path.basename(filePath), bytes: stat.size };
   } finally {
     // Only remove the unique working directory created for this invocation.
     if (path.dirname(staging) !== directory || !path.basename(staging).startsWith('.video-download-')) throw new Error('Unexpected video staging directory');

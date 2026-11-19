@@ -24,6 +24,9 @@
       $('profiles').replaceChildren(...state.available.profiles.map(p => checkbox(p.directory, state.policy.profiles.includes(p.directory), `${p.name} (${p.directory})`)));
       $('scenarios').replaceChildren(...state.available.scenarios.map(s => {
         const box = el('div'); box.className = 'choice'; const check = checkbox(s.name, state.policy.scenarios.includes(s.name), s.name); check.querySelector('input').dataset.scenario = s.name; box.append(check);
+        const clips = checkbox(s.name, !!state.policy.clipScenarios?.includes(s.name), 'Cho phép xem tên và chọn clip đã lưu từ control-server');
+        clips.querySelector('input').dataset.clipScenario = s.name;
+        box.append(clips);
         const variables = el('div'); variables.className = 'variables';
         if (s.variables.length) variables.append(el('small', 'Cho phép thay giá trị biến (tùy chọn):'));
         for (const name of s.variables) { const row = checkbox(name, !!state.policy.variables[s.name]?.includes(name), name); row.querySelector('input').dataset.variable = name; variables.append(row); }
@@ -45,9 +48,15 @@
   $('approve').addEventListener('click', () => change($('approve'), 'pair-approve', { claim }, 'Đã xác nhận tài khoản. Thiết bị sẽ chủ động kết nối VPS.'));
   $('disconnect').addEventListener('click', () => { if (confirm('Ngắt kết nối và dừng các lượt chạy remote trên máy này?')) void change($('disconnect'), 'disconnect', {}, 'Đã ngắt kết nối local.'); });
   $('policy-form').addEventListener('submit', event => {
-    event.preventDefault(); const profiles = [...$('profiles').querySelectorAll('input:checked')].map(n => n.value), scenarios = [], variables = {};
-    for (const box of $('scenarios').children) { const input = box.querySelector('input[data-scenario]'); if (input.checked) { scenarios.push(input.value); variables[input.value] = [...box.querySelectorAll('input[data-variable]:checked')].map(n => n.value); } }
-    void change(event.submitter, 'policy', { profiles, scenarios, variables }, 'Đã lưu quyền điều khiển.');
+    event.preventDefault(); const profiles = [...$('profiles').querySelectorAll('input:checked')].map(n => n.value), scenarios = [], variables = {}, clipScenarios = [];
+    for (const box of $('scenarios').children) {
+      const input = box.querySelector('input[data-scenario]');
+      if (!input.checked) continue;
+      scenarios.push(input.value);
+      variables[input.value] = [...box.querySelectorAll('input[data-variable]:checked')].map(n => n.value);
+      if (box.querySelector('input[data-clip-scenario]').checked) clipScenarios.push(input.value);
+    }
+    void change(event.submitter, 'policy', { profiles, scenarios, variables, clipScenarios }, 'Đã lưu quyền điều khiển.');
   });
   document.addEventListener('visibilitychange', () => { if (document.hidden) clearTimeout(timer); else void refresh(); });
   void refresh();

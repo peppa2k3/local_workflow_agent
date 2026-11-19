@@ -3,6 +3,7 @@ const path = require('path');
 const { validateVideo } = require('../integrations/video/video-download');
 const { resolveVariables, hasRuntime, resolveRuntime } = require('./variables');
 const { validateUploadMetadata } = require('../storage/activity-store');
+const { clipFile, isClip, prefix, uploadFolders } = require('./clip-library');
 
 function validateStep(step, uploadPath = '') {
   if (!['downloadVideo', 'openUrl', 'openFolder', 'wait', 'waitFor', 'click', 'type', 'setDate', 'setTime', 'scroll', 'upload'].includes(step.action)) throw new Error(`Unsupported action: ${step.action}`);
@@ -28,6 +29,7 @@ function validateStep(step, uploadPath = '') {
   if (step.action === 'downloadVideo') {
     validateVideo(step);
     if (!step.directory) throw new Error('Video download requires directory');
+    if (isClip(step.url)) clipFile(step.directory, step.url.slice(prefix.length));
   }
   if (step.action === 'openUrl') {
     const url = new URL(step.url);
@@ -42,7 +44,7 @@ function validateStep(step, uploadPath = '') {
   if (step.action === 'click' && step.settleMs === undefined) step.settleMs = 0;
   if (step.action !== 'upload') return step;
   validateUploadMetadata(step);
-  const inputPath = uploadPath || step.filePath ||
+  const inputPath = isClip(step.filePath) ? clipFile(step.folder, step.filePath.slice(prefix.length)) : uploadPath || step.filePath ||
     (step.folder && step.filename ? path.join(step.folder, step.filename) : '');
   if (!inputPath) throw new Error('Upload step needs a file path, folder + filename, or a run-time upload path');
   const resolved = path.resolve(inputPath);
@@ -84,12 +86,14 @@ function createScenarioStore(scenariosDir) {
         throw new Error('Scenario needs a nonempty steps array');
       }
       const prepared = resolveVariables(scenario);
+      const folders = uploadFolders(prepared.steps);
       let downloaded = false;
-      for (const step of prepared.steps) {
+      for (const [index, step] of prepared.steps.entries()) {
+        if (step.action === 'upload' && isClip(step.filePath) && !step.folder && folders[index]) step.folder = folders[index];
         if (hasRuntime(step)) {
           if (!downloaded) throw new Error('Runtime download references require an earlier downloadVideo step');
           if (!['downloadVideo', 'openUrl', 'openFolder', 'wait', 'waitFor', 'click', 'type', 'setDate', 'setTime', 'scroll', 'upload'].includes(step.action)) throw new Error(`Unsupported action: ${step.action}`);
-        } else validateStep(step, uploadPath);
+        } else validateStep(step.action === 'upload' && isClip(step.filePath) ? { ...step } : step, uploadPath);
         if (step.label !== undefined && typeof step.label !== 'string') throw new Error('Step label must be text');
         if (step.action === 'downloadVideo') downloaded = true;
       }

@@ -1,6 +1,9 @@
 const c = require('../shared/remote-protocol');
 const ACTIVE = ['queued', 'dispatched', 'running'];
 const TERMINAL = ['succeeded', 'failed', 'cancelled', 'interrupted', 'rejected', 'unknown', 'expired'];
+const clipTargetId = id => typeof id === 'string' && /^[a-f0-9]{64}$/.test(id);
+const clipName = name => typeof name === 'string' && name.length <= 255 &&
+  !/[\\/:\u0000-\u001f]/.test(name) && /\.(mp4|m4v|mov|webm|mkv|avi|mpeg|mpg|ts|wmv|3gp|flv)$/i.test(name);
 function metadata(value) {
   if (!c.object(value) || !Array.isArray(value.profiles) || !Array.isArray(value.scenarios) || value.profiles.length > 100 || value.scenarios.length > 200) c.fail('Invalid device metadata');
   return { version: 'remote-v1', uptime: Number.isFinite(value.uptime) ? value.uptime : 0,
@@ -9,11 +12,21 @@ function metadata(value) {
       extensionConnected: p.extensionConnected === true, running: p.running === true })),
     scenarios: value.scenarios.map(s => {
       if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(s.name) || !Number.isInteger(s.steps) || s.steps < 1 || s.steps > 10000 || !Array.isArray(s.variables) || s.variables.length > 100) c.fail('Invalid scenario metadata');
-      return { name: s.name, steps: s.steps, variables: s.variables.map(v => c.text(v, 100)) };
+      const scenario = { name: s.name, steps: s.steps, variables: s.variables.map(v => c.text(v, 100)) };
+      if (Array.isArray(s.clipTargets)) scenario.clipTargets = s.clipTargets.slice(0, 150)
+        .filter(t => c.object(t) && clipTargetId(t.id) && Number.isInteger(t.index) && t.index >= 0 && t.index < s.steps && ['upload', 'downloadVideo'].includes(t.action))
+        .map(({ id, index, action, variable }) => ({ id, index, action, variable: scenario.variables.includes(variable) ? variable : undefined }));
+      return scenario;
     }) };
 }
 function snapshot(value, command) {
   if (!c.object(value) || !['running', ...TERMINAL].includes(value.state)) c.fail('Invalid command result');
+  if (command.type === 'browseClips') return { state: value.state,
+    message: typeof value.message === 'string' ? value.message.slice(0, 240) : '',
+    ...(value.state === 'succeeded' ? { clips: {
+      names: Array.isArray(value.clips?.names) ? value.clips.names.slice(0, 60).filter(clipName) : [],
+      more: value.clips?.more === true
+    } } : {}) };
   return { runId: command.type === 'run' ? command.id : command.payload.runId, state: value.state,
     index: Number.isInteger(value.index) && value.index >= 0 ? value.index : 0,
     total: Number.isInteger(value.total) && value.total >= 0 ? value.total : 0,
@@ -36,16 +49,29 @@ function createCommandApi(store) {
   function account(route, method, user, data, url) {
     if (route === '/api/commands' && method === 'GET') {
       const id = url.searchParams.get('device'); owned(user, id);
-      return { commands: expire(user.id, id).slice(-200).reverse().map(({ fingerprint, ...v }) => v) };
+      const requestId = url.searchParams.get('request');
+      const commands = expire(user.id, id);
+      return { commands: commands.filter(v => requestId ? v.id === requestId : v.type !== 'browseClips')
+        .slice(-200).reverse().map(({ fingerprint, ...v }) => v) };
     }
     if (route !== '/api/commands' || method !== 'POST') c.fail('Not found', 404);
     const d = owned(user, data.deviceId), id = c.uuid(data.requestId), type = data.type;
-    if (!['run', 'stop'].includes(type)) c.fail('Unsupported remote command');
-    const payload = type === 'run' ? { profile: c.text(data.profile, 100), scenario: c.text(data.scenario, 64), variables: data.variables || {} } : { runId: c.uuid(data.runId) };
+    if (!['run', 'stop', 'browseClips'].includes(type)) c.fail('Unsupported remote command');
+    let payload;
+    if (type === 'run') payload = { profile: c.text(data.profile, 100), scenario: c.text(data.scenario, 64), variables: data.variables || {} };
+    else if (type === 'stop') payload = { runId: c.uuid(data.runId) };
+    else {
+      if (!clipTargetId(data.target) || typeof data.query !== 'string' || data.query.length > 255) c.fail('Invalid clip search');
+      payload = { scenario: c.text(data.scenario, 64), target: data.target, query: data.query };
+    }
     if (!c.object(payload.variables || {})) c.fail('Invalid variables');
     if (type === 'run') {
       payload.variables = Object.fromEntries(Object.keys(payload.variables).sort().map(k => [k, payload.variables[k]]));
       if (JSON.stringify(payload.variables).length > 16000) c.fail('Variables too large');
+      if (data.clips !== undefined) {
+        if (!c.object(data.clips) || Object.keys(data.clips).length > 30 || Object.entries(data.clips).some(([id, name]) => !clipTargetId(id) || !clipName(name))) c.fail('Invalid clip selections');
+        if (Object.keys(data.clips).length) payload.clips = Object.fromEntries(Object.entries(data.clips).sort(([a], [b]) => a.localeCompare(b)));
+      }
     }
     const fingerprint = c.hash(JSON.stringify({ deviceId: d.id, type, payload }));
     expire(user.id, d.id);
@@ -61,7 +87,12 @@ function createCommandApi(store) {
       const scenario = d.metadata.scenarios?.find(s => s.name === payload.scenario);
       if (!d.metadata.profiles?.some(p => p.directory === payload.profile) || !scenario) c.fail('Not allowed by local policy', 403);
       if (Object.entries(payload.variables).some(([k, v]) => !scenario.variables.includes(k) || !['string', 'number', 'boolean'].includes(typeof v) || (typeof v === 'number' && !Number.isFinite(v)))) c.fail('Variable is not allowed by local policy', 403);
+      if (Object.keys(payload.clips || {}).some(id => !scenario.clipTargets?.some(t => t.id === id))) c.fail('Clip target is not allowed by local policy', 403);
+      if (Object.entries(payload.variables).some(([name, value]) => typeof value === 'string' && value.startsWith('clip:') &&
+        (!clipName(value.slice(5)) || !scenario.clipTargets?.some(t => t.variable === name)))) c.fail('Clip variable is not allowed by local policy', 403);
       if (commands.some(v => v.type === 'run' && v.payload.profile === payload.profile && ACTIVE.includes(v.state))) c.fail('A remote run is already pending on this profile', 409);
+    } else if (type === 'browseClips') {
+      if (!d.metadata.scenarios?.find(s => s.name === payload.scenario)?.clipTargets?.some(t => t.id === payload.target)) c.fail('Clip target is not allowed by local policy', 403);
     } else {
       const run = store.get('command', payload.runId);
       if (!run || run.owner !== user.id || run.deviceId !== d.id || run.type !== 'run') c.fail('Remote run not found', 404);

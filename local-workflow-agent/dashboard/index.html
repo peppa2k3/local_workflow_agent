@@ -64,6 +64,8 @@
     .variables { border: 1px solid #334361; border-radius: 12px; padding: 14px; margin: 16px 0; }
     .variable-row { display: flex; gap: 8px; align-items: end; margin: 10px 0; flex-wrap: wrap; }
     .variable-row label { flex: 1; min-width: 160px; }
+    #clipPicker { width: min(540px, 92vw); color: #eef4ff; background: #142136; border: 1px solid #607897; border-radius: 12px; }
+    #clipPicker form { display: grid; gap: 10px; }
     .variable-ref { width: 100%; margin-top: 3px; font-size: 12px; min-height: 30px; padding: 4px 8px; }
     .performance { margin: 12px 0; color: #acbbd6; font-size: 13px; }
     @media (max-width: 700px) { .shell { padding: 16px 12px 36px; } .top { flex-direction: column; } .editor { padding: 12px; } .fields { grid-template-columns: 1fr; } .fields label:first-of-type { grid-column: auto; } .toolbar select, .toolbar input { width: 100%; } .toolbar label { flex: 1 1 100%; } .step-title { min-width: 70px; flex-basis: 70px; } .step-head select { order: 3; width: 100%; } .step-controls { order: 2; } }
@@ -83,6 +85,14 @@
 </head>
 <body>
 <nav class="site-nav" aria-label="Điều hướng chính"><a class="site-brand" href="/">Workflow Studio</a><div class="site-links"><a href="/" aria-current="page">Kịch bản</a><a href="/content">Quản lý nội dung</a><a href="/remote">Remote Control</a></div></nav>
+  <dialog id="clipPicker" aria-labelledby="clipPickerTitle">
+    <h2 id="clipPickerTitle">Chọn clip đã lưu</h2>
+    <form id="clipSearch"><label>Tìm theo tên<input name="query" maxlength="255"></label><button class="btn ghost" type="submit">Tìm clip</button></form>
+    <p id="clipStatus" aria-live="polite"></p>
+    <label>File trong thư mục lưu trữ<select id="clipNames"></select></label>
+    <button class="btn" id="useClip" type="button">Dùng clip</button>
+    <button class="btn ghost" id="cancelClip" type="button">Hủy</button>
+  </dialog>
   <main class="shell">
     <header class="top">
       <div><div class="eyebrow">Local automation</div><h1>Workflow Studio</h1><p>Tạo kịch bản trực quan và chạy trên Chrome profile hiện có.</p></div>
@@ -137,7 +147,7 @@
       type: { label: 'Nhập chữ', fields: [['locatorType', 'Cách tìm', 'locatorType'], ['locator', 'Chữ / tên / XPath / selector', 'text'], ['role', 'Role (khi tìm theo role)', 'text'], ['index', 'Vị trí từ 0 (nếu trùng)', 'number'], ['text', 'Nội dung nhập', 'text'], ['clear', 'Xóa nội dung cũ (true/false)', 'boolean'], ['timeoutMs', 'Timeout chờ ô nhập / con trỏ (ms)', 'number']] },
       setDate: { label: 'Click và nhập ngày', fields: [['locatorType', 'Cách tìm', 'locatorType'], ['locator', 'Ô ngày tháng năm', 'text'], ['role', 'Role (khi tìm theo role)', 'text'], ['index', 'Vị trí từ 0 (nếu trùng)', 'number'], ['value', 'Ngày (YYYY-MM-DD hoặc biến)', 'date'], ['format', 'Định dạng cho input text', 'dateFormat'], ['timeoutMs', 'Timeout (ms)', 'number']] },
       setTime: { label: 'Click và nhập giờ', fields: [['locatorType', 'Cách tìm', 'locatorType'], ['locator', 'Ô giờ phút', 'text'], ['role', 'Role (khi tìm theo role)', 'text'], ['index', 'Vị trí từ 0 (nếu trùng)', 'number'], ['value', 'Giờ (HH:mm hoặc biến)', 'time'], ['timeoutMs', 'Timeout (ms)', 'number']] },
-      upload: { label: 'Upload file', fields: [['locatorType', 'Cách tìm nút / input file', 'locatorType'], ['locator', 'Nút mở chọn file (click trước), hoặc input[type=file]', 'text'], ['role', 'Role (khi tìm theo role)', 'text'], ['index', 'Vị trí từ 0 (nếu trùng)', 'number'], ['filePath', 'Đường dẫn file đầy đủ', 'text'], ['folder', 'Hoặc: thư mục', 'text'], ['filename', 'Và: tên file', 'text'], ['timeoutMs', 'Timeout chờ ô file (ms)', 'number'], ['waitAfterMs', 'Chờ sau khi chọn file (ms)', 'number']] },
+      upload: { label: 'Upload file', fields: [['locatorType', 'Cách tìm nút / input file', 'locatorType'], ['locator', 'Nút mở chọn file (click trước), hoặc input[type=file]', 'text'], ['role', 'Role (khi tìm theo role)', 'text'], ['index', 'Vị trí từ 0 (nếu trùng)', 'number'], ['filePath', 'Đường dẫn file đầy đủ', 'text'], ['folder', 'Thư mục lưu trữ (có thể dùng biến)', 'text'], ['filename', 'Tên file trong thư mục', 'text'], ['timeoutMs', 'Timeout chờ ô file (ms)', 'number'], ['waitAfterMs', 'Chờ sau khi chọn file (ms)', 'number']] },
       scroll: { label: 'Cuộn trang', fields: [['pixels', 'Số pixel', 'number'], ['times', 'Số lần', 'number'], ['intervalMs', 'Khoảng cách (ms)', 'number']] }
     };
     for (const action of ['openUrl', 'click', 'type', 'setDate', 'setTime', 'upload']) {
@@ -239,17 +249,34 @@
       if (new Set(names).size !== names.length) throw new Error('Tên biến bị trùng');
       return Object.fromEntries(entries);
     }
+    function clipStepIndex(name) {
+      return scenario.steps.findIndex(step => {
+        const source = step.action === 'downloadVideo' ? step.url : step.action === 'upload' ? step.filePath : '';
+        return String(source || '').match(/^\{\{\s*([a-zA-Z_]\w*)\s*\}\}$/)?.[1] === name;
+      });
+    }
+    function syncVariableClipButtons() {
+      $('variables').querySelectorAll('[data-clip-variable]').forEach((button, index) => {
+        button.hidden = clipStepIndex(variableDrafts[index].name.trim()) < 0;
+      });
+    }
     function renderVariables() {
       $('variables').replaceChildren(...variableDrafts.map((item, index) => {
         const row = document.createElement('div'); row.className = 'variable-row';
+        let valueInput;
         for (const [key, title] of [['name', 'Tên biến'], ['value', 'Giá trị biến']]) {
           const label = document.createElement('label'); label.textContent = title;
           const input = document.createElement('input'); input.value = item[key]; input.setAttribute('aria-label', `${title} ${index + 1}`);
-          input.oninput = () => { item[key] = input.value; }; label.append(input); row.append(label);
+          if (key === 'value') valueInput = input;
+          input.oninput = () => { item[key] = input.value; if (key === 'name') syncVariableClipButtons(); }; label.append(input); row.append(label);
         }
+        const pick = document.createElement('button'); pick.type = 'button'; pick.className = 'btn ghost'; pick.textContent = 'Chọn clip đã lưu…'; pick.dataset.clipVariable = '';
+        pick.onclick = () => handle(() => openClipPicker({ variable: item.name.trim() }, name => { item.value = valueInput.value = 'clip:' + name; }));
+        row.append(pick);
         const remove = document.createElement('button'); remove.className = 'btn ghost'; remove.textContent = 'Xóa biến';
         remove.onclick = () => { variableDrafts.splice(index, 1); renderVariables(); }; row.append(remove); return row;
       }));
+      syncVariableClipButtons();
     }
 
     async function api(route, method = 'GET', body) {
@@ -259,6 +286,36 @@
       return data;
     }
     function notice(text, error = false) { $('message').textContent = text; $('message').classList.toggle('error', error); }
+    let clipPicker;
+    async function loadClips() {
+      const picker = clipPicker, search = $('clipSearch'), list = $('clipNames');
+      const request = ++picker.request;
+      list.replaceChildren();
+      $('useClip').disabled = true;
+      $('clipStatus').textContent = 'Đang đọc thư mục…';
+      try {
+        const { names, more } = await api('/api/clips', 'POST', { scenario: picker.scenario, ...picker.target, query: search.elements.query.value });
+        if (clipPicker !== picker || request !== picker.request) return;
+        list.replaceChildren(...names.map(name => new Option(name, name)));
+        $('useClip').disabled = !names.length;
+        $('clipStatus').textContent = more ? 'Hiện 60 clip đầu tiên. Nhập tên để tìm tiếp.' : names.length ? '' : 'Không tìm thấy clip.';
+      } catch (error) {
+        if (clipPicker === picker && request === picker.request) $('clipStatus').textContent = error.message;
+      }
+    }
+    function openClipPicker(target, choose) {
+      clipPicker = { target, choose, scenario: { steps: structuredClone(scenario.steps), variables: collectVariables() }, request: 0 };
+      $('clipSearch').reset();
+      $('clipPicker').showModal();
+      return loadClips();
+    }
+    $('clipSearch').onsubmit = event => { event.preventDefault(); void loadClips(); };
+    $('cancelClip').onclick = () => $('clipPicker').close();
+    $('clipPicker').onclose = () => { clipPicker = null; };
+    $('useClip').onclick = () => {
+      clipPicker.choose($('clipNames').value);
+      $('clipPicker').close();
+    };
     async function chooseFile(input) {
       if (filePicking) return;
       filePicking = true;
@@ -378,14 +435,24 @@
           const inspect = document.createElement('button'); inspect.className = 'btn ghost'; inspect.textContent = 'Phân tích URL / lấy tên';
           inspect.addEventListener('click', () => handle(() => editTask(async () => {
             const variables = collectVariables();
-            const expand = (text, seen = []) => String(text).replace(/{{([a-zA-Z_][a-zA-Z0-9_]*)}}/g, (_, key) => {
+            const expand = (text, seen = []) => String(text).replace(/{{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*}}/g, (_, key) => {
               if (!(key in variables) || seen.includes(key)) throw new Error(`Biến thiếu hoặc vòng lặp: ${key}`);
               return expand(variables[key], [...seen, key]);
             });
-            const info = await api('/api/video/inspect', 'POST', { url: expand(step.url) });
+            const url = expand(step.url);
+            if (url.startsWith('clip:')) { notice(`Clip đã lưu: ${url.slice(5)}`); return; }
+            const info = await api('/api/video/inspect', 'POST', { url });
             notice(`Tên video: ${info.title} · ID: ${info.id} · File: tiêu đề.ext`);
           })));
           body.append(inspect);
+        }
+        if (['upload', 'downloadVideo'].includes(step.action)) {
+          const pick = document.createElement('button'); pick.type = 'button'; pick.className = 'btn ghost'; pick.textContent = 'Chọn clip đã lưu…';
+          pick.addEventListener('click', () => handle(() => openClipPicker({ index }, name => {
+            step[step.action === 'downloadVideo' ? 'url' : 'filePath'] = 'clip:' + name;
+            render();
+          })));
+          body.append(pick);
         }
         const fields = document.createElement('div'); fields.className = 'fields';
         if (step.action === 'click') {
@@ -438,10 +505,12 @@
           fields.append(field(label, value ?? (type === 'locatorType' ? 'css' : type === 'conditionState' ? 'visible' : type === 'dateFormat' ? 'DD/MM/YYYY' : ''), type, value => {
             const target = child ? (step[parent] ||= {}) : step;
             if (value === undefined) delete target[child || parent]; else target[child || parent] = value;
+            if (['url', 'filePath'].includes(key)) syncVariableClipButtons();
           }));
         }
         body.append(nameField, fields); card.append(head, body); list.append(card);
       });
+      syncVariableClipButtons();
     }
     async function refreshNames() {
       const { names } = await api('/api/scenarios');

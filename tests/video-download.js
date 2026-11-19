@@ -72,12 +72,22 @@ const { createCachedDownloader } = require('../local-workflow-agent/src/storage/
           else data = saved;
         }
         else if (pathname === '/api/video/inspect') { assert.equal(request.postDataJSON().url, url); inspected = true; data = { title, id: 'sample' }; }
+        else if (pathname === '/api/clips') {
+          const body = request.postDataJSON();
+          assert.equal(body.scenario.variables.dir, directory);
+          if (body.variable) assert.equal(body.variable, 'url'); else assert.equal(body.index, 0);
+          data = { names: ['Tên phim.mp4'], more: false };
+        }
         else if (pathname === '/api/content/catalog/pages') data = { rows: [{ _id: '8d7956a8-cb45-457f-a7f0-094ae1a9362e', name: 'Page dùng chung', platform: 'Facebook', url: 'https://example.test/shared' }], total: 1 };
         else if (pathname === '/api/history') data = { runs: [{ runId: 'fixture-run', scenario: 'download-upload-reels-lili', state: 'failed', startedAt: Date.now(), total: 6, stoppedAtStep: 6,
           steps: [{ number: 1, label: 'Tải clip', state: 'succeeded', reused: true, file_path: 'D:/Videos/sample.mp4' }, { number: 6, label: 'Bước cuối', state: 'failed', error: 'Target not found' }] }] };
         return route.fulfill({ json: data });
       });
       await page.goto('http://127.0.0.1:34719');
+      const saveScenario = async () => {
+        await page.locator('#saveBtn').click();
+        await page.waitForFunction(() => !document.getElementById('saveBtn').disabled && document.getElementById('message').textContent.includes('Đã lưu'));
+      };
       const button = page.getByRole('button', { name: 'Ph\u00e2n t\u00edch URL / l\u1ea5y t\u00ean', exact: true });
       await page.getByRole('button', { name: 'Mở chi tiết bước 1' }).click();
       await button.waitFor();
@@ -91,18 +101,27 @@ const { createCachedDownloader } = require('../local-workflow-agent/src/storage/
       assert.equal(await page.getByLabel('Độ phân giải', { exact: true }).inputValue(), '720');
       await page.getByLabel('Ngôn ngữ âm thanh', { exact: true }).selectOption('en');
       await page.getByLabel('Độ phân giải', { exact: true }).selectOption('1080');
-      await page.locator('#saveBtn').click();
-      await page.waitForFunction(() => document.getElementById('message').textContent.includes('Đã lưu'));
+      await saveScenario();
       assert.equal(saved.steps[0].language, 'en');
       assert.equal(saved.steps[0].quality, 1080);
+      await page.locator('#variables').getByRole('button', { name: 'Chọn clip đã lưu…' }).click();
+      await page.getByRole('button', { name: 'Dùng clip' }).click();
+      await page.locator('.step').getByRole('button', { name: 'Chọn clip đã lưu…' }).click();
+      await page.getByRole('button', { name: 'Hủy', exact: true }).click();
+      await saveScenario();
+      assert.equal(saved.variables.url, 'clip:Tên phim.mp4');
+      assert.equal(saved.steps[0].url, '{{url}}', 'variable picker preserves the step template');
+      await page.locator('.step').getByRole('button', { name: 'Chọn clip đã lưu…' }).click();
+      await page.getByRole('button', { name: 'Dùng clip' }).click();
+      await saveScenario();
+      assert.equal(saved.steps[0].url, 'clip:Tên phim.mp4');
       assert.equal(await page.locator('#runBtn').isEnabled(), true, 'download-only workflow runs without extension');
       await page.locator('.step-head select').selectOption('openUrl');
       assert.equal(await page.locator('#runBtn').isEnabled(), false, 'browser action still requires extension');
       const stepName = page.getByRole('textbox', { name: 'Tên bước (tùy chọn)', exact: true });
       assert.equal(await page.locator('.step-title').textContent(), 'Bước 1');
       await stepName.fill('Mở trang Reels');
-      await page.locator('#saveBtn').click();
-      await page.waitForFunction(() => document.getElementById('message').textContent.includes('Đã lưu'));
+      await saveScenario();
       assert.equal(saved.steps[0].label, 'Mở trang Reels');
       await page.locator('#loadBtn').click();
       await page.waitForFunction(() => document.getElementById('message').textContent.includes('Đã mở'));
@@ -129,8 +148,7 @@ const { createCachedDownloader } = require('../local-workflow-agent/src/storage/
       assert.equal(await page.getByRole('textbox', { name: 'Tên page đích (khuyến nghị)', exact: true }).inputValue(), 'Page dùng chung');
       await page.getByRole('textbox', { name: 'Tên page đích (khuyến nghị)', exact: true }).fill('Lili');
       await page.getByRole('textbox', { name: 'URL page đích (nên dùng biến)', exact: true }).fill('https://example.test/lili');
-      await page.locator('#saveBtn').click();
-      await page.waitForFunction(() => document.getElementById('message').textContent.includes('Đã lưu'));
+      await saveScenario();
       assert.equal(saved.steps[0].pageName, 'Lili'); assert.equal(saved.steps[0].pageUrl, 'https://example.test/lili');
       assert.equal(saved.steps[0].pageId, '8d7956a8-cb45-457f-a7f0-094ae1a9362e');
       await page.locator('#historyBtn').click();
@@ -190,6 +208,13 @@ const { createCachedDownloader } = require('../local-workflow-agent/src/storage/
       });
       await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
       const localUrl = `http://127.0.0.1:${server.address().port}/fixture.mp4`;
+      const selected = await downloadVideo({ url: 'clip:fixture.mp4', directory });
+      assert.equal(selected.filePath, fs.realpathSync(fixture));
+      assert.equal(selected.title, 'fixture');
+      assert.equal(selected.reused, true);
+      assert.equal(selected.verified, true);
+      assert.equal(requests, 0, 'using a stored clip must skip network download');
+      await assert.rejects(downloadVideo({ url: 'clip:../fixture.mp4', directory }), /thư mục lưu trữ/);
       const info = await inspectVideo(localUrl);
       assert(info.title && info.id);
       const result = await downloadVideo({ url: localUrl, directory: path.join(directory, 'saved'), quality: 720 });
@@ -209,6 +234,7 @@ const { createCachedDownloader } = require('../local-workflow-agent/src/storage/
       fs.writeFileSync(fixture, 'not a video');
       try {
         await assert.rejects(downloadVideo({ url: localUrl, directory: path.join(directory, 'saved'), quality: 'best' }), /ffprobe|readable video/i);
+        await assert.rejects(downloadVideo({ url: 'clip:fixture.mp4', directory }), /ffprobe|readable video/i);
         assert.equal(fs.readdirSync(path.join(directory, 'saved')).length, 2, 'invalid downloads must not publish or leave staging files');
       } finally { fs.writeFileSync(fixture, sourceBytes); }
 

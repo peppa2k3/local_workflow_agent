@@ -1,5 +1,7 @@
 const path = require('node:path');
 const c = require('../../../shared/remote-protocol');
+const { clipTargets, isClip, isVideoName, listClips, prefix } = require('../../workflow/clip-library');
+const { overrideVariables } = require('../../workflow/variables');
 function createRemoteExecutor({ dataDir, workflows, scenarios, getPolicy }) {
   const file = path.join(dataDir, 'remote-journal.json');
   const journal = c.readJson(file, {});
@@ -13,7 +15,7 @@ function createRemoteExecutor({ dataDir, workflows, scenarios, getPolicy }) {
   function update(record, value) {
     if (JSON.stringify(record.result) !== JSON.stringify(value)) { record.result = value; record.seq++; save(); }
   }
-  function execute(command, deviceId) {
+  async function execute(command, deviceId) {
     c.uuid(command.id);
     const existing = journal[command.id];
     if (existing) {
@@ -27,10 +29,35 @@ function createRemoteExecutor({ dataDir, workflows, scenarios, getPolicy }) {
       if (command.type === 'run') {
         const p = command.payload, policy = getPolicy();
         if (!policy.profiles.includes(p.profile) || !policy.scenarios.includes(p.scenario)) c.fail('Local policy no longer permits this command');
+        const scenario = scenarios.load(p.scenario);
         if (!c.object(p.variables) || Object.entries(p.variables).some(([k, v]) => !policy.variables[p.scenario]?.includes(k)
-          || !Object.hasOwn(scenarios.load(p.scenario).variables || {}, k) || !['string', 'number', 'boolean'].includes(typeof v))) c.fail('Variable override not allowed');
-        const run = workflows.start(p.profile, scenarios.load(p.scenario), '', p.scenario, p.variables, 3600000, record.id);
+          || !Object.hasOwn(scenario.variables || {}, k) || !['string', 'number', 'boolean'].includes(typeof v))) c.fail('Variable override not allowed');
+        const clips = p.clips ?? {};
+        if (!c.object(clips) || Object.keys(clips).length > 30) c.fail('Invalid clip selections');
+        const clipVariables = Object.keys(p.variables).filter(name => isClip(p.variables[name]));
+        if (Object.keys(clips).length || clipVariables.length) {
+          if (!policy.clipScenarios?.includes(p.scenario)) c.fail('Local policy does not permit clip selection');
+          const targets = clipTargets(scenario), effective = clipTargets(overrideVariables(scenario, p.variables));
+          for (const name of clipVariables) {
+            const matching = targets.filter(target => target.variable === name);
+            if (new Set(matching.map(target => target.directory)).size !== 1 ||
+              matching.some(target => !effective.some(item => item.id === target.id))) c.fail('Clip variable has no matching storage folder');
+          }
+          for (const [id, name] of Object.entries(clips)) {
+            const target = effective.find(target => target.id === id && targets.some(saved => saved.id === id));
+            if (!target || !isVideoName(name)) c.fail('Clip target changed or selection is invalid');
+            scenario.steps[target.index][target.action === 'downloadVideo' ? 'url' : 'filePath'] = prefix + name;
+          }
+        }
+        const run = workflows.start(p.profile, scenario, '', p.scenario, p.variables, 3600000, record.id);
         record.phase = 'started'; update(record, result(run));
+      } else if (command.type === 'browseClips') {
+        const { scenario, target, query } = command.payload, policy = getPolicy();
+        if (!policy.scenarios.includes(scenario) || !policy.clipScenarios?.includes(scenario)) c.fail('Local policy does not permit clip browsing');
+        const folder = clipTargets(scenarios.load(scenario)).find(item => item.id === target)?.directory;
+        if (!folder || typeof query !== 'string' || query.length > 255) c.fail('Clip folder changed or search is invalid');
+        const clips = await listClips(folder, query);
+        record.phase = 'done'; update(record, { state: 'succeeded', clips });
       } else if (command.type === 'stop') {
         const targetId = c.uuid(command.payload.runId), target = journal[targetId];
         if (target && target.deviceId !== deviceId) c.fail('Cannot stop a run from a different pairing');
@@ -44,7 +71,9 @@ function createRemoteExecutor({ dataDir, workflows, scenarios, getPolicy }) {
       } else c.fail('Unsupported command');
     } catch {
       const run = command.type === 'run' && workflows.getRun(record.id);
-      record.phase = 'done'; update(record, run ? result(run) : { state: 'rejected', message: 'Local validation failed; inspect the local dashboard and policy.' });
+      record.phase = 'done'; update(record, run ? result(run) : { state: 'rejected', message: command.type === 'browseClips'
+        ? 'Không đọc được thư mục clip. Kiểm tra thư mục và quyền chọn clip trên máy local.'
+        : 'Local validation failed; inspect the local dashboard and policy.' });
     }
     save();
   }

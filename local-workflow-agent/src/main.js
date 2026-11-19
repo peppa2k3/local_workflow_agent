@@ -19,6 +19,7 @@ const { mongoSettings } = require('./env');
 const { createContentApi } = require('./http/content-api');
 const { createMediaGuard } = require('./workflow/media-guard');
 const { createRemoteClient } = require('./integrations/remote/remote-client');
+const { clipTargets, isClip, listClips } = require('./workflow/clip-library');
 const daemon = process.argv[2] === '--daemon' || process.env.LOCAL_AGENT_DAEMON === '1';
 
 const scenarios = createScenarioStore(scenariosDir);
@@ -36,6 +37,11 @@ const content = createContentApi({ mongo: mongoSync, activity, readBody });
 const mediaGuard = createMediaGuard({ activity, mongo: mongoSync });
 const cachedDownloader = createCachedDownloader(activity, downloadVideo);
 const workflows = createWorkflows({ scenarios, defaultProfile: profile, profiles, activity, mediaGuard, prepareUpload: content.prepareUpload, async downloadVideo(step, signal, context) {
+  if (isClip(step.url)) {
+    const clip = await downloadVideo(step, signal);
+    const file = await activity.registerFile(clip.filePath, { duration: clip.duration, tag: step.folderTag || 'automation', signal });
+    return { ...clip, ...file };
+  }
   const release = await mediaGuard.check(step, null, { ...context, signal });
   try { return await cachedDownloader(step, signal); } finally { release(); }
 }, openFolder(folderPath) {
@@ -137,6 +143,16 @@ const server = http.createServer(async (request, response) => {
         return json(200, { ok: true });
       }
       if (request.method === 'GET' && route === '/api/pick/status') return json(200, workflows.session(selected).picker);
+      if (request.method === 'POST' && route === '/api/clips') {
+        if (!dashboardAuthorized(request)) return json(403, { error: 'Local dashboard session required' });
+        const { scenario, index, variable, query = '' } = await readBody(request);
+        if (!Array.isArray(scenario?.steps) || !(Number.isInteger(index) || typeof variable === 'string') || typeof query !== 'string' || query.length > 255) throw new Error('Invalid clip request');
+        const targets = clipTargets(scenario).filter(target => variable ? target.variable === variable : target.index === index);
+        if (new Set(targets.map(target => target.directory)).size > 1) throw new Error('Biến này dùng nhiều thư mục lưu trữ. Chọn clip riêng tại từng bước.');
+        const [target] = targets;
+        if (!target) throw new Error('Hãy cấu hình thư mục lưu trữ cho bước này.');
+        return json(200, await listClips(target.directory, query));
+      }
       if (request.method === 'POST' && route === '/api/choose-file') {
         if (filePickerPending) throw new Error('Hộp chọn file đang mở. Chọn file hoặc Hủy trong cửa sổ đó.');
         const body = await readBody(request);

@@ -10,19 +10,35 @@ const { createRemoteExecutor } = require('../local-workflow-agent/src/integratio
 const { createWorkflows } = require('../local-workflow-agent/src/workflow/workflows');
 const { createScenarioStore } = require('../local-workflow-agent/src/workflow/scenario-store');
 const c = require('../control-server/shared/remote-protocol');
+const { overrideVariables } = require('../local-workflow-agent/src/workflow/variables');
 (async () => {
   const f = await fixture(createCommandApi), dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remote-execution-'));
   const runs = new Map(); let started = 0, stopped = 0;
   const profiles = () => [{ directory: 'Default', name: 'Fixture' }];
-  const scenarios = { list: () => ['sample'], load: () => ({ variables: { caption: 'PRIVATE DEFAULT' }, steps: [{ action: 'wait', ms: 50 }] }) };
+  const clip = 'Clip tiếng Việt.mp4';
+  fs.writeFileSync(path.join(dir, clip), 'fixture');
+  fs.writeFileSync(path.join(dir, 'partial.mp4.part'), 'fixture');
+  fs.writeFileSync(path.join(dir, 'empty.mp4'), '');
+  const library = { variables: { source: 'https://example.test/video', storage: dir }, steps: [
+    { action: 'downloadVideo', url: '{{ source }}', directory: '{{storage}}' },
+    { action: 'upload', selector: '#upload', filePath: '{{download_file_path}}' }
+  ] };
+  const realScenarios = createScenarioStore(dir);
+  const scenarios = { list: () => ['sample', 'library'], load: name => name === 'library' ? structuredClone(library) :
+    { variables: { caption: 'PRIVATE DEFAULT' }, steps: [{ action: 'wait', ms: 50 }] } };
   const workflows = {
     status: () => ({ running: false, extensionConnected: true }),
     start(profile, scenario, upload, name, variables, timeout, id) { started++; assert.equal(upload, '');
+      if (name === 'library') {
+        const prepared = realScenarios.prepare(overrideVariables(scenario, variables));
+        assert.equal(prepared.steps[0].url, 'clip:' + clip);
+        assert.equal(realScenarios.prepareStep(prepared.steps[1]).filePath, fs.realpathSync(path.join(dir, clip)));
+      }
       const run = { runId: id, state: 'running', index: 0, total: 1, steps: [{ number: 1, state: 'running', action: 'wait', label: 'Bước 1' }], startedAt: Date.now(), endedAt: null };
       runs.set(id, run); return run; },
     getRun: id => runs.get(id), stopRun(id) { stopped++; const r = runs.get(id); if (r) { r.state = 'cancelled'; r.endedAt = Date.now(); } return r; }
   };
-  const policy = { profiles: ['Default'], scenarios: ['sample'], variables: { sample: ['caption'] } };
+  const policy = { profiles: ['Default'], scenarios: ['sample', 'library'], variables: { sample: ['caption'], library: ['source', 'storage'] }, clipScenarios: ['library'] };
   const client = createRemoteClient({ dataDir: dir, profiles, scenarios, workflows, allowHttp: true });
   try {
     const api = f.browser(), other = f.browser();
@@ -35,6 +51,18 @@ const c = require('../control-server/shared/remote-protocol');
     const deviceId = client.status().device.id;
     const devices = await api('/api/devices'); assert.equal(devices.devices[0].online, true);
     assert(!JSON.stringify(devices).includes('PRIVATE DEFAULT'));
+    const targets = devices.devices[0].metadata.scenarios.find(s => s.name === 'library').clipTargets;
+    assert.deepEqual(targets.map(t => [t.index, t.action, t.variable]), [[0, 'downloadVideo', 'source'], [1, 'upload', undefined]]);
+    assert(!JSON.stringify(devices).includes(clip));
+    assert(!targets.some(t => Object.hasOwn(t, 'directory')));
+    const browse = { deviceId, requestId: randomUUID(), type: 'browseClips', scenario: 'library', target: targets[0].id, query: '' };
+    await other('/api/commands', browse, 404);
+    await api('/api/commands', { ...browse, scenario: 'sample' }, 403);
+    await api('/api/commands', { ...browse, target: 'a'.repeat(64) }, 403);
+    await api('/api/commands', browse);
+    await client.tick(); await client.tick();
+    assert.deepEqual((await api(`/api/commands?device=${deviceId}&request=${browse.requestId}`)).commands[0].result.clips, { names: [clip], more: false });
+    assert.deepEqual((await api(`/api/commands?device=${deviceId}`)).commands, []);
     const command = { deviceId, requestId: randomUUID(), type: 'run', profile: 'Default', scenario: 'sample', variables: { caption: 'hello' } };
     await other('/api/commands', command, 404);
     await api('/api/commands', { ...command, variables: { filePath: 'C:/secret' } }, 403);
@@ -54,7 +82,14 @@ const c = require('../control-server/shared/remote-protocol');
     await client.tick(); await client.tick(); assert.equal(stopped, 1);
     commands = await api(`/api/commands?device=${deviceId}`);
     assert.equal(commands.commands.find(v => v.id === command.requestId).state, 'cancelled');
-    const second = { ...command, requestId: randomUUID() }; await api('/api/commands', second); await client.tick(); assert.equal(started, 2);
+    const second = { ...command, requestId: randomUUID(), scenario: 'library', variables: { source: 'clip:' + clip }, clips: { [targets[1].id]: clip } };
+    await api('/api/commands', { ...second, clips: { [targets[1].id]: '../' + clip } }, 400);
+    const withChangedFolder = { ...second, requestId: randomUUID(), variables: { ...second.variables, storage: path.dirname(dir) } };
+    await api('/api/commands', withChangedFolder); await client.tick(); await client.tick();
+    const rejected = (await api(`/api/commands?device=${deviceId}&request=${withChangedFolder.requestId}`)).commands[0];
+    assert.equal(rejected.state, 'rejected');
+    await api('/api/commands', second); await client.tick(); assert.equal(started, 2);
+    assert.equal(runs.get(second.requestId).state, 'running');
     const config = c.readJson(path.join(dir, 'remote.json'));
     await assert.rejects(c.post(f.origin, '/device/exchange', { id: deviceId, instanceId: randomUUID(), metadata: {}, reports: [] }, config.token, { allowHttp: true }), /instance/);
     await api('/api/device-revoke', { id: deviceId }); await client.tick();
@@ -88,7 +123,7 @@ const c = require('../control-server/shared/remote-protocol');
     exchange([{ id: ambiguous.id, seq: 2, result: { state: 'succeeded' } }]); assert.equal(f.store.get('command', ambiguous.id).state, 'succeeded');
     exchange([{ id: ambiguous.id, seq: 1, result: { state: 'running' } }]); assert.equal(f.store.get('command', ambiguous.id).state, 'succeeded');
     // Stable execution UUID is independent of the extension protocol runId.
-    const realScenarios = createScenarioStore(dir), real = createWorkflows({ scenarios: realScenarios, profiles, defaultProfile: 'Default' });
+    const real = createWorkflows({ scenarios: realScenarios, profiles, defaultProfile: 'Default' });
     const stableId = randomUUID(); real.start('Default', { steps: [{ action: 'wait', ms: 5 }] }, '', 'fixture', {}, 1000, stableId);
     assert.notEqual(real.status('Default').runId, stableId);
     await new Promise(r => setTimeout(r, 20)); assert.equal(real.getRun(stableId).state, 'succeeded');

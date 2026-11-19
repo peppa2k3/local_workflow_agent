@@ -1,6 +1,7 @@
 (() => {
   const $ = id => document.getElementById(id);
   let csrf = '', selected = '', devices = [], busy = false, timer, formSignature = '', historySignature = '', runIntent = null;
+  let clipSelections = {}, closeClipPicker;
   const stateName = { pending: 'Chờ thực hiện', queued: 'Đang đợi', dispatched: 'Đã gửi tới máy', running: 'Đang chạy', succeeded: 'Thành công', failed: 'Thất bại', cancelled: 'Đã dừng',
     interrupted: 'Bị gián đoạn', unknown: 'Chưa rõ kết quả — kiểm tra máy local', expired: 'Hết hạn', rejected: 'Máy local từ chối' };
   const when = n => n ? new Date(n).toLocaleString('vi-VN') : 'Chưa nhận heartbeat';
@@ -27,18 +28,81 @@
     const value = await r.json();
     if (!r.ok) { if (r.status === 401) loginView(); throw Error(value.error || 'Yêu cầu thất bại'); } return value;
   }
-  function loginView() { csrf = ''; selected = ''; devices = []; formSignature = ''; historySignature = ''; runIntent = null; $('history').replaceChildren(); clearTimeout(timer); $('workspace').hidden = true; $('account').hidden = true; $('login').hidden = false; }
+  function loginView() { closeClipPicker?.(); csrf = ''; selected = ''; devices = []; formSignature = ''; historySignature = ''; runIntent = null; $('history').replaceChildren(); clearTimeout(timer); $('workspace').hidden = true; $('account').hidden = true; $('login').hidden = false; }
   function accountView(value) { csrf = value.csrf; $('email').textContent = value.email; $('account').hidden = false; $('login').hidden = true; $('workspace').hidden = false; }
   function options(target, items, valueKey, labelKey) { const old = target.value; target.replaceChildren(...items.map(item => { const n = el('option', item[labelKey]); n.value = item[valueKey]; return n; })); if (items.some(i => i[valueKey] === old)) target.value = old; }
+  function clipPicker(scenario, target, choose) {
+    const deviceId = selected, dialog = el('dialog', undefined, 'clip-picker'), form = el('form');
+    const title = el('h2', 'Chọn clip đã lưu trên thiết bị'), searchLabel = el('label', 'Tìm theo tên'), query = el('input'), search = el('button', 'Tìm clip');
+    const status = el('p'), listLabel = el('label', 'File trong thư mục lưu trữ'), list = el('select'), use = el('button', 'Dùng clip'), cancel = el('button', 'Hủy');
+    let pending;
+    query.maxLength = 255; use.type = cancel.type = 'button'; use.disabled = true; status.setAttribute('role', 'status');
+    title.id = 'clip-picker-title'; dialog.setAttribute('aria-labelledby', title.id);
+    searchLabel.append(query); listLabel.append(list); form.append(searchLabel, search);
+    dialog.append(title, form, status, listLabel, use, cancel);
+    async function load() {
+      pending?.abort();
+      const controller = new AbortController(), signal = controller.signal;
+      pending = controller;
+      const requestId = crypto.randomUUID();
+      list.replaceChildren(); use.disabled = true; status.textContent = 'Đang đợi thiết bị đọc thư mục…';
+      try {
+        await api('/api/commands', { requestId, deviceId, type: 'browseClips', scenario, target, query: query.value });
+        const deadline = Date.now() + 30000;
+        while (!signal.aborted && Date.now() < deadline) {
+          const { commands } = await api(`/api/commands?device=${encodeURIComponent(deviceId)}&request=${requestId}`);
+          if (signal.aborted) return;
+          const command = commands[0];
+          if (command?.state === 'succeeded') {
+            const { names, more } = command.result.clips;
+            list.replaceChildren(...names.map(name => new Option(name, name)));
+            use.disabled = !names.length;
+            status.textContent = more ? 'Hiện 60 clip đầu tiên. Nhập tên để tìm tiếp.' : names.length ? '' : 'Không tìm thấy clip.';
+            return;
+          }
+          if (command && !['queued', 'dispatched'].includes(command.state)) throw Error(command.result?.message || 'Thiết bị không trả về danh sách clip.');
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+        if (!signal.aborted) throw Error('Thiết bị chưa trả lời. Thử tìm lại khi thiết bị online.');
+      } catch (error) { if (!signal.aborted) status.textContent = error.message; }
+    }
+    form.onsubmit = event => { event.preventDefault(); void load(); };
+    closeClipPicker = () => { pending?.abort(); dialog.close(); };
+    dialog.onclose = () => { pending?.abort(); closeClipPicker = null; dialog.remove(); };
+    cancel.onclick = closeClipPicker;
+    use.onclick = () => { choose(list.value); closeClipPicker(); };
+    document.body.append(dialog); dialog.showModal(); void load();
+  }
   function renderVariables() {
+    closeClipPicker?.();
     runIntent = null;
+    clipSelections = {};
     const d = devices.find(d => d.id === selected), s = d?.metadata.scenarios?.find(s => s.name === $('run-scenario').value);
     $('variables').replaceChildren();
     for (const name of s?.variables || []) {
       const row = el('div', undefined, 'two'), label = el('label', `Thay giá trị ${name}`), check = el('input'), input = el('input');
       check.type = 'checkbox'; check.dataset.variable = name; label.prepend(check); input.disabled = true; input.maxLength = 4000;
       input.setAttribute('aria-label', `Giá trị ${name}`); check.addEventListener('change', () => { input.disabled = !check.checked; });
-      row.append(label, input); $('variables').append(row);
+      row.append(label, input);
+      const target = s.clipTargets?.find(target => target.variable === name);
+      if (target) {
+        const choose = el('button', `Chọn clip cho ${name}…`); choose.type = 'button';
+        choose.onclick = () => clipPicker(s.name, target.id, file => {
+          input.value = 'clip:' + file; check.checked = true; input.disabled = false; runIntent = null;
+        });
+        row.append(choose);
+      }
+      $('variables').append(row);
+    }
+    for (const target of s?.clipTargets || []) {
+      const row = el('div', undefined, 'row'), name = el('small');
+      const choose = el('button', `Chọn clip · Bước ${target.index + 1} (${target.action === 'upload' ? 'Upload' : 'Nguồn video'})`);
+      const clear = el('button', 'Bỏ chọn'); choose.type = clear.type = 'button'; clear.hidden = true;
+      choose.onclick = () => clipPicker(s.name, target.id, file => {
+        clipSelections[target.id] = file; name.textContent = file; clear.hidden = false; runIntent = null;
+      });
+      clear.onclick = () => { delete clipSelections[target.id]; name.textContent = ''; clear.hidden = true; runIntent = null; };
+      row.append(choose, name, clear); $('variables').append(row);
     }
   }
   function renderDevices() {
@@ -107,7 +171,8 @@
   $('run-form').addEventListener('change', () => { runIntent = null; });
   $('run-form').addEventListener('submit', event => { event.preventDefault(); void submit(event.submitter, async () => {
     const variables = Object.fromEntries([...$('variables').querySelectorAll('input[type=checkbox]:checked')].map(check => [check.dataset.variable, check.closest('.two').querySelector('input:not([type=checkbox])').value]));
-    const payload = { deviceId: selected, type: 'run', profile: $('run-profile').value, scenario: $('run-scenario').value, variables };
+    const payload = { deviceId: selected, type: 'run', profile: $('run-profile').value, scenario: $('run-scenario').value, variables,
+      ...(Object.keys(clipSelections).length ? { clips: { ...clipSelections } } : {}) };
     // Preserve the key after a lost HTTP response so retry does not create a second run.
     runIntent ||= { requestId: crypto.randomUUID(), ...payload };
     await api('/api/commands', runIntent); runIntent = null; message('Đã gửi lệnh chạy. Máy local sẽ xác nhận và cập nhật tiến độ.'); await refresh();

@@ -6,6 +6,7 @@ const http = require('node:http');
 const { spawn, spawnSync } = require('node:child_process');
 const { once } = require('node:events');
 const root = path.resolve(__dirname, '..');
+const fixtureSource = source => !['.env', 'data', 'tools', 'node_modules'].includes(path.basename(source));
 
 async function checkAgent(tree, entry, standalone = false) {
   const probe = http.createServer();
@@ -34,11 +35,24 @@ async function checkAgent(tree, entry, standalone = false) {
       await new Promise(resolve => setTimeout(resolve, 50));
     }
     assert(ready, log);
+    let dashboardSession;
     for (const route of ['/', '/content', '/remote', '/remote.js', '/issues.js', '/remote.css']) {
       const response = await fetch(base + route);
       assert.equal(response.status, 200, route);
-      assert((await response.text()).length > 0, route);
+      const body = await response.text();
+      assert(body.length > 0, route);
+      if (route === '/') dashboardSession = body.match(/name="local-agent-session" content="([a-f\d]+)"/)?.[1];
     }
+    const clip = 'fixture.mp4';
+    fs.writeFileSync(path.join(profileDir, clip), 'fixture');
+    const clipRequest = { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ index: 0, query: 'FIXTURE', scenario: {
+        variables: { storage: profileDir }, steps: [{ action: 'upload', folder: '{{storage}}' }]
+      } }) };
+    assert.equal((await fetch(base + '/api/clips', clipRequest)).status, 403);
+    clipRequest.headers['x-local-agent-session'] = dashboardSession;
+    const clips = await fetch(base + '/api/clips', clipRequest);
+    assert.deepEqual(await clips.json(), { names: [clip], more: false });
     assert((await (await fetch(base + '/api/scenarios')).json()).names.includes('fixture'));
     const response = await fetch(base + '/api/run', {
       method: 'POST', headers: { 'content-type': 'application/json' },
@@ -61,7 +75,7 @@ async function checkControl(standalone = false) {
   let child;
   try {
     // Mirrors the Docker COPY set; deliberately no local runtime or node_modules.
-    fs.cpSync(path.join(root, 'control-server'), path.join(tree, 'control-server'), { recursive: true });
+    fs.cpSync(path.join(root, 'control-server'), path.join(tree, 'control-server'), { recursive: true, filter: fixtureSource });
     if (!standalone) fs.copyFileSync(path.join(root, 'remote-control.js'), path.join(tree, 'remote-control.js'));
     const probe = http.createServer();
     await new Promise(resolve => probe.listen(0, '127.0.0.1', resolve));
@@ -99,7 +113,7 @@ async function checkControl(standalone = false) {
   try {
     // No control-server, browser extension or root development source is needed to run.
     fs.cpSync(path.join(root, 'local-workflow-agent'), path.join(tree, 'local-workflow-agent'), {
-      recursive: true, filter: source => !source.split(path.sep).includes('node_modules')
+      recursive: true, filter: fixtureSource
     });
     fs.copyFileSync(path.join(root, 'local-agent.js'), path.join(tree, 'local-agent.js'));
     fs.symlinkSync(path.join(root, 'node_modules'), path.join(tree, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
@@ -111,7 +125,7 @@ async function checkControl(standalone = false) {
     await checkControl();
     await checkControl(true);
     fs.cpSync(path.join(root, 'local-workflow-agent'), standalone, {
-      recursive: true, filter: source => !source.split(path.sep).some(part => ['node_modules', 'data', 'tools'].includes(part)) && path.basename(source) !== '.env'
+      recursive: true, filter: fixtureSource
     });
     fs.symlinkSync(path.join(root, 'node_modules'), path.join(standalone, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
     fs.writeFileSync(path.join(standalone, 'scenarios/fixture.json'), JSON.stringify({ steps: [{ action: 'wait', ms: 10 }] }));

@@ -31,6 +31,7 @@ const { chromium } = require('playwright');
     await navigation.close();
     page.on('pageerror', e => errors.push(e.message));
     const id = 'e43c8711-3731-4daa-9725-6721f78f1039';
+    const target = 'a'.repeat(64), uploadTarget = 'b'.repeat(64), clip = 'Clip tiếng Việt.mp4';
     let loggedIn = false, online = true;
     await page.route('https://control.test/**', async route => {
       const req = route.request(), url = new URL(req.url());
@@ -40,7 +41,9 @@ const { chromium } = require('playwright');
       if (url.pathname === '/api/login') { loggedIn = true; return route.fulfill({ json: { email: 'user@example.test', csrf: 'fixture-csrf' } }); }
       if (url.pathname === '/api/me') return route.fulfill({ status: loggedIn ? 200 : 401, json: loggedIn ? { email: 'user@example.test', csrf: 'fixture-csrf' } : { error: 'Login required' } });
       if (url.pathname === '/api/devices') return route.fulfill({ json: { devices: [{ id, name: '<img src=x onerror=alert(1)>', online, revoked: false, lastSeen: Date.now(), metadata: {
-        profiles: [{ directory: 'Default', name: 'Test', extensionConnected: true }], scenarios: [{ name: 'sample', variables: ['caption'], steps: 2 }] } }] } });
+        profiles: [{ directory: 'Default', name: 'Test', extensionConnected: true }], scenarios: [{ name: 'sample', variables: ['caption'], steps: 2,
+          clipTargets: [{ id: target, index: 0, action: 'downloadVideo', variable: 'caption' }, { id: uploadTarget, index: 1, action: 'upload' }] }] } }] } });
+      if (url.pathname === '/api/commands' && url.searchParams.has('request')) return route.fulfill({ json: { commands: [{ state: 'succeeded', result: { clips: { names: [clip], more: false } } }] } });
       if (url.pathname === '/api/commands') return route.fulfill({ json: req.method() === 'POST' ? { command: { id } } : { commands: [{ id, type: 'run', state: 'failed', payload: { scenario: 'sample', profile: 'Default' }, created: Date.now(), result: { total: 2, index: 1, stoppedAtStep: 2,
         steps: [{ number: 1, label: 'Tải clip', state: 'succeeded', action: 'downloadVideo' }, { number: 2, label: 'Upload', state: 'failed', action: 'upload' }] } }] } });
       return route.fulfill({ json: {} });
@@ -50,9 +53,16 @@ const { chromium } = require('playwright');
     await page.locator('.device').click(); await page.locator('#detail').waitFor({ state: 'visible' });
     assert.equal(await page.locator('#device-name').textContent(), '<img src=x onerror=alert(1)>'); assert.equal(await page.locator('#device-name img').count(), 0);
     await page.locator('#variables input[type=checkbox]').check(); await page.locator('#variables input:not([type=checkbox])').fill('Tiếng Việt');
+    await page.getByRole('button', { name: 'Chọn clip cho caption…' }).click();
+    await page.getByRole('button', { name: 'Dùng clip' }).click();
+    assert.equal(await page.getByRole('textbox', { name: 'Giá trị caption' }).inputValue(), 'clip:' + clip);
+    await page.getByRole('button', { name: 'Chọn clip · Bước 2 (Upload)' }).click();
+    await page.getByRole('button', { name: 'Dùng clip' }).click();
     await page.locator('#run').click(); await page.waitForFunction(() => document.getElementById('message').textContent.includes('Đã gửi lệnh chạy'));
-    const request = posted.find(p => p.path === '/api/commands').data;
-    assert.equal(request.variables.caption, 'Tiếng Việt'); assert.match(request.requestId, /^[0-9a-f-]{36}$/);
+    assert.deepEqual(posted.filter(p => p.data.type === 'browseClips').map(p => p.data.target), [target, uploadTarget]);
+    const request = posted.find(p => p.path === '/api/commands' && p.data.type === 'run').data;
+    assert.equal(request.variables.caption, 'clip:' + clip); assert.match(request.requestId, /^[0-9a-f-]{36}$/);
+    assert.deepEqual(request.clips, { [uploadTarget]: clip });
     assert.match(await page.locator('#history').textContent(), /Dừng tại bước 2\/2/);
     await page.locator('#history summary').click(); assert.match(await page.locator('#history ol').textContent(), /Tải clip — Thành công/);
     await page.setViewportSize({ width: 390, height: 844 }); assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
@@ -74,8 +84,10 @@ const { chromium } = require('playwright');
     await page.goto('https://local.test/remote'); await page.locator('#approve').waitFor({ state: 'visible' });
     assert.match(await page.locator('#claim').textContent(), /user@example.test/);
     await page.locator('#profiles input').check(); await page.locator('input[data-scenario]').check(); await page.locator('input[data-variable]').check();
+    await page.locator('input[data-clip-scenario]').check();
     await page.locator('#policy-form button').click(); await page.waitForFunction(() => document.getElementById('message').textContent === 'Đã lưu quyền điều khiển.');
     assert.deepEqual(posted.find(p => p.path.endsWith('/policy')).data.variables, { sample: ['caption'] });
+    assert.deepEqual(posted.find(p => p.path.endsWith('/policy')).data.clipScenarios, ['sample']);
     await page.locator('#approve').click(); await page.waitForFunction(() => document.getElementById('pending').hidden);
     assert.equal(posted.find(p => p.path.endsWith('/pair-approve')).data.claim, 'fixture-claim');
     assert.deepEqual(errors, []);
