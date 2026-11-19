@@ -3,6 +3,9 @@ name: Deploy control server
 on:
   push:
     branches: [main]
+    paths:
+      - 'control-server/**'
+      - '!control-server/**/*.md'
   workflow_dispatch:
 
 permissions:

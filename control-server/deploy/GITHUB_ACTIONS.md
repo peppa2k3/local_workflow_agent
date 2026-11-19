@@ -20,7 +20,7 @@ Không lưu app env, domain hoặc password ứng dụng trong GitHub. Các cấ
 
 Tạo SSH key riêng cho deploy. Thêm public key vào `~deploy/.ssh/authorized_keys`, lưu private key trong secret `VPS_SSH_PRIVATE_KEY`. Lấy host key bằng `ssh-keyscan -p 22 your-vps-host`, xác minh fingerprint qua kênh tin cậy trước khi lưu kết quả vào `VPS_SSH_KNOWN_HOSTS`.
 
-Pull request chạy CI. Push vào `main` sẽ deploy; có thể chạy thủ công tại **Actions → Deploy control server → Run workflow**.
+Pull request chạy CI. Deploy tự động chỉ chạy khi push vào `main` có thay đổi trong `control-server/`, bỏ qua các file Markdown. Để deploy theo yêu cầu, dùng **Actions → Deploy control server → Run workflow** và chọn nhánh `main`.
 
 ## 2. Chuẩn bị VPS và env
 
