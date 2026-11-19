@@ -2,7 +2,7 @@
 
 Workflow chỉ chuyển source trong `control-server/` lên VPS, build Docker image ngay trên VPS, rồi chạy container. Source release, file env và cấu hình deploy nằm dưới `/opt/agent-local`. `local-workflow-agent/` và `chrome-reels-extension/` tiếp tục chạy trên máy local.
 
-Container dùng host network nhưng chỉ bind vào `127.0.0.1:34800`. Nginx cài trên VPS nhận HTTPS và proxy tới cổng loopback này. Luồng deploy không cần Docker network external hoặc Traefik.
+Đặt `TRAEFIK_NETWORK` nếu Traefik đang nhận HTTPS trên VPS. Container nối vào mạng Docker đó và Traefik chuyển tiếp đến cổng 34800 trong container. Khi để trống biến này, container dùng host network và Nginx chuyển tiếp tới `127.0.0.1:34800`.
 
 ## 1. Cấu hình GitHub Actions
 
@@ -24,7 +24,7 @@ Pull request chạy CI. Push vào `main` sẽ deploy; có thể chạy thủ cô
 
 ## 2. Chuẩn bị VPS và env
 
-VPS cần Docker Engine, Docker Compose v2, Nginx và domain đã trỏ DNS về VPS. Nếu chưa có Nginx, cài bằng `sudo apt-get update && sudo apt-get install -y nginx`. Mở cổng inbound 80/443; cổng 34800 chỉ dùng loopback, không mở trên firewall. Cần có TLS certificate hợp lệ cho domain trước khi bật server block HTTPS. User SSH phải có quyền Docker:
+VPS cần Docker Engine, Docker Compose v2, `curl`, reverse proxy HTTPS và domain đã trỏ DNS về VPS. Mở cổng inbound 80/443 cho proxy. User SSH phải có quyền Docker:
 
 ```bash
 sudo usermod -aG docker deploy
@@ -51,6 +51,23 @@ CONTROL_VOLUME_NAME=local-agent-control-data
 
 ## 3. Cấu hình HTTPS proxy trên VPS
 
+### VPS dùng Traefik
+
+Bật Docker provider của Traefik, rồi lấy tên mạng Docker mà container Traefik đang dùng bằng `docker inspect traefik --format '{{json .NetworkSettings.Networks}}'`. Thêm các biến sau vào `/opt/agent-local/.env`, dùng đúng tên mạng, entrypoint và ACME resolver trên VPS:
+
+```dotenv
+TRAEFIK_NETWORK=web
+TRAEFIK_CONTAINER=traefik
+TRAEFIK_HTTPS_ENTRYPOINT=websecure
+TRAEFIK_CERT_RESOLVER=le
+```
+
+Nếu Traefik đã có chứng chỉ phù hợp cho domain, có thể để trống `TRAEFIK_CERT_RESOLVER`. Script deploy tra IP nội bộ của Traefik trên mạng đã chọn để ứng dụng xác định đúng IP người dùng. Nếu IP Traefik thay đổi khi tạo lại container, chạy lại deploy. Cổng 34800 chỉ được dùng trên mạng Docker đã chọn.
+
+### VPS dùng Nginx trên máy chủ
+
+Để trống `TRAEFIK_NETWORK`. Nếu cần cài Nginx, dùng `sudo apt-get update && sudo apt-get install -y nginx`.
+
 Nginx phải proxy HTTPS tới `http://127.0.0.1:34800`. Mẫu cấu hình nằm ở [nginx.conf.example](nginx.conf.example). Chép mẫu lên VPS, thay `control.example.com` bằng `CONTROL_DOMAIN`, rồi kiểm tra certificate path:
 
 ```powershell
@@ -68,7 +85,7 @@ Certificate phải hợp lệ cho domain và tồn tại ở các đường dẫ
 
 ## 4. Deploy và dữ liệu
 
-Khi workflow chạy, nó tải release vào `/opt/agent-local/releases/<commit-sha>`, build image tại VPS, chạy health check rồi cập nhật symlink `/opt/agent-local/current`. Nếu container mới không khỏe, script thử khôi phục release/image trước. `.env` và volume SQLite không bị thay thế khi upload source.
+Khi workflow chạy, nó tải release vào `/opt/agent-local/releases/<commit-sha>`, build image tại VPS, chờ health check trong container và gọi `https://<CONTROL_DOMAIN>/health` qua DNS, TLS và reverse proxy. Chỉ sau khi cả hai kiểm tra thành công, script cập nhật `/opt/agent-local/current`. Nếu một kiểm tra thất bại, script thử khôi phục release/image trước. `.env` và volume SQLite giữ nguyên qua mỗi deploy.
 
 Nếu VPS đang chạy bản cũ bằng systemd, dừng service trước lần deploy container đầu tiên để tránh chiếm cổng:
 
@@ -109,16 +126,12 @@ unset CONTROL_PASSWORD
 
 ## 5. Thay đổi env, log và khắc phục lỗi
 
-Sau khi sửa `/opt/agent-local/.env`, recreate container từ release hiện tại:
+Sau khi sửa `/opt/agent-local/.env`, chạy lại workflow hoặc chạy script cho release hiện tại để áp dụng cấu hình và kiểm tra domain:
 
 ```bash
 source_dir="$(readlink -f /opt/agent-local/current)"
 release_tag="$(basename "$source_dir")"
-APP_SOURCE_ROOT="$source_dir" RELEASE_TAG="$release_tag" \
-  docker compose --project-directory /opt/agent-local \
-  --env-file /opt/agent-local/.env \
-  -f "$source_dir/deploy/docker-compose.source.yml" \
-  up -d --no-deps --force-recreate --no-build --wait --wait-timeout 180 control
+bash "$source_dir/deploy/deploy-container.sh" apply /opt/agent-local "$release_tag"
 ```
 
 Xem log container:
@@ -134,9 +147,10 @@ APP_SOURCE_ROOT="$source_dir" RELEASE_TAG="$release_tag" \
 
 | Lỗi | Kiểm tra |
 | --- | --- |
-| `network traefik-public ... could not be found` | Nếu log này xuất hiện, VPS đang chạy Compose cũ. Chạy lại workflow từ commit có `network_mode: host`; cấu hình mới không khai báo network Traefik. |
+| `network ... could not be found` | Đặt `TRAEFIK_NETWORK` bằng đúng tên mạng Docker của Traefik. |
 | Cổng 34800 đã được dùng | Dừng service/container control cũ; chỉ để một instance dùng cổng này. |
 | Health check thất bại | Xem log control, kiểm tra Docker daemon và quyền truy cập volume. Script sẽ thử rollback nếu có image/release trước. |
+| Container healthy, HTTPS trả 404 | Với Traefik, kiểm tra `TRAEFIK_NETWORK`, Docker provider và HTTPS entrypoint. Với Nginx, kiểm tra server block cho `CONTROL_DOMAIN` đã được nạp. |
 | Nginx trả 502 | Kiểm tra container healthy và Nginx proxy tới đúng `127.0.0.1:34800`; chạy `curl -i -H 'Host: agent.example.com' http://127.0.0.1:34800/health` trên VPS. |
 | HTTPS hoặc Host không hợp lệ | Kiểm tra DNS, certificate, `CONTROL_DOMAIN` trong `.env`, và server_name trong Nginx. |
 

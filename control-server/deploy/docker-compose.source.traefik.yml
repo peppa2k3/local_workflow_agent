@@ -1,0 +1,24 @@
+services:
+  control:
+    network_mode: !reset null
+    networks:
+      - traefik
+    environment:
+      CONTROL_BIND: 0.0.0.0
+      CONTROL_TRUST_PROXY: "0"
+      CONTROL_TRUSTED_PROXY_IPS: ${CONTROL_TRAEFIK_IPS:?Set exact Traefik IPs for the shared network}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=${TRAEFIK_NETWORK:?Set the existing Traefik Docker network}"
+      - "traefik.http.routers.${CONTROL_ROUTER:-local-agent-control}.rule=Host(`${CONTROL_DOMAIN}`)"
+      - "traefik.http.routers.${CONTROL_ROUTER:-local-agent-control}.entrypoints=${TRAEFIK_HTTPS_ENTRYPOINT:-websecure}"
+      - "traefik.http.routers.${CONTROL_ROUTER:-local-agent-control}.tls=true"
+      - "traefik.http.routers.${CONTROL_ROUTER:-local-agent-control}.tls.certresolver=${TRAEFIK_CERT_RESOLVER:-}"
+      - "traefik.http.routers.${CONTROL_ROUTER:-local-agent-control}.service=${CONTROL_ROUTER:-local-agent-control}"
+      - "traefik.http.services.${CONTROL_ROUTER:-local-agent-control}.loadbalancer.server.port=34800"
+      - "traefik.http.services.${CONTROL_ROUTER:-local-agent-control}.loadbalancer.server.scheme=http"
+      - "traefik.http.services.${CONTROL_ROUTER:-local-agent-control}.loadbalancer.passhostheader=true"
+networks:
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK:?Set the existing Traefik Docker network}

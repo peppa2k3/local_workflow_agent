@@ -28,6 +28,29 @@ jobs:
           docker compose --project-directory "$GITHUB_WORKSPACE"
           --env-file control-server/deploy/source.env.example
           -f control-server/deploy/docker-compose.source.yml config --quiet
+      - name: Validate VPS source deployment through Traefik
+        env:
+          APP_SOURCE_ROOT: ${{ github.workspace }}/control-server
+          RELEASE_TAG: ${{ github.sha }}
+          TRAEFIK_NETWORK: web
+          CONTROL_TRAEFIK_IPS: 172.18.0.8
+          TRAEFIK_CERT_RESOLVER: le
+        run: |
+          set -o pipefail
+          docker compose --project-directory "$GITHUB_WORKSPACE" \
+            --env-file control-server/deploy/source.env.example \
+            -f control-server/deploy/docker-compose.source.yml \
+            -f control-server/deploy/docker-compose.source.traefik.yml config --format json |
+            jq -e '
+              .networks.traefik.external and .networks.traefik.name == "web" and
+              (.services.control |
+                (.network_mode == null) and (.ports == null) and
+                .environment.CONTROL_BIND == "0.0.0.0" and
+                .environment.CONTROL_TRUSTED_PROXY_IPS == "172.18.0.8" and
+                .labels["traefik.http.routers.local-agent-control.rule"] == "Host(`agent.dangngochai.io.vn`)" and
+                .labels["traefik.http.routers.local-agent-control.tls.certresolver"] == "le" and
+                .labels["traefik.http.services.local-agent-control.loadbalancer.server.port"] == "34800")
+            '
       - name: Build control-server image
         run: docker build --pull --file control-server/deploy/Dockerfile --tag "local-agent-control-ci:$GITHUB_SHA" control-server
       - name: Check VPS deploy script syntax
