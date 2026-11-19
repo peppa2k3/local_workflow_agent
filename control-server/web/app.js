@@ -7,10 +7,14 @@
   const when = n => n ? new Date(n).toLocaleString('vi-VN') : 'Chưa nhận heartbeat';
   function el(tag, text, className) { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (className) n.className = className; return n; }
   const notices = new Set(), noticeQueue = [];
+  const reportedResults = new Map();
   let notice;
-  function popup(text) {
-    if (!text || notices.has(text)) return;
-    notices.add(text); if (notices.size > 200) notices.delete(notices.values().next().value);
+  function popup(text, fromHistory = false) {
+    if (!text || (!fromHistory && notices.has(text))) return;
+    if (!fromHistory) {
+      notices.add(text);
+      if (notices.size > 200) notices.delete(notices.values().next().value);
+    }
     noticeQueue.push(text); showNotice();
   }
   function showNotice() {
@@ -127,8 +131,11 @@
     if (signature !== formSignature) { options($('run-profile'), d.metadata.profiles || [], 'directory', 'name'); options($('run-scenario'), d.metadata.scenarios || [], 'name', 'name'); renderVariables(); formSignature = signature; }
     $('run').disabled = !d.online || d.revoked || !$('run-profile').value || !$('run-scenario').value;
   }
-  function renderHistory(commands) {
+  function renderHistory(commands, deviceId) {
     const signature = JSON.stringify(commands); if (historySignature === signature) return; historySignature = signature;
+    const previousResults = reportedResults.get(deviceId);
+    // The first response is saved history. Only later results are new notifications.
+    reportedResults.set(deviceId, new Set(commands.filter(cmd => cmd.result?.message).map(cmd => cmd.id)));
     const open = new Set([...$('history').querySelectorAll('details[open]')].map(n => n.dataset.id));
     $('history').replaceChildren(...commands.map(cmd => {
       const n = el('article', undefined, 'run'), row = el('div', undefined, 'row');
@@ -139,7 +146,12 @@
       if (result?.startedAt) n.append(el('p', `Bắt đầu: ${when(result.startedAt)}${result.endedAt ? ' · Kết thúc: ' + when(result.endedAt) : ''}`, 'muted'));
       if (result?.total) { const progress = el('progress'); progress.max = result.total; progress.value = cmd.state === 'succeeded' ? result.total : result.index;
         n.append(el('p', result.stoppedAtStep ? `Dừng tại bước ${result.stoppedAtStep}/${result.total}` : `Tiến độ: ${Math.min(result.index + 1, result.total)}/${result.total}`), progress); }
-      if (result?.message) { n.append(el('p', result.message, 'muted')); popup(`${cmd.payload.scenario || cmd.type}: ${result.message}`); }
+      if (result?.message) {
+        n.append(el('p', result.message, 'muted'));
+        if (previousResults && !previousResults.has(cmd.id)) {
+          popup(`${cmd.payload.scenario || cmd.type}: ${result.message}`, true);
+        }
+      }
       if (result?.steps?.length) { const details = el('details'), list = el('ol'); details.dataset.id = cmd.id; details.open = open.has(cmd.id);
         details.append(el('summary', 'Chi tiết từng bước')); list.append(...result.steps.map(s => el('li', `${s.label || s.action} — ${stateName[s.state] || s.state}`))); details.append(list); n.append(details); }
       if (cmd.type === 'run' && ['queued', 'dispatched', 'running', 'unknown'].includes(cmd.state)) {
@@ -154,7 +166,11 @@
   async function refresh() {
     if (busy || !csrf || document.hidden) return; busy = true; clearTimeout(timer);
     try { devices = (await api('/api/devices')).devices; renderDevices(); renderDetail();
-      if (selected) renderHistory((await api(`/api/commands?device=${encodeURIComponent(selected)}`)).commands);
+      const deviceId = selected;
+      if (deviceId) {
+        const { commands } = await api(`/api/commands?device=${encodeURIComponent(deviceId)}`);
+        if (selected === deviceId) renderHistory(commands, deviceId);
+      }
     } catch (e) { message(e.message, true); }
     finally { busy = false; if (csrf) timer = setTimeout(refresh, 5000); }
   }

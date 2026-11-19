@@ -44,13 +44,16 @@ const { chromium } = require('playwright');
         profiles: [{ directory: 'Default', name: 'Test', extensionConnected: true }], scenarios: [{ name: 'sample', variables: ['caption'], steps: 2,
           clipTargets: [{ id: target, index: 0, action: 'downloadVideo', variable: 'caption' }, { id: uploadTarget, index: 1, action: 'upload' }] }] } }] } });
       if (url.pathname === '/api/commands' && url.searchParams.has('request')) return route.fulfill({ json: { commands: [{ state: 'succeeded', result: { clips: { names: [clip], more: false } } }] } });
-      if (url.pathname === '/api/commands') return route.fulfill({ json: req.method() === 'POST' ? { command: { id } } : { commands: [{ id, type: 'run', state: 'failed', payload: { scenario: 'sample', profile: 'Default' }, created: Date.now(), result: { total: 2, index: 1, stoppedAtStep: 2,
+      if (url.pathname === '/api/commands') return route.fulfill({ json: req.method() === 'POST' ? { command: { id } } : { commands: [{ id: posted.find(p => p.data.type === 'run')?.data.requestId || id, type: 'run', state: 'failed', payload: { scenario: 'sample', profile: 'Default' }, created: Date.now(), result: { total: 2, index: 1, stoppedAtStep: 2, message: 'Upload thất bại',
         steps: [{ number: 1, label: 'Tải clip', state: 'succeeded', action: 'downloadVideo' }, { number: 2, label: 'Upload', state: 'failed', action: 'upload' }] } }] } });
       return route.fulfill({ json: {} });
     });
     await page.goto('https://control.test/'); await page.locator('#login').waitFor({ state: 'visible' });
     await page.locator('[name=email]').fill('user@example.test'); await page.locator('[name=password]').fill('fixture-password'); await page.locator('#login-form button').click();
     await page.locator('.device').click(); await page.locator('#detail').waitFor({ state: 'visible' });
+    await page.locator('#history').getByText('Upload thất bại').waitFor();
+    const taskNotice = page.getByRole('dialog').filter({ hasText: 'Thông báo tác vụ' });
+    assert.equal(await taskNotice.count(), 0);
     assert.equal(await page.locator('#device-name').textContent(), '<img src=x onerror=alert(1)>'); assert.equal(await page.locator('#device-name img').count(), 0);
     await page.locator('#variables input[type=checkbox]').check(); await page.locator('#variables input:not([type=checkbox])').fill('Tiếng Việt');
     await page.getByRole('button', { name: 'Chọn clip cho caption…' }).click();
@@ -63,9 +66,16 @@ const { chromium } = require('playwright');
     const request = posted.find(p => p.path === '/api/commands' && p.data.type === 'run').data;
     assert.equal(request.variables.caption, 'clip:' + clip); assert.match(request.requestId, /^[0-9a-f-]{36}$/);
     assert.deepEqual(request.clips, { [uploadTarget]: clip });
+    await taskNotice.waitFor({ state: 'visible' });
+    await taskNotice.getByRole('button', { name: 'Đã hiểu' }).click();
+    await taskNotice.waitFor({ state: 'hidden' });
     assert.match(await page.locator('#history').textContent(), /Dừng tại bước 2\/2/);
     await page.locator('#history summary').click(); assert.match(await page.locator('#history ol').textContent(), /Tải clip — Thành công/);
     await page.setViewportSize({ width: 390, height: 844 }); assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await page.reload();
+    await page.locator('.device').click();
+    await page.locator('#history').getByText('Upload thất bại').waitFor();
+    assert.equal(await taskNotice.count(), 0);
     // Local approval UI uses its session header and explicit claim, with fake state only.
     const state = { configured: false, url: 'https://control.test', policy: { profiles: [], scenarios: [], variables: {} }, pending: { id, code: 'FIXTURECODE1', expires: Date.now() + 60000, email: 'user@example.test', claim: 'fixture-claim' },
       available: { profiles: [{ directory: 'Default', name: 'Fixture' }], scenarios: [{ name: 'sample', variables: ['caption'] }] } };
