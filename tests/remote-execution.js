@@ -13,7 +13,7 @@ const c = require('../control-server/shared/remote-protocol');
 const { overrideVariables } = require('../local-workflow-agent/src/workflow/variables');
 (async () => {
   const f = await fixture(createCommandApi), dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remote-execution-'));
-  const runs = new Map(); let started = 0, stopped = 0;
+  const runs = new Map(); let started = 0, stopped = 0, downloadChoice;
   const profiles = () => [{ directory: 'Default', name: 'Fixture' }];
   const clip = 'Clip tiếng Việt.mp4';
   fs.writeFileSync(path.join(dir, clip), 'fixture');
@@ -36,7 +36,13 @@ const { overrideVariables } = require('../local-workflow-agent/src/workflow/vari
       }
       const run = { runId: id, state: 'running', index: 0, total: 1, steps: [{ number: 1, state: 'running', action: 'wait', label: 'Bước 1' }], startedAt: Date.now(), endedAt: null };
       runs.set(id, run); return run; },
-    getRun: id => runs.get(id), stopRun(id) { stopped++; const r = runs.get(id); if (r) { r.state = 'cancelled'; r.endedAt = Date.now(); } return r; }
+    getRun: id => runs.get(id), stopRun(id) { stopped++; const r = runs.get(id); if (r) { r.state = 'cancelled'; r.endedAt = Date.now(); } return r; },
+    resolveConfirmation(profile, runId, id, proceed, source) {
+      const run = runs.get(runId);
+      assert.equal(run.confirmation.id, id);
+      downloadChoice = { profile, runId, id, proceed, source };
+      delete run.confirmation;
+    }
   };
   const policy = { profiles: ['Default'], scenarios: ['sample', 'library'], variables: { sample: ['caption'], library: ['source', 'storage'] }, clipScenarios: ['library'] };
   const client = createRemoteClient({ dataDir: dir, profiles, scenarios, workflows, allowHttp: true });
@@ -77,6 +83,27 @@ const { overrideVariables } = require('../local-workflow-agent/src/workflow/vari
     const queued = f.store.get('command', command.requestId); queued.deliveryUntil = 0; f.store.put('command', queued, f.alice.id);
     await client.tick(); assert.equal(started, 1);
     let commands = await api(`/api/commands?device=${deviceId}`); assert.equal(commands.commands[0].state, 'running');
+    const run = runs.get(command.requestId), confirmationId = randomUUID();
+    run.confirmation = { kind: 'download', id: confirmationId, step: 1, name: clip, filePath: path.join(dir, clip), expiresAt: Date.now() + 30000 };
+    await client.tick();
+    const pending = (await api(`/api/commands?device=${deviceId}`)).commands[0].result.confirmation;
+    assert.equal(pending.name, clip);
+    assert.equal(pending.filePath, path.join(dir, clip));
+    const decision = { deviceId, runId: command.requestId, id: confirmationId, proceed: false };
+    await other('/api/download-confirmation', decision, 404);
+    await api('/api/download-confirmation', { ...decision, id: randomUUID() }, 409);
+    await api('/api/download-confirmation', decision);
+    await api('/api/download-confirmation', decision);
+    await api('/api/download-confirmation', { ...decision, proceed: true }, 409);
+    await client.tick(); await client.tick();
+    assert.deepEqual(downloadChoice, { profile: 'Default', runId: command.requestId, id: confirmationId, proceed: false, source: 'remote' });
+    const reported = (await api(`/api/commands?device=${deviceId}`)).commands[0];
+    assert.equal(reported.result.confirmation, undefined);
+    assert.equal(reported.downloadDecision, undefined);
+    await api('/api/download-confirmation', decision, 409);
+    run.confirmation = { ...pending, kind: 'download', id: randomUUID(), expiresAt: Date.now() - 1 };
+    await client.tick();
+    await api('/api/download-confirmation', { ...decision, id: run.confirmation.id }, 409);
     await api('/api/commands', { deviceId, requestId: randomUUID(), type: 'stop', runId: randomUUID() }, 404);
     await api('/api/commands', { deviceId, requestId: randomUUID(), type: 'stop', runId: command.requestId });
     await client.tick(); await client.tick(); assert.equal(stopped, 1);

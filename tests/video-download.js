@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
+const { mock } = require('node:test');
 const { validateVideo, inspectVideo, downloadVideo, run, selectionArgs, videoOptions, publishVideo, transferArgs } = require('../local-workflow-agent/src/integrations/video/video-download');
 const { createScenarioStore } = require('../local-workflow-agent/src/workflow/scenario-store');
 const { createWorkflows } = require('../local-workflow-agent/src/workflow/workflows');
@@ -41,6 +42,65 @@ const { createCachedDownloader } = require('../local-workflow-agent/src/storage/
     finish({ title: 'Stale' });
     await new Promise(resolve => setImmediate(resolve));
     assert.equal(workflows.status().download, null, 'stale result after Stop must be ignored');
+    let transfers = 0, nextSteps = 0, completeTransfer;
+    const confirmationWorkflows = createWorkflows({ scenarios: store, defaultProfile: 'Default', profiles: () => [{ directory: 'Default' }],
+      openFolder: async () => { nextSteps++; },
+      async downloadVideo(step, signal, { confirm }) {
+        await confirm({ kind: 'download', name: 'preview.mp4', filePath: path.join(directory, 'preview.mp4') });
+        transfers++;
+        await new Promise(resolve => { completeTransfer = resolve; });
+        return { title: 'Preview', name: 'preview.mp4', filePath: path.join(directory, 'preview.mp4'), verified: true };
+      }
+    });
+    const confirmedScenario = { ...scenario, steps: [...scenario.steps, { action: 'openFolder', path: directory }] };
+    const start = () => confirmationWorkflows.start('Default', confirmedScenario);
+    const decide = (run, proceed) => confirmationWorkflows.resolveConfirmation('Default', run.executionId, run.confirmation.id, proceed);
+    const flush = () => new Promise(resolve => setImmediate(resolve));
+    mock.timers.enable({ apis: ['Date', 'setTimeout'] });
+    try {
+      const declined = start();
+      assert.equal(declined.confirmation.name, 'preview.mp4');
+      assert.equal(declined.confirmation.expiresAt - Date.now(), 30000);
+      decide(declined, false);
+      await flush();
+      assert.equal(confirmationWorkflows.getRun(declined.runId).state, 'cancelled');
+      assert.equal(transfers, 0);
+      assert.equal(nextSteps, 0);
+      const approved = start();
+      assert.throws(() => decide(declined, true), /hết hiệu lực/);
+      decide(approved, true);
+      await flush();
+      assert.equal(transfers, 1);
+      assert.equal(nextSteps, 0);
+      completeTransfer();
+      await flush();
+      assert.equal(nextSteps, 1);
+      const automatic = start();
+      mock.timers.tick(29999);
+      await flush();
+      assert.equal(transfers, 1);
+      mock.timers.tick(1);
+      await flush();
+      assert.equal(transfers, 2);
+      assert.equal(nextSteps, 1);
+      completeTransfer();
+      await flush();
+      assert.equal(nextSteps, 2);
+      assert.equal(confirmationWorkflows.getRun(automatic.runId).steps[0].decisions[0].source, 'timeout');
+      start();
+      confirmationWorkflows.stop('Default');
+      mock.timers.tick(30000);
+      await flush();
+      assert.equal(transfers, 2);
+      const remote = confirmationWorkflows.start('Default', confirmedScenario, '', 'fixture', {}, 60000, null, true);
+      mock.timers.tick(30000);
+      assert.throws(() => decide(remote, false), /hết thời gian/);
+      confirmationWorkflows.resolveConfirmation('Default', remote.executionId, remote.confirmation.id, false, 'remote');
+      mock.timers.tick(4000);
+      await flush();
+      assert.equal(transfers, 2);
+      assert.equal(confirmationWorkflows.getRun(remote.runId).state, 'cancelled');
+    } finally { mock.timers.reset(); }
     await assert.rejects(run(process.execPath, ['-e', 'setInterval(()=>{},1000)'], { signal: AbortSignal.timeout(100) }), /cancelled|timed out/);
     await assert.rejects(run(process.execPath, ['-e', 'console.error("fixture failure");process.exit(3)']), /fixture failure/);
     await assert.rejects(run(process.execPath, ['-e', 'console.log("x".repeat(1000))'], { limit: 10 }), /too large/);
@@ -56,14 +116,17 @@ const { createCachedDownloader } = require('../local-workflow-agent/src/storage/
     const browser = await chromium.launch({ channel: 'chrome', headless: true });
     try {
       const page = await browser.newPage();
-      let inspected = false, deleted = false;
+      let inspected = false, deleted = false, pending, decision;
       let saved = structuredClone(scenario);
       const title = 'Video ti\u1ebfng Vi\u1ec7t';
       await page.route('http://127.0.0.1:34719/**', async route => {
         const request = route.request(), pathname = new URL(request.url()).pathname;
         let data = {};
         if (pathname === '/') return route.fulfill({ contentType: 'text/html; charset=utf-8', body: fs.readFileSync(path.resolve(__dirname, '../local-workflow-agent/dashboard/index.html'), 'utf8') });
-        if (pathname === '/api/profiles') data = { defaultProfile: 'Default', capabilities: ['variables-v1', 'video-download-v1', 'video-quality-best-v1', 'download-references-v1', 'scenario-management-v1'], profiles: [{ directory: 'Default', name: 'Test', extensionConnected: false, running: false, download: { title, filePath: 'D:/Videos/sample.mp4', width: 1440, height: 1920, fps: 60, videoCodec: 'vp9' } }] };
+        if (pathname === '/issues.js') return route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.resolve(__dirname, '../local-workflow-agent/dashboard/issues.js'), 'utf8') });
+        if (pathname === '/api/profiles') data = { defaultProfile: 'Default', capabilities: ['variables-v1', 'video-download-v1', 'video-quality-best-v1', 'download-references-v1', 'scenario-management-v1'], profiles: [{ directory: 'Default', profile: 'Default', name: 'Test', extensionConnected: false, running: Boolean(pending), executionId: 'fixture-confirmation-run',
+          confirmation: pending, download: { title, filePath: 'D:/Videos/sample.mp4', width: 1440, height: 1920, fps: 60, videoCodec: 'vp9' } }] };
+        else if (pathname === '/api/confirm') { decision = request.postDataJSON(); pending = null; }
         else if (pathname === '/api/scenarios') data = { names: deleted ? [] : ['video-download'] };
         else if (pathname === '/api/scenarios/my-workflow' && request.method() === 'PUT') { saved = request.postDataJSON(); data = { ok: true }; }
         else if (pathname === '/api/scenarios/video-download') {
@@ -157,6 +220,13 @@ const { createCachedDownloader } = require('../local-workflow-agent/src/storage/
       await page.locator('#runHistory summary').click();
       assert.match(await page.locator('#runHistory').textContent(), /Đã tải trước đó.*sample.mp4/);
       assert.match(await page.locator('#runHistory').textContent(), /Thất bại.*Target not found/);
+      pending = { id: 'fixture-confirmation', kind: 'download', message: 'Xác nhận tải video', step: 1, name: 'Tên phim.mp4', filePath: 'D:/Videos/Tên phim.mp4', expiresAt: Date.now() + 30000 };
+      await page.evaluate(() => fetch('/api/profiles'));
+      const dialog = page.getByRole('dialog', { name: 'Xác nhận tải video' });
+      await dialog.getByText(/D:\/Videos\/Tên phim\.mp4/).waitFor();
+      await dialog.getByRole('button', { name: 'Yes', exact: true }).click();
+      await dialog.waitFor({ state: 'hidden' });
+      assert.deepEqual(decision, { profile: 'Default', executionId: 'fixture-confirmation-run', id: 'fixture-confirmation', proceed: true });
       console.log('Dashboard preview, runtime reference picker, step label persistence/default and deletion/cancel: OK');
     } finally { await browser.close(); }
 
@@ -226,7 +296,12 @@ const { createCachedDownloader } = require('../local-workflow-agent/src/storage/
       const probe = JSON.parse(await run(path.join(tools, 'ffprobe.exe'), ['-v', 'quiet', '-show_streams', '-of', 'json', result.filePath]));
       assert(probe.streams.some(item => item.codec_type === 'video'));
       assert(probe.streams.some(item => item.codec_type === 'audio'));
-      const again = await downloadVideo({ url: localUrl, directory: path.join(directory, 'saved'), quality: 720 });
+      const again = await downloadVideo({ url: localUrl, directory: path.join(directory, 'saved'), quality: 720 }, undefined, preview => {
+        assert.equal(preview.name, 'fixture (2).mp4');
+        assert.equal(preview.filePath, path.join(directory, 'saved', preview.name));
+        assert(!fs.existsSync(preview.filePath));
+        assert.deepEqual(fs.readdirSync(path.dirname(preview.filePath)), ['fixture.mp4']);
+      });
       assert.equal(again.name, 'fixture (2).mp4');
       assert.notEqual(again.filePath, result.filePath);
       assert(fs.existsSync(result.filePath), 'must preserve previous video');
@@ -242,7 +317,10 @@ const { createCachedDownloader } = require('../local-workflow-agent/src/storage/
       let merged;
       try {
         process.env.YTDLP_CONCURRENT_FRAGMENTS = '4';
-        merged = await downloadVideo({ url: localUrl.replace('.mp4', '.mpd'), directory: path.join(directory, 'merged'), quality: 720 });
+        merged = await downloadVideo({ url: localUrl.replace('.mp4', '.mpd'), directory: path.join(directory, 'merged'), quality: 720 }, undefined, preview => {
+          assert.equal(preview.name, 'fixture.mp4');
+          assert.equal(peakSegments, 0, 'DASH transfer starts after confirmation');
+        });
       } finally {
         if (savedFragments === undefined) delete process.env.YTDLP_CONCURRENT_FRAGMENTS;
         else process.env.YTDLP_CONCURRENT_FRAGMENTS = savedFragments;
@@ -255,7 +333,9 @@ const { createCachedDownloader } = require('../local-workflow-agent/src/storage/
       const cachedDownloader = createCachedDownloader(createActivityStore(path.join(directory, 'activity')), downloadVideo);
       const firstCached = await cachedDownloader({ url: localUrl, directory: path.join(directory, 'cached') });
       const requestsAfterDownload = requests;
-      const secondCached = await cachedDownloader({ url: localUrl, directory: path.join(directory, 'different-directory') });
+      const secondCached = await cachedDownloader({ url: localUrl, directory: path.join(directory, 'different-directory') }, undefined, {
+        confirmDownload: preview => assert.deepEqual(preview, { name: firstCached.name, filePath: firstCached.filePath, reused: true })
+      });
       assert.equal(secondCached.reused, true); assert.equal(secondCached.filePath, firstCached.filePath);
       assert.equal(requests, requestsAfterDownload, 'verified URL reuse must not contact source or redownload');
       console.log('Real yt-dlp + FFmpeg local video download, title, no-overwrite and audio/video verification: OK');

@@ -27,7 +27,16 @@ function snapshot(value, command) {
       names: Array.isArray(value.clips?.names) ? value.clips.names.slice(0, 60).filter(clipName) : [],
       more: value.clips?.more === true
     } } : {}) };
+  const pending = command.type === 'run' && value.state === 'running' && value.confirmation;
+  let confirmation;
+  if (pending) {
+    if (!c.object(pending) || !Number.isSafeInteger(pending.step) || pending.step < 1 ||
+      !Number.isSafeInteger(pending.expiresAt)) c.fail('Invalid download confirmation');
+    confirmation = { id: c.uuid(pending.id), step: pending.step, name: c.text(pending.name, 255), filePath: c.text(pending.filePath, 32767),
+      expiresAt: pending.expiresAt, reused: pending.reused === true, duplicate: pending.duplicate === true };
+  }
   return { runId: command.type === 'run' ? command.id : command.payload.runId, state: value.state,
+    ...(confirmation && { confirmation }),
     index: Number.isInteger(value.index) && value.index >= 0 ? value.index : 0,
     total: Number.isInteger(value.total) && value.total >= 0 ? value.total : 0,
     stoppedAtStep: Number.isInteger(value.stoppedAtStep) ? value.stoppedAtStep : null,
@@ -47,6 +56,22 @@ function createCommandApi(store) {
   }
   function owned(user, id) { const d = store.get('device', c.uuid(id)); if (!d || d.owner !== user.id) c.fail('Device not found', 404); return d; }
   function account(route, method, user, data, url) {
+    if (route === '/api/download-confirmation' && method === 'POST') {
+      const d = owned(user, data.deviceId), id = c.uuid(data.id);
+      const run = store.get('command', c.uuid(data.runId));
+      if (run?.owner !== user.id || run.deviceId !== d.id || run.type !== 'run') c.fail('Remote run not found', 404);
+      if (typeof data.proceed !== 'boolean') c.fail('Invalid download decision');
+      const confirmation = run.result?.confirmation;
+      if (d.revoked || run.state !== 'running' || confirmation?.id !== id) c.fail('Xác nhận tải video đã hết hiệu lực.', 409);
+      if (run.downloadDecision?.id === id) {
+        if (run.downloadDecision.proceed !== data.proceed) c.fail('Đã gửi quyết định tải video.', 409);
+        return { ok: true };
+      }
+      if (Date.now() >= confirmation.expiresAt) c.fail('Đã hết thời gian xác nhận tải video.', 409);
+      run.downloadDecision = { id, proceed: data.proceed };
+      store.put('command', run, user.id);
+      return { ok: true };
+    }
     if (route === '/api/commands' && method === 'GET') {
       const id = url.searchParams.get('device'); owned(user, id);
       const requestId = url.searchParams.get('request');
@@ -122,17 +147,22 @@ function createCommandApi(store) {
         if (report.seq > cmd.seq) {
           const result = snapshot(report.result, cmd);
           // Terminal receipts cannot regress on a late/replayed progress update.
-          if (!TERMINAL.includes(cmd.state) || cmd.state === 'unknown') { cmd.result = result; cmd.state = result.state; cmd.updated = now; }
+          if (!TERMINAL.includes(cmd.state) || cmd.state === 'unknown') {
+            cmd.result = result; cmd.state = result.state; cmd.updated = now;
+            if (cmd.downloadDecision?.id !== result.confirmation?.id) delete cmd.downloadDecision;
+          }
           cmd.seq = report.seq; store.put('command', cmd, d.owner);
         }
         ack.push({ id: cmd.id, seq: report.seq });
       }
       Object.assign(d, { metadata: meta, lastSeen: now, instanceId: data.instanceId, leaseUntil: now + 35000 }); store.put('device', d, d.owner);
       const commands = expire(d.owner, d.id);
+      const downloadDecisions = commands.filter(cmd => cmd.state === 'running' && cmd.downloadDecision)
+        .map(cmd => ({ runId: cmd.id, ...cmd.downloadDecision }));
       const next = commands.filter(cmd => ['queued', 'dispatched'].includes(cmd.state) && cmd.expires >= now && cmd.deliveryUntil <= now)
         .sort((a, b) => (a.type === 'stop' ? 0 : 1) - (b.type === 'stop' ? 0 : 1) || a.created - b.created)[0];
       if (next) { next.state = 'dispatched'; next.deliveryUntil = now + 10000; store.put('command', next, d.owner); }
-      return { ack, command: next ? { id: next.id, type: next.type, payload: next.payload, expires: next.expires } : null, serverTime: now };
+      return { ack, command: next ? { id: next.id, type: next.type, payload: next.payload, expires: next.expires } : null, serverTime: now, downloadDecisions };
     });
   }
   return { account, device };

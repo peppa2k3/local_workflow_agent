@@ -161,6 +161,8 @@ The Windows file picker runs asynchronously with its console hidden and a foregr
 
 Action `downloadVideo` chạy trong agent, không cần mở Chrome. Dashboard có nút **Phân tích URL / lấy tên** để đọc title/ID trước khi tải, hỗ trợ biến. Chọn profile để theo dõi tác vụ; workflow có bước trình duyệt vẫn cần extension.
 
+Khi bước chạy từ URL HTTP/HTTPS, agent kiểm tra nguồn, tên file và đường dẫn đích rồi hiện popup trên dashboard local. Lượt chạy từ control-server cũng hiện popup trên trang thiết bị đang chạy. **Yes** cho phép tải hoặc dùng file cache đã xác minh. **No** dừng lượt chạy tại bước này. Sau 30 giây, agent mặc định chọn **Yes**. Lượt chạy remote dành thêm tối đa 4 giây để nhận quyết định đã gửi đúng hạn qua polling. Bước sau chỉ chạy khi file sẵn sàng và đã được xác minh. Bước dùng `clip:` mở video đã lưu trực tiếp.
+
 Ví dụ: `{"action":"downloadVideo","url":"https://www.youtube.com/watch?v=9qq_Fqp2rnM","directory":"D:\\Videos","quality":1080,"language":"vi","downloadTimeoutMs":1800000}`.
 
 - `url`: HTTP/HTTPS của một video; không playlist/live, không credentials trong URL.
@@ -168,7 +170,7 @@ Ví dụ: `{"action":"downloadVideo","url":"https://www.youtube.com/watch?v=9qq_
 - `quality`: mặc định `1080` (Full HD); chọn 360/480/720/1080/1440/2160 hoặc `"best"`. Ưu tiên độ phân giải cạnh ngắn lớn nhất không vượt mức, sau đó FPS/bitrate/codec. Nếu chỉ có bản vượt mức, chọn bản nhỏ nhất có sẵn; không upscale hoặc ép nén. `"best"` chọn độ phân giải cao nhất. Giá trị số trong JSON cũ nay được áp dụng thật.
 - `language`: mặc định `"vi"` (audio tiếng Việt); có thể dùng `en`, `zh`, `ja`, `ko`, mã ngôn ngữ như `pt-BR`, hoặc `"auto"` theo nguồn. Ưu tiên audio khớp mã; nếu thiếu dùng audio nguồn. Không tự dịch/lồng tiếng hoặc tải phụ đề. Cache cũ không có tùy chọn sẽ được tải lại; thay ngôn ngữ/độ phân giải không tái sử dụng file của tùy chọn khác.
 - Tên cuối: `tiêu đề.ext`, không tự gắn `[ID]`. Lấy metadata thật, xử lý ký tự Windows, giới hạn phần tiêu đề theo template 150B của yt-dlp. URL đã tải và còn đúng file/hash thì dùng lại file; trường hợp cần tải mới, trùng tên tạo `tiêu đề (2).ext`, `(3)`… và không ghi đè. ID vẫn có trong metadata và `{{download_id}}`.
-- Timeout tổng phân tích + tải: mặc định 30 phút, 1000–7200000 ms. Nút Dừng hủy cây tiến trình yt-dlp/FFmpeg; file .part hoặc file đã xong trước lúc dừng có thể còn lại.
+- Timeout phân tích và tải: mỗi giai đoạn mặc định 30 phút, 1000–7200000 ms. Thời gian xác nhận tính riêng. Nút Dừng hủy cây tiến trình yt-dlp/FFmpeg.
 
 Status trả `download` gồm title, id, name, filePath, bytes, width, height, fps, videoCodec, audioCodec, bitrate; chỉ báo thành công sau hậu xử lý và xác nhận file tồn tại, khác rỗng. API phân tích: POST `/api/video/inspect` với `{"url":"https://..."}`, trả title/id/url/duration, timeout 60 giây.
 
@@ -270,8 +272,8 @@ Agent đọc `.env` ở thư mục dự án, gồm `MONGODB_URI` và `MONGODB_DA
 
 Trước `downloadVideo`, agent kiểm tra URL chuẩn hóa trong lịch sử local và collection `downloads` của MongoDB nếu đã cấu hình. Trước `upload`, agent đối chiếu đường dẫn, tên file (không phân biệt hoa/thường) và SHA-256 với `file_instances`, `upload_events`, `publications`, trên mọi page. File đã nhập kho nhưng chưa có upload/publication không tự coi là upload trùng.
 
-Khi trùng, workflow giữ bước hiện tại và trả `paused: true`, `confirmation` trong status; extension chưa nhận bước upload. Popup trên dashboard local có **Dừng tác vụ** và **Xác nhận tiếp tục**. Download sau xác nhận vẫn dùng cache nếu file còn đúng size/hash; nếu không còn file hợp lệ thì tải lại. Upload sau xác nhận là chủ động cho phép upload thêm lần nữa. Quyết định được lưu cùng step; ID xác nhận cũ hoặc khác execution bị từ chối. Stop, timeout và restart không tự tiếp tục tác vụ đang chờ.
+Popup tải video báo khi URL đã có trong lịch sử và hiển thị đường dẫn thực tế của file cache hoặc file sẽ tải mới. Khi phát hiện upload trùng, workflow trả `paused: true`, `confirmation` trong status và giữ bước upload để chờ **Dừng tác vụ** hoặc **Xác nhận tiếp tục** trên dashboard local. Quyết định được lưu cùng bước. ID xác nhận chỉ áp dụng cho lượt chạy và bước đang chờ.
 
 Agent ghi sự kiện upload `pending` trước dispatch và đổi thành `uploaded` sau acknowledgement. Nếu lỗi hoặc mất phản hồi, bản ghi pending vẫn cảnh báo nguy cơ trùng ở lần chạy sau. MongoDB đã cấu hình nhưng không truy vấn được sẽ làm tác vụ thất bại và hiển thị popup; không tự bỏ kiểm tra DB. Trong một process agent, các thao tác media được tuần tự hóa đến kết quả; các service độc lập vẫn cần phối hợp khóa riêng nếu yêu cầu chống chạy đồng thời giữa nhiều máy.
 
-Popup lỗi có nút **Đã hiểu** trên các trang local. Web VPS thông báo tác vụ tạm dừng và yêu cầu mở dashboard local để xác nhận. Các bước click xuất bản riêng của website vẫn cần điều kiện xác nhận tương ứng; acknowledgement upload không chứng minh đã xuất bản.
+Popup lỗi có nút **Đã hiểu** trên các trang local. Control-server hướng dẫn mở dashboard local khi bước upload đang chờ xác nhận trùng. Các bước click xuất bản riêng của website vẫn cần điều kiện xác nhận tương ứng.

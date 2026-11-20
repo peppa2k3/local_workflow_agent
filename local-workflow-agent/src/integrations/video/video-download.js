@@ -43,15 +43,17 @@ function run(command, args, { signal, limit = 4 * 1024 * 1024, cwd } = {}) {
   });
 }
 const baseArgs = ['--js-runtimes', `node:${process.execPath}`, '--encoding', 'utf-8', '--ignore-config', '--no-playlist', '--no-progress', '--no-warnings', '--windows-filenames'];
-async function metadata(url, signal) {
-  const raw = await run(binary('yt-dlp', 'YTDLP_PATH'), [...baseArgs, '--skip-download', '--dump-single-json', '--', url], { signal });
+const outputArgs = ['--merge-output-format', 'mp4', '--output', '%(title).150B.%(ext)s'];
+async function metadata(url, signal, options = []) {
+  const raw = await run(binary('yt-dlp', 'YTDLP_PATH'), [...baseArgs, ...options, '--simulate', '--dump-single-json', '--', url], { signal });
   const info = JSON.parse(raw);
   if (!info.id || !info.title || info.entries || info.is_live) throw new Error('URL must resolve to one non-live video with a title and ID');
-  return { id: String(info.id), title: String(info.title), url: info.webpage_url || url, duration: info.duration ?? null };
+  const video = { id: String(info.id), title: String(info.title), url: info.webpage_url || url, duration: info.duration ?? null };
+  return { video, filename: info.requested_downloads?.[0]?.filename };
 }
 async function inspectVideo(url, signal) {
   validateVideo({ url });
-  return metadata(url, AbortSignal.any([AbortSignal.timeout(60000), ...(signal ? [signal] : [])]));
+  return (await metadata(url, AbortSignal.any([AbortSignal.timeout(60000), ...(signal ? [signal] : [])]))).video;
 }
 function videoOptions(step = {}) {
   return { quality: String(step.quality ?? 1080), language: step.language ?? 'vi' };
@@ -70,10 +72,24 @@ function selectionArgs(step = {}) {
   return ['--format', `bv+${audio}/${combined}/bv`, '--format-sort-force', '--format-sort',
     `${quality === 'best' ? 'res' : `res:${quality}`},fps,vbr,abr,tbr,vcodec,acodec`];
 }
-async function publishVideo(source, directory) {
-  const ext = path.extname(source), stem = path.basename(source, ext);
+function* videoDestinations(name, directory) {
+  const { name: stem, ext } = path.parse(name);
   for (let suffix = 1; suffix < 10000; suffix++) {
-    const destination = path.join(directory, stem + (suffix === 1 ? '' : ' (' + suffix + ')') + ext);
+    yield path.join(directory, stem + (suffix === 1 ? '' : ' (' + suffix + ')') + ext);
+  }
+  throw new Error('Too many files with the same video title');
+}
+async function availableDestination(name, directory) {
+  for (const destination of videoDestinations(name, directory)) {
+    try { await fs.promises.lstat(destination); }
+    catch (error) {
+      if (error.code === 'ENOENT') return destination;
+      throw error;
+    }
+  }
+}
+async function publishVideo(source, directory) {
+  for (const destination of videoDestinations(path.basename(source), directory)) {
     try {
       // Same filesystem: link publishes the complete file atomically and never overwrites.
       await fs.promises.link(source, destination);
@@ -82,7 +98,6 @@ async function publishVideo(source, directory) {
       if (error.code !== 'EEXIST') throw error;
     }
   }
-  throw new Error('Too many files with the same video title');
 }
 async function probeVideo(filePath, ffmpeg, signal) {
   const siblingProbe = path.isAbsolute(ffmpeg) ? path.join(path.dirname(ffmpeg), process.platform === 'win32' ? 'ffprobe.exe' : 'ffprobe') : '';
@@ -98,10 +113,11 @@ async function probeVideo(filePath, ffmpeg, signal) {
     fps: denominator ? numerator / denominator : 0, videoCodec: video.codec_name, audioCodec: audio?.codec_name || null,
     bitrate: Number(media.format?.bit_rate) || null };
 }
-async function downloadVideo(step, signal) {
+async function downloadVideo(step, signal, confirm) {
   validateVideo(step);
   if (!step.directory) throw new Error('Video download requires directory');
-  const combined = AbortSignal.any([AbortSignal.timeout(Number(step.downloadTimeoutMs || 1800000)), ...(signal ? [signal] : [])]);
+  const withTimeout = () => AbortSignal.any([AbortSignal.timeout(Number(step.downloadTimeoutMs || 1800000)), ...(signal ? [signal] : [])]);
+  let combined = withTimeout();
   const ffmpeg = binary('ffmpeg', 'FFMPEG_PATH');
   if (isClip(step.url)) {
     const name = step.url.slice(prefix.length);
@@ -112,16 +128,24 @@ async function downloadVideo(step, signal) {
   }
   const transfer = transferArgs();
   await run(ffmpeg, ['-version'], { signal: combined });
-  const info = await metadata(step.url, combined);
+  const format = selectionArgs(step);
+  const { video: info, filename } = await metadata(step.url, combined, confirm ? [...format, ...outputArgs] : []);
   const directory = path.resolve(step.directory);
+  let destination;
+  if (confirm) {
+    if (!filename || path.basename(filename) !== filename || filename === '.' || filename === '..') throw new Error('Could not determine the video filename');
+    destination = await availableDestination(filename, directory);
+    combined.throwIfAborted();
+    await confirm({ name: path.basename(destination), filePath: destination });
+    combined = withTimeout();
+  }
+  combined.throwIfAborted();
   await fs.promises.mkdir(directory, { recursive: true });
   const staging = await fs.promises.mkdtemp(path.join(directory, '.video-download-'));
   try {
     const output = await run(binary('yt-dlp', 'YTDLP_PATH'), [...baseArgs,
       '--no-simulate', '--no-overwrites', ...(fs.existsSync(ffmpeg) ? ['--ffmpeg-location', ffmpeg] : []),
-      ...transfer, ...selectionArgs(step),
-      '--merge-output-format', 'mp4', '--paths', staging,
-      '--output', '%(title).150B.%(ext)s',
+      ...transfer, ...format, ...outputArgs, '--paths', staging,
       '--print', 'after_move:%(filepath)j', '--', step.url], { signal: combined });
     const stagedPath = path.resolve(JSON.parse(output));
     const relative = path.relative(staging, stagedPath);
@@ -130,7 +154,12 @@ async function downloadVideo(step, signal) {
     if (!stat.isFile() || !stat.size) throw new Error('Downloaded file is missing or empty');
     if (/\.(part|ytdl|tmp)$/i.test(stagedPath)) throw new Error('Download did not produce a final media file');
     const media = await probeVideo(stagedPath, ffmpeg, combined);
-    const filePath = await publishVideo(stagedPath, directory);
+    combined.throwIfAborted();
+    if (destination) {
+      if (path.basename(stagedPath) !== filename) throw new Error('Video filename changed after confirmation');
+      await fs.promises.link(stagedPath, destination);
+    }
+    const filePath = destination || await publishVideo(stagedPath, directory);
     return { ...info, ...media, downloadOptions: videoOptions(step), filePath, name: path.basename(filePath), bytes: stat.size };
   } finally {
     // Only remove the unique working directory created for this invocation.

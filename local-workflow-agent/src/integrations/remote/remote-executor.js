@@ -7,10 +7,13 @@ function createRemoteExecutor({ dataDir, workflows, scenarios, getPolicy }) {
   const journal = c.readJson(file, {});
   const save = () => c.atomicJson(file, journal);
   function result(run) {
+    const confirmation = run.state === 'running' && run.confirmation?.kind === 'download' ? run.confirmation : null;
     return { runId: run.runId, state: run.state, index: run.index, total: run.total, stoppedAtStep: run.stoppedAtStep,
       steps: (run.steps || []).slice(0, 100).map(s => ({ number: s.number, state: s.state, action: s.action, label: String(s.label || '').slice(0, 120) })),
       startedAt: run.startedAt, endedAt: run.endedAt,
-      message: run.paused ? 'Tạm dừng vì trùng dữ liệu. Xác nhận tại dashboard local để tiếp tục hoặc dừng.' : ['failed', 'interrupted'].includes(run.state) ? 'Workflow failed/interrupted. See local history for details.' : '' };
+      ...(confirmation && { confirmation: { id: confirmation.id, step: confirmation.step, name: confirmation.name, filePath: confirmation.filePath,
+        expiresAt: confirmation.expiresAt, reused: confirmation.reused === true, duplicate: Boolean(confirmation.matches?.length) } }),
+      message: run.paused && !confirmation ? 'Tạm dừng vì trùng dữ liệu. Xác nhận tại dashboard local để tiếp tục hoặc dừng.' : ['failed', 'interrupted'].includes(run.state) ? 'Workflow failed/interrupted. See local history for details.' : '' };
   }
   function update(record, value) {
     if (JSON.stringify(record.result) !== JSON.stringify(value)) { record.result = value; record.seq++; save(); }
@@ -49,7 +52,7 @@ function createRemoteExecutor({ dataDir, workflows, scenarios, getPolicy }) {
             scenario.steps[target.index][target.action === 'downloadVideo' ? 'url' : 'filePath'] = prefix + name;
           }
         }
-        const run = workflows.start(p.profile, scenario, '', p.scenario, p.variables, 3600000, record.id);
+        const run = workflows.start(p.profile, scenario, '', p.scenario, p.variables, 3600000, record.id, true);
         record.phase = 'started'; update(record, result(run));
       } else if (command.type === 'browseClips') {
         const { scenario, target, query } = command.payload, policy = getPolicy();
@@ -99,12 +102,21 @@ function createRemoteExecutor({ dataDir, workflows, scenarios, getPolicy }) {
     for (const item of ack || []) { const r = journal[item.id]; if (r && item.seq <= r.seq && item.seq > r.ack) { r.ack = item.seq; changed = true; } }
     if (changed) save();
   }
+  function confirmDownloads(decisions, deviceId) {
+    for (const { runId, id, proceed } of decisions || []) {
+      const record = journal[runId];
+      if (record?.deviceId !== deviceId || record.type !== 'run' || record.phase !== 'started') continue;
+      const run = workflows.getRun(runId);
+      if (run?.state !== 'running' || run.confirmation?.kind !== 'download' || run.confirmation.id !== id) continue;
+      workflows.resolveConfirmation(record.payload.profile, runId, id, proceed, 'remote');
+    }
+  }
   function stopOwned(deviceId, policy) {
     for (const r of Object.values(journal)) if (r.deviceId === deviceId && r.type === 'run' && r.phase === 'started'
       && (!policy || !policy.profiles.includes(r.payload.profile) || !policy.scenarios.includes(r.payload.scenario))) {
       const run = workflows.stopRun(r.id); if (run) update(r, result(run));
     }
   }
-  return { execute, reports, acknowledge, stopOwned };
+  return { execute, reports, acknowledge, confirmDownloads, stopOwned };
 }
 module.exports = { createRemoteExecutor };

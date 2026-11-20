@@ -42,8 +42,16 @@ const workflows = createWorkflows({ scenarios, defaultProfile: profile, profiles
     const file = await activity.registerFile(clip.filePath, { duration: clip.duration, tag: step.folderTag || 'automation', signal });
     return { ...clip, ...file };
   }
-  const release = await mediaGuard.check(step, null, { ...context, signal });
-  try { return await cachedDownloader(step, signal); } finally { release(); }
+  let duplicate;
+  const release = await mediaGuard.check(step, null, { signal, confirm: issue => { duplicate = issue; } });
+  try {
+    return await cachedDownloader(step, signal, {
+      confirmDownload: details => context.confirm({
+        ...duplicate, ...details, kind: 'download',
+        message: details.reused ? 'Xác nhận dùng video đã lưu' : 'Xác nhận tải video'
+      })
+    });
+  } finally { release(); }
 }, openFolder(folderPath) {
   const folder = path.resolve(folderPath);
   if (!fs.existsSync(folder) || !fs.statSync(folder).isDirectory()) throw new Error(`Folder does not exist: ${folder}`);

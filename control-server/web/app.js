@@ -9,6 +9,61 @@
   const notices = new Set(), noticeQueue = [];
   const reportedResults = new Map();
   let notice;
+  let downloadPrompt, submittedDownload;
+  function closeDownloadPrompt() {
+    if (!downloadPrompt) return;
+    clearInterval(downloadPrompt.timer);
+    downloadPrompt.dialog.close();
+    downloadPrompt.dialog.remove();
+    downloadPrompt = null;
+    showNotice();
+  }
+  function showDownloadConfirmation(commands, deviceId) {
+    const run = commands.filter(cmd => cmd.state === 'running' && cmd.result?.confirmation?.expiresAt > Date.now()
+      && cmd.downloadDecision?.id !== cmd.result.confirmation.id && cmd.result.confirmation.id !== submittedDownload)
+      .sort((a, b) => a.result.confirmation.expiresAt - b.result.confirmation.expiresAt)[0];
+    const confirmation = run?.result.confirmation;
+    if (downloadPrompt?.id === confirmation?.id) return;
+    closeDownloadPrompt();
+    if (!confirmation) return;
+    const dialog = el('dialog', undefined, 'clip-picker');
+    const title = el('h2', confirmation.reused ? 'Xác nhận dùng video đã lưu' : 'Xác nhận tải video');
+    title.id = 'download-confirmation-title';
+    dialog.setAttribute('aria-labelledby', title.id);
+    dialog.addEventListener('cancel', event => event.preventDefault());
+    const file = el('p', `Tên file: ${confirmation.name}`);
+    const destination = el('p', `Đường dẫn trên máy local: ${confirmation.filePath}`);
+    const remaining = el('p'), error = el('p', '', 'error'), actions = el('div', undefined, 'row');
+    error.setAttribute('role', 'status');
+    for (const [label, proceed] of [['Yes', true], ['No', false]]) {
+      const button = el('button', label);
+      button.addEventListener('click', async () => {
+        for (const item of actions.children) item.disabled = true;
+        error.textContent = '';
+        try {
+          await api('/api/download-confirmation', { deviceId, runId: run.id, id: confirmation.id, proceed });
+          submittedDownload = confirmation.id;
+          if (downloadPrompt?.id === confirmation.id) closeDownloadPrompt();
+          message('Đã gửi quyết định tải video.');
+          await refresh();
+        } catch (e) {
+          error.textContent = e.message;
+          for (const item of actions.children) item.disabled = false;
+        }
+      });
+      actions.append(button);
+    }
+    const update = () => {
+      const seconds = Math.ceil((confirmation.expiresAt - Date.now()) / 1000);
+      if (seconds <= 0) return closeDownloadPrompt();
+      remaining.textContent = `Tự tiếp tục sau ${seconds} giây. No sẽ dừng lượt chạy.`;
+    };
+    dialog.append(title, el('p', `${run.payload.scenario} · ${run.payload.profile} · Bước ${confirmation.step}`), file, destination);
+    if (confirmation.duplicate) dialog.append(el('p', 'URL đã có trong lịch sử tải.'));
+    dialog.append(remaining, error, actions);
+    downloadPrompt = { id: confirmation.id, dialog, timer: setInterval(update, 250) };
+    document.body.append(dialog); dialog.showModal(); update();
+  }
   function popup(text, fromHistory = false) {
     if (!text || (!fromHistory && notices.has(text))) return;
     if (!fromHistory) {
@@ -18,7 +73,7 @@
     noticeQueue.push(text); showNotice();
   }
   function showNotice() {
-    if (notice || !noticeQueue.length) return;
+    if (downloadPrompt || notice || !noticeQueue.length) return;
     notice = el('dialog'); notice.style.cssText = 'max-width:560px;width:calc(100% - 32px);background:#142136;color:#edf2ff;border:1px solid #607897;border-radius:14px;padding:24px;overflow-wrap:anywhere';
     const close = el('button', 'Đã hiểu'); close.addEventListener('click', () => notice.close());
     notice.append(el('h2', 'Thông báo tác vụ'), el('p', noticeQueue.shift()), close);
@@ -32,7 +87,7 @@
     const value = await r.json();
     if (!r.ok) { if (r.status === 401) loginView(); throw Error(value.error || 'Yêu cầu thất bại'); } return value;
   }
-  function loginView() { closeClipPicker?.(); csrf = ''; selected = ''; devices = []; formSignature = ''; historySignature = ''; runIntent = null; $('history').replaceChildren(); clearTimeout(timer); $('workspace').hidden = true; $('account').hidden = true; $('login').hidden = false; }
+  function loginView() { closeClipPicker?.(); closeDownloadPrompt(); submittedDownload = null; csrf = ''; selected = ''; devices = []; formSignature = ''; historySignature = ''; runIntent = null; $('history').replaceChildren(); clearTimeout(timer); $('workspace').hidden = true; $('account').hidden = true; $('login').hidden = false; }
   function accountView(value) { csrf = value.csrf; $('email').textContent = value.email; $('account').hidden = false; $('login').hidden = true; $('workspace').hidden = false; }
   function options(target, items, valueKey, labelKey) { const old = target.value; target.replaceChildren(...items.map(item => { const n = el('option', item[labelKey]); n.value = item[valueKey]; return n; })); if (items.some(i => i[valueKey] === old)) target.value = old; }
   function clipPicker(scenario, target, choose) {
@@ -113,7 +168,7 @@
     $('devices').replaceChildren(...devices.map(d => {
       const n = el('button', undefined, 'device' + (d.id === selected ? ' selected' : ''));
       n.append(el('strong', d.name), el('span', d.revoked ? 'Đã thu hồi' : d.online ? 'Online' : 'Offline', 'badge ' + (d.online ? 'online' : 'offline')));
-      n.addEventListener('click', () => { selected = d.id; formSignature = ''; historySignature = ''; runIntent = null; void refresh(); }); return n;
+      n.addEventListener('click', () => { if (selected !== d.id) closeDownloadPrompt(); selected = d.id; formSignature = ''; historySignature = ''; runIntent = null; void refresh(); }); return n;
     }));
     if (!devices.length) $('devices').append(el('p', 'Chưa ghép thiết bị nào.', 'muted'));
   }
@@ -169,7 +224,10 @@
       const deviceId = selected;
       if (deviceId) {
         const { commands } = await api(`/api/commands?device=${encodeURIComponent(deviceId)}`);
-        if (selected === deviceId) renderHistory(commands, deviceId);
+        if (selected === deviceId) {
+          showDownloadConfirmation(commands, deviceId);
+          renderHistory(commands, deviceId);
+        }
       }
     } catch (e) { message(e.message, true); }
     finally { busy = false; if (csrf) timer = setTimeout(refresh, 5000); }

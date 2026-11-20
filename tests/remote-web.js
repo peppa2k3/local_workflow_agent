@@ -32,7 +32,7 @@ const { chromium } = require('playwright');
     page.on('pageerror', e => errors.push(e.message));
     const id = 'e43c8711-3731-4daa-9725-6721f78f1039';
     const target = 'a'.repeat(64), uploadTarget = 'b'.repeat(64), clip = 'Clip tiếng Việt.mp4';
-    let loggedIn = false, online = true;
+    let loggedIn = false, online = true, downloadConfirmation;
     await page.route('https://control.test/**', async route => {
       const req = route.request(), url = new URL(req.url());
       if (['/', '/app.js', '/style.css'].includes(url.pathname)) return route.fulfill({ contentType: url.pathname === '/' ? 'text/html' : url.pathname.endsWith('.js') ? 'text/javascript' : 'text/css',
@@ -44,6 +44,14 @@ const { chromium } = require('playwright');
         profiles: [{ directory: 'Default', name: 'Test', extensionConnected: true }], scenarios: [{ name: 'sample', variables: ['caption'], steps: 2,
           clipTargets: [{ id: target, index: 0, action: 'downloadVideo', variable: 'caption' }, { id: uploadTarget, index: 1, action: 'upload' }] }] } }] } });
       if (url.pathname === '/api/commands' && url.searchParams.has('request')) return route.fulfill({ json: { commands: [{ state: 'succeeded', result: { clips: { names: [clip], more: false } } }] } });
+      if (url.pathname === '/api/download-confirmation') {
+        downloadConfirmation = null;
+        return route.fulfill({ json: { ok: true } });
+      }
+      if (url.pathname === '/api/commands' && downloadConfirmation) return route.fulfill({ json: { commands: [{
+        id: posted.find(p => p.data.type === 'run').data.requestId, type: 'run', state: 'running', payload: { scenario: 'sample', profile: 'Default' },
+        created: Date.now(), result: { total: 2, index: 0, confirmation: downloadConfirmation }
+      }] } });
       if (url.pathname === '/api/commands') return route.fulfill({ json: req.method() === 'POST' ? { command: { id } } : { commands: [{ id: posted.find(p => p.data.type === 'run')?.data.requestId || id, type: 'run', state: 'failed', payload: { scenario: 'sample', profile: 'Default' }, created: Date.now(), result: { total: 2, index: 1, stoppedAtStep: 2, message: 'Upload thất bại',
         steps: [{ number: 1, label: 'Tải clip', state: 'succeeded', action: 'downloadVideo' }, { number: 2, label: 'Upload', state: 'failed', action: 'upload' }] } }] } });
       return route.fulfill({ json: {} });
@@ -71,6 +79,13 @@ const { chromium } = require('playwright');
     await taskNotice.waitFor({ state: 'hidden' });
     assert.match(await page.locator('#history').textContent(), /Dừng tại bước 2\/2/);
     await page.locator('#history summary').click(); assert.match(await page.locator('#history ol').textContent(), /Tải clip — Thành công/);
+    downloadConfirmation = { id: target, name: clip, filePath: 'D:/Videos/' + clip, step: 1, expiresAt: Date.now() + 30000 };
+    await page.locator('.device').click();
+    const downloadDialog = page.getByRole('dialog', { name: 'Xác nhận tải video' });
+    await downloadDialog.getByText('Đường dẫn trên máy local: D:/Videos/' + clip).waitFor();
+    await downloadDialog.getByRole('button', { name: 'No', exact: true }).click();
+    await downloadDialog.waitFor({ state: 'hidden' });
+    assert.deepEqual(posted.find(p => p.path === '/api/download-confirmation').data, { deviceId: id, runId: request.requestId, id: target, proceed: false });
     await page.setViewportSize({ width: 390, height: 844 }); assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     await page.reload();
     await page.locator('.device').click();

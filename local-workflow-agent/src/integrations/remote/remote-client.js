@@ -64,6 +64,7 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, performan
         if (closed) return;
         executor.acknowledge(response.ack);
         if (response.command) await executor.execute(response.command, config.device.id);
+        executor.confirmDownloads(response.downloadDecisions, config.device.id);
         lastContact = Date.now();
       }
       error = ''; failures = 0; nextAttempt = 0;

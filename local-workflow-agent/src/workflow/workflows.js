@@ -73,21 +73,35 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
   }
   function confirm(s, issue) {
     const signal = s.controller.signal;
+    const timed = issue.kind === 'download';
     return new Promise((resolve, reject) => {
       signal.throwIfAborted();
-      const clean = () => { signal.removeEventListener('abort', abort); s.confirmation = null; s.decide = null; };
+      let timer;
+      const clean = () => { clearTimeout(timer); signal.removeEventListener('abort', abort); s.confirmation = null; s.decide = null; };
       const abort = () => { clean(); reject(new Error('Đã dừng tác vụ đang chờ xác nhận')); };
       s.confirmation = { ...issue, id: randomUUID(), executionId: s.executionId, step: s.index + 1 };
+      if (timed) s.confirmation.expiresAt = Date.now() + 30000;
       s.decide = () => { clean(); resolve(); };
       signal.addEventListener('abort', abort, { once: true });
-      try { persist(s); } catch (error) { clean(); reject(error); }
+      try {
+        persist(s);
+        if (timed) {
+          const { id, expiresAt } = s.confirmation;
+          // A remote decision recorded before the deadline can arrive on the next device poll.
+          timer = setTimeout(() => {
+            try { resolveConfirmation(s.profile, s.executionId, id, true, 'timeout'); }
+            catch (error) { clean(); reject(error); }
+          }, Math.max(0, expiresAt - Date.now()) + (s.remote ? 4000 : 0));
+        }
+      } catch (error) { clean(); reject(error); }
     });
   }
-  function resolveConfirmation(profile, executionId, id, proceed) {
+  function resolveConfirmation(profile, executionId, id, proceed, source = 'local') {
     const s = session(profile);
     if (!s.running || s.executionId !== executionId || s.confirmation?.id !== id || typeof proceed !== 'boolean') throw new Error('Xác nhận đã hết hiệu lực. Làm mới trạng thái.');
+    if (source === 'local' && s.confirmation.expiresAt <= Date.now()) throw new Error('Đã hết thời gian xác nhận tải video.');
     s.steps[s.index].decisions ||= [];
-    s.steps[s.index].decisions.push({ ...structuredClone(s.confirmation), proceed, at: new Date().toISOString() });
+    s.steps[s.index].decisions.push({ ...structuredClone(s.confirmation), proceed, source, at: new Date().toISOString() });
     persist(s);
     if (proceed) s.decide(); else stop(profile);
     return status(profile);
@@ -151,7 +165,7 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
       if (s.runId === runId) s.localPending = false;
     }
   }
-  function start(profile, scenario, uploadPath = '', scenarioName = null, variables = {}, timeoutMs = 3600000, executionId = null) {
+  function start(profile, scenario, uploadPath = '', scenarioName = null, variables = {}, timeoutMs = 3600000, executionId = null, remote = false) {
     if (executionId) {
       if (!/^[0-9a-f-]{36}$/.test(executionId)) throw new Error('Invalid execution ID');
       if (getRun(executionId)) throw new Error('Execution ID already exists');
@@ -163,7 +177,7 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
       throw new Error('Extension chưa kết nối profile này. Mở profile, cài/reload extension và chọn đúng profile trong Extension options.');
     }
     stop(profile);
-    Object.assign(s, { workflow, scenarioName: scenarioName || scenario.name || null, uploadPath, currentStep: null, currentUrl: '', uploadFile: null,
+    Object.assign(s, { workflow, remote, scenarioName: scenarioName || scenario.name || null, uploadPath, currentStep: null, currentUrl: '', uploadFile: null,
       steps: workflow.steps.map((step, index) => ({ index, number: index + 1, action: step.action, label: step.label?.trim() || `Bước ${index + 1}`,
         state: 'pending', started_at: null, ended_at: null, error: '' })),
       runtime: {}, index: 0, download: null, error: '', tabId: null, running: true, startedAt: Date.now(), endedAt: null, lastStepMs: null });

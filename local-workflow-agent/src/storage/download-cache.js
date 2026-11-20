@@ -3,7 +3,7 @@ const { validateVideo, videoOptions } = require('../integrations/video/video-dow
 
 function createCachedDownloader(store, downloadVideo) {
   const locks = new Map();
-  return async function download(step, signal) {
+  return async function download(step, signal, { confirmDownload } = {}) {
     validateVideo(step);
     if (!step.directory) throw new Error('Video download requires directory');
     const combined = AbortSignal.any([AbortSignal.timeout(Number(step.downloadTimeoutMs || 1800000)), ...(signal ? [signal] : [])]);
@@ -21,11 +21,19 @@ function createCachedDownloader(store, downloadVideo) {
       combined.throwIfAborted();
       const cached = await store.cachedDownload(key, combined);
       const options = videoOptions(step);
-      if (cached && cached.downloadOptions?.quality === options.quality && cached.downloadOptions?.language === options.language) return cached;
-      const result = await downloadVideo(step, combined);
-      combined.throwIfAborted();
+      if (cached && cached.downloadOptions?.quality === options.quality && cached.downloadOptions?.language === options.language) {
+        if (confirmDownload) {
+          await confirmDownload({ name: cached.name, filePath: cached.filePath, reused: true });
+          const verified = await store.cachedDownload(key, signal);
+          if (verified?.filePath !== cached.filePath || verified.asset_id !== cached.asset_id) throw new Error('Cached video changed after confirmation');
+        }
+        return cached;
+      }
+      const operationSignal = confirmDownload ? signal : combined;
+      const result = await downloadVideo(step, operationSignal, confirmDownload);
+      operationSignal?.throwIfAborted();
       if (result.verified !== true || !result.filePath) throw new Error('Download must finish final-file verification before continuing');
-      const file = await store.registerFile(result.filePath, { duration: result.duration, tag: step.folderTag || 'automation', signal: combined });
+      const file = await store.registerFile(result.filePath, { duration: result.duration, tag: step.folderTag || 'automation', signal: operationSignal });
       const saved = store.rememberDownload(key, { ...result, downloadOptions: options }, file);
       return { ...saved, reused: false };
     } finally {
