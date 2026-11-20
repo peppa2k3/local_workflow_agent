@@ -17,10 +17,16 @@ body{margin:0}
 button,input,select,textarea{font:inherit}
 button{cursor:pointer}
 a{color:#92b9ff;text-decoration:none}
-button,.button{border:1px solid #34435b;border-radius:8px;background:#202e43;color:#e7edf9;padding:10px 14px;display:inline-block}
-button:hover,.button:hover{background:#2a3c55}
-button:disabled{opacity:.5;cursor:wait}
-.primary{background:#087f70;border-color:#0e9d88}
+button,.button{min-height:40px;border:1px solid #506789;border-radius:8px;background:#202e43;color:#f2f6ff;padding:9px 14px;display:inline-block;font-weight:650;transition:background-color .15s ease,border-color .15s ease,transform .15s ease}
+button:hover,.button:hover{background:#344c70;border-color:#7891b6}
+button:active,.button:active{transform:translateY(1px)}
+button:focus-visible,.button:focus-visible{outline:3px solid #79ceff;outline-offset:3px}
+button:disabled{opacity:.48;cursor:not-allowed;filter:saturate(.55)}
+button:disabled:hover,button:disabled:active{transform:none}
+button.primary,.button.primary{background:#087a55;border-color:#20a879;color:#fff;font-weight:750}
+button.primary:hover,.button.primary:hover{background:#0a9063;border-color:#43c492}
+button.danger,.button.danger{background:#a52f3b;border-color:#d34b59;color:#fff;font-weight:750}
+button.danger:hover,.button.danger:hover{background:#bd3947;border-color:#ed6974}
 .muted{color:#92a3bb;font-size:13px;line-height:1.7}
 .layout{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:100vh}
 .sidebar{border-right:1px solid #283247;background:#101928;padding:28px 20px}
@@ -44,8 +50,9 @@ p{margin:0}
 .metric{background:#152033;border:1px solid #293950;border-radius:12px;padding:19px}
 .metric strong{display:block;font-size:30px;margin-top:8px;letter-spacing:-1px}
 .tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid #2c3a50;margin-bottom:20px;padding-bottom:8px}
-.tabs button{background:transparent;border:0;color:#91a3bf;border-radius:6px;padding:10px 13px}
-.tabs button[aria-selected=true]{background:#23354d;color:#e7f2ff}
+.tabs button{background:transparent;border:1px solid transparent;color:#a9bbd5;border-radius:6px;padding:9px 13px}
+.tabs button:hover{background:#1d2c43;border-color:#405574;color:#f2f6ff}
+.tabs button[aria-selected=true]{background:#173f34;border-color:#267a59;color:#c5ffdf}
 .filters{display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:18px}
 label{display:grid;gap:7px;font-size:12px;color:#a5b6cf;font-weight:600}
 input,select,textarea{border:1px solid #35455f;background:#0d1626;color:#eef4ff;border-radius:8px;padding:10px;min-width:0}
@@ -56,7 +63,7 @@ table{border-collapse:collapse;width:100%;font-size:13px}
 th{text-align:left;background:#172338;color:#8fa5c4;font-size:11px;letter-spacing:.5px;text-transform:uppercase;padding:15px;white-space:nowrap}
 td{padding:16px 15px;border-top:1px solid #263249;max-width:340px;overflow-wrap:anywhere;vertical-align:top;line-height:1.6}
 td:first-child{font-weight:600}
-td button{padding:5px 9px;font-size:12px;white-space:nowrap}
+td button{min-height:34px;padding:5px 9px;font-size:12px;white-space:nowrap}
 td .secondary{display:block;font-size:11px;color:#8fa0ba;font-weight:400}
 .empty{padding:55px 20px;text-align:center;color:#a5b6ce}
 .footer{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:16px}

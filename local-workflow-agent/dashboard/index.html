@@ -28,12 +28,17 @@
     .file-path-control { display: flex; gap: 6px; align-items: center; }
     .file-path-control input { min-width: 0; flex: 1; }
     .file-path-control .btn { white-space: nowrap; }
-    .btn { min-height: 40px; border-radius: 9px; padding: 9px 15px; color: #edf2ff; background: #263956; font-weight: 700; }
-    .btn:hover { filter: brightness(1.15); }
-    .btn.primary { background: #587cff; color: white; }
-    .btn.success { background: #168c69; }
-    .btn.danger { background: #6c3343; }
-    .btn.ghost { background: transparent; border: 1px solid #344464; }
+    .btn { min-height: 42px; border: 1px solid #506789; border-radius: 9px; padding: 9px 15px; color: #f5f8ff; background: #263956; font-weight: 700; transition: background-color .15s ease, border-color .15s ease, transform .15s ease; }
+    .btn:hover { background: #344c70; border-color: #7891b6; }
+    .btn:active { transform: translateY(1px); }
+    .btn.primary { background: #315ed8; border-color: #5279ec; color: #fff; }
+    .btn.primary:hover { background: #416eea; border-color: #7d9aff; }
+    .btn.success { background: #087a55; border-color: #20a879; color: #fff; }
+    .btn.success:hover { background: #0a9063; border-color: #43c492; }
+    .btn.danger { background: #a52f3b; border-color: #d34b59; color: #fff; }
+    .btn.danger:hover { background: #bd3947; border-color: #ed6974; }
+    .btn.ghost { background: #17243a; border: 1px solid #526987; color: #e0e9fb; }
+    .btn.ghost:hover { background: #243650; border-color: #8299bb; }
     .editor { border-radius: 16px; padding: 16px; }
     .editor-head { display: flex; justify-content: space-between; align-items: end; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
     h2 { font-size: 20px; margin: 0 0 4px; }
@@ -48,19 +53,28 @@
     .step-head select { width: 220px; max-width: 100%; }
     .step-toggle { white-space: nowrap; min-height: 32px; padding: 5px 10px; font-size: 12px; }
     .spacer { flex: 1; }
-    .icon { background: #25344e; color: #c6d2eb; width: 32px; height: 32px; border-radius: 7px; }
+    .icon { background: #25344e; color: #f3f6ff; border: 1px solid #506789; width: 36px; height: 36px; border-radius: 8px; font-size: 17px; font-weight: 800; transition: background-color .15s ease, border-color .15s ease, transform .15s ease; }
+    .icon:hover { background: #344c70; border-color: #7891b6; }
+    .icon:active { transform: translateY(1px); }
+    .icon.move-up { background: #087a55; border-color: #20a879; color: #fff; }
+    .icon.move-up:hover { background: #0a9063; border-color: #43c492; }
+    .icon.move-down, .icon.remove { background: #a52f3b; border-color: #d34b59; color: #fff; }
+    .icon.move-down:hover, .icon.remove:hover { background: #bd3947; border-color: #ed6974; }
+    button:focus-visible { outline: 3px solid #79ceff; outline-offset: 3px; }
     .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     .fields label:first-of-type { grid-column: span 2; }
     .fields input { width: 100%; }
     .fields label { align-content: start; }
-    .add { width: 100%; margin-top: 10px; border: 1px dashed #536b9a; background: #172541; color: #bed0ff; min-height: 40px; border-radius: 10px; font-weight: 700; }
+    .add { width: 100%; margin-top: 10px; border: 1px dashed #36b88a; background: #15382f; color: #c6ffdf; min-height: 42px; border-radius: 10px; font-weight: 700; }
+    .add:hover { background: #1b4b3d; border-color: #58d7a6; }
     .bottom { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 18px; }
     .message { color: #9fbee8; min-height: 21px; font-size: 13px; }
     .message.error { color: #ff9aa7; }
     .progress { margin-top: 18px; border: 1px solid #2c3b57; border-radius: 13px; padding: 14px 16px; background: #101a2d; font-size: 13px; color: #b7c5df; }
     .progress strong { color: #f2f5ff; }
     .profiles-summary { margin: 12px 0; color: #acbbd6; font-size: 13px; line-height: 1.7; }
-    button:disabled { opacity: .5; cursor: wait; }
+    button:disabled { opacity: .48; cursor: not-allowed; filter: saturate(.55); }
+    button:disabled:hover, button:disabled:active { transform: none; }
     .variables { border: 1px solid #334361; border-radius: 12px; padding: 14px; margin: 16px 0; }
     .variable-row { display: flex; gap: 8px; align-items: end; margin: 10px 0; flex-wrap: wrap; }
     .variable-row label { flex: 1; min-width: 160px; }
@@ -110,7 +124,7 @@
       <button class="btn ghost" id="newBtn">Tạo mới</button>
       <label>File upload cho lần chạy<span class="file-path-control"><input id="uploadPath" placeholder="C:\\...\\anh.jpg (tùy chọn)" spellcheck="false"><button class="btn ghost" id="chooseRunFile" type="button">Chọn file…</button></span></label>
       <span class="spacer"></span>
-      <button class="btn" id="saveBtn">Lưu</button>
+      <button class="btn success" id="saveBtn">Lưu</button>
       <button class="btn success" id="runBtn">▶ Chạy kịch bản</button>
       <button class="btn danger" id="stopBtn">Dừng</button>
     </section>
@@ -414,12 +428,12 @@
         toggle.addEventListener('click', () => setExpanded(body.hidden));
         controls.append(toggle);
         for (const [label, offset] of [['↑', -1], ['↓', 1]]) {
-          const button = document.createElement('button'); button.type = 'button'; button.className = 'icon'; button.textContent = label;
+          const button = document.createElement('button'); button.type = 'button'; button.className = 'icon ' + (offset < 0 ? 'move-up' : 'move-down'); button.textContent = label;
           button.title = offset < 0 ? 'Lên' : 'Xuống'; button.setAttribute('aria-label', `${button.title} bước ${index + 1}`); button.disabled = index + offset < 0 || index + offset >= scenario.steps.length;
           button.addEventListener('click', () => { [scenario.steps[index], scenario.steps[index + offset]] = [scenario.steps[index + offset], scenario.steps[index]]; render(); });
           controls.append(button);
         }
-        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'icon'; remove.textContent = '×'; remove.title = 'Xóa bước'; remove.setAttribute('aria-label', `Xóa bước ${index + 1}`);
+        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'icon'; remove.classList.add('remove'); remove.textContent = '×'; remove.title = 'Xóa bước'; remove.setAttribute('aria-label', `Xóa bước ${index + 1}`);
         remove.addEventListener('click', () => { scenario.steps.splice(index, 1); render(); }); controls.append(remove);
         head.append(controls);
         if (['click', 'waitFor', 'type', 'setDate', 'setTime', 'upload'].includes(step.action)) {

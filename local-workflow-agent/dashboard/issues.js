@@ -45,7 +45,9 @@
     }
     const choices = download ? [['Yes', true], ['No', false]] : issue.run ? [['Dừng tác vụ', false], ['Xác nhận tiếp tục', true]] : [['Đã hiểu', null]];
     for (const [label, proceed] of choices) {
-      const button = document.createElement('button'); button.textContent = label;
+      const button = document.createElement('button'); button.className = download ? (proceed ? 'btn success' : 'btn danger')
+        : issue.run ? (proceed ? 'btn success' : 'btn danger') : 'btn primary';
+      button.textContent = label;
       button.addEventListener('click', async () => {
         for (const item of actions.children) item.disabled = true;
         try {
