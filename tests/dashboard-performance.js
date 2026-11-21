@@ -28,6 +28,7 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     const page = await browser.newPage();
     const epoch = new Date('2026-10-21T00:00:00Z');
     await page.clock.install({ time: epoch }); await page.clock.pauseAt(epoch);
+    let scheduledTask;
     let requests = 0, inFlight = 0, maxInFlight = 0, failed = false, connected = true, running = false, hold = false, release;
     await page.route('http://dashboard.test/**', async route => {
       const request = route.request(), endpoint = new URL(request.url()).pathname;
@@ -37,12 +38,17 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
         try {
           if (hold) await new Promise(resolve => { release = resolve; });
           if (failed) return await route.fulfill({ status: 503, json: { error: 'offline' } });
-          return await route.fulfill({ json: { defaultProfile: 'Profile 1', capabilities: ['variables-v1', 'scenario-management-v1'], performance: { cpuPercent: 0, memoryMb: 40, eventLoopP95Ms: 0 }, profiles: [{ directory: 'Profile 1', name: 'Test', extensionConnected: connected, running, index: 0, total: 1 }] } });
+          return await route.fulfill({ json: { schedules: scheduledTask ? [scheduledTask] : [], defaultProfile: 'Profile 1', capabilities: ['variables-v1', 'scenario-management-v1'], performance: { cpuPercent: 0, memoryMb: 40, eventLoopP95Ms: 0 }, profiles: [{ directory: 'Profile 1', name: 'Test', extensionConnected: connected, running, index: 0, total: 1 }] } });
         } finally { inFlight--; }
       }
       let data = {};
       if (endpoint === '/api/scenarios') data = { names: ['sample'] };
       if (endpoint === '/api/scenarios/sample' && request.method() === 'GET') data = { name: 'Sample', steps: [{ action: 'openUrl', url: 'https://example.test/' }] };
+      if (endpoint === '/api/schedules') scheduledTask = { ...request.postDataJSON(), id: 'fixture-schedule', state: 'scheduled' };
+      if (endpoint === '/api/schedules/decision') {
+        assert.equal(request.postDataJSON().proceed, false);
+        scheduledTask.state = 'cancelled';
+      }
       if (endpoint === '/api/run') running = true;
       if (endpoint === '/api/stop') running = false;
       return route.fulfill({ json: data });
@@ -123,6 +129,17 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     failed = false;
     await page.evaluate(() => { void updateStatus(); }); await settle();
     assert.equal(await page.locator('#runBtn').isEnabled(), true);
+    await page.evaluate(() => { document.getElementById('schedule-later').click(); document.getElementById('schedule-create').click(); });
+    await page.locator('#schedule-list').getByText('Hủy lịch', { exact: true }).waitFor();
+    assert.equal(scheduledTask.profile, 'Profile 1');
+    assert.equal(scheduledTask.scenario, 'sample');
+    scheduledTask.state = 'confirming';
+    scheduledTask.confirmBy = await page.evaluate(() => Date.now() + 30000);
+    await page.evaluate(() => updateStatus());
+    assert.equal(await page.locator('#schedule-dialog').isVisible(), true);
+    await page.evaluate(() => document.getElementById('schedule-no').click());
+    await page.waitForFunction(() => !document.getElementById('schedule-dialog').open);
+    assert.equal(scheduledTask.state, 'cancelled');
     console.log('Dashboard: idle 40\u21926 polls/min, hidden 0, single in-flight, Run coalescing, backoff, focus/DOM stability; async profile cache: OK');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

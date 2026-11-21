@@ -79,6 +79,11 @@ function readBody(request) {
     request.on('error', reject);
   });
 }
+const { createSchedules } = require('./workflow/schedules');
+const { createSchedulePopups } = require('./integrations/chrome/schedule-popup');
+const schedules = createSchedules({ dataDir, workflows, scenarios });
+const schedulePopups = createSchedulePopups((task, proceed) => schedules.decide(task.id, proceed));
+let scheduleTimer;
 const automation = createAutomationApi({ workflows, scenarios, profiles, readBody });
 const dashboardToken = randomBytes(32).toString('hex');
 const remote = createRemoteClient({ dataDir: dataDir,
@@ -127,6 +132,19 @@ const server = http.createServer(async (request, response) => {
       if (origin && origin !== `http://127.0.0.1:${port}` && !extensionRead) throw new Error('Origin not allowed');
       if (automation.enabled && !extensionRead && !dashboardAuthorized(request) && !automation.authorized(request)) return json(401, { error: 'Valid Bearer token or dashboard session required' });
       if (route.startsWith('/api/content/')) return await content.handle(request, url, json);
+      if (route.startsWith('/api/schedules') && request.method === 'POST') {
+        if (!dashboardAuthorized(request)) return json(403, { error: 'Local dashboard approval required' });
+        const body = await readBody(request);
+        if (route === '/api/schedules') return json(201, schedules.create(body));
+        if (route === '/api/schedules/time') {
+          schedules.reschedule(body.id, body.scheduledAt);
+          return json(200, { ok: true });
+        }
+        if (route === '/api/schedules/decision') {
+          schedules.decide(body.id, body.proceed);
+          return json(200, { ok: true });
+        }
+      }
       const selected = url.searchParams.get('profile') || profile;
       if (request.method === 'GET' && route === '/api/issues') return json(200, { profiles: profiles().map(p => workflows.status(p.directory)), storage: activity.syncStatus() });
       if (request.method === 'POST' && route === '/api/confirm') {
@@ -142,7 +160,7 @@ const server = http.createServer(async (request, response) => {
         return json(run ? 200 : 404, run || { error: 'Run not found' });
       }
       if (profileDiscovery) {
-        return json(200, { defaultProfile: profile, automationEnabled: automation.enabled, storage: activity.syncStatus(), capabilities: ['remote-control-v1', 'shared-content-v1', 'activity-history-v1', 'download-cache-v1', 'automation-api-v1', 'variables-v1', 'video-download-v1', 'video-quality-best-v1', 'download-references-v1', 'scenario-management-v1'], performance, profiles: profiles().map(item => ({ ...item, ...workflows.status(item.directory) })) });
+        return json(200, { ...(dashboardAuthorized(request) && { schedules: schedules.list() }), defaultProfile: profile, automationEnabled: automation.enabled, storage: activity.syncStatus(), capabilities: ['remote-control-v1', 'shared-content-v1', 'activity-history-v1', 'download-cache-v1', 'automation-api-v1', 'variables-v1', 'video-download-v1', 'video-quality-best-v1', 'download-references-v1', 'scenario-management-v1'], performance, profiles: profiles().map(item => ({ ...item, ...workflows.status(item.directory) })) });
       }
       if (request.method === 'POST' && route === '/api/profiles/open') {
         const body = await readBody(request);
@@ -241,6 +259,12 @@ const performanceTimer = setInterval(() => {
 }, 2000);
 performanceTimer.unref();
 profileCache.ready.then(() => { if (closing) return; server.listen(port, '127.0.0.1', () => {
+  scheduleTimer = setInterval(() => {
+    try {
+      schedules.tick();
+      schedulePopups.sync(schedules.list().filter(task => task.state === 'confirming'));
+    } catch (error) { console.error('Schedule:', error.message); }
+  }, 500);
   console.log(`Local agent ready. Default Chrome profile: ${profile}.`);
   console.log(`Dashboard: http://127.0.0.1:${port}`);
   console.log(`Content manager: http://127.0.0.1:${port}/content`);
@@ -275,6 +299,7 @@ terminal?.on('line', line => {
 let closing = false;
 async function shutdown() {
   if (closing) return; closing = true;
+  clearInterval(scheduleTimer); schedulePopups.sync([]);
   remote.close(); terminal?.close(); clearInterval(expiry); clearInterval(performanceTimer); eventLoop.disable();
   profiles().forEach(item => workflows.stop(item.directory));
   server.close(); server.closeIdleConnections();

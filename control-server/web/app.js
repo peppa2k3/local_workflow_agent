@@ -2,10 +2,39 @@
   const $ = id => document.getElementById(id);
   let csrf = '', selected = '', devices = [], busy = false, timer, formSignature = '', historySignature = '', runIntent = null;
   let clipSelections = {}, closeClipPicker;
-  const stateName = { pending: 'Chờ thực hiện', queued: 'Đang đợi', dispatched: 'Đã gửi tới máy', running: 'Đang chạy', succeeded: 'Thành công', failed: 'Thất bại', cancelled: 'Đã dừng',
+  const stateName = { scheduled: 'Đã lên lịch', confirming: 'Chờ xác nhận', approved: 'Đã xác nhận', pending: 'Chờ thực hiện', queued: 'Đang đợi', dispatched: 'Đã gửi tới máy', running: 'Đang chạy', succeeded: 'Thành công', failed: 'Thất bại', cancelled: 'Đã dừng',
     interrupted: 'Bị gián đoạn', unknown: 'Chưa rõ kết quả — kiểm tra máy local', expired: 'Hết hạn', rejected: 'Máy local từ chối' };
   const when = n => n ? new Date(n).toLocaleString('vi-VN') : 'Chưa nhận heartbeat';
   function el(tag, text, className) { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (className) n.className = className; return n; }
+  function editScheduleTime(timestamp, save) {
+    const details = document.createElement('details'), summary = document.createElement('summary');
+    summary.textContent = 'Đổi giờ';
+    const input = document.createElement('input'), button = document.createElement('button');
+    input.type = 'datetime-local';
+    input.setAttribute('aria-label', 'Giờ chạy mới');
+    const date = new Date(timestamp);
+    input.value = new Date(timestamp - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    button.textContent = 'Lưu giờ mới';
+    button.onclick = () => save(new Date(input.value).getTime(), button);
+    details.append(summary, input, button);
+    return details;
+  }
+  const scheduleTime = $('schedule-at');
+  let followClock = true;
+  function setScheduleTime(offset = 0) {
+    const date = new Date(Date.now() + offset * 60000);
+    scheduleTime.value = new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  }
+  scheduleTime.oninput = () => { followClock = false; };
+  $('schedule-now').onclick = () => { runIntent = null; followClock = true; setScheduleTime(); };
+  $('schedule-later').onclick = () => { runIntent = null; followClock = false; setScheduleTime(15); };
+  setScheduleTime();
+  function selectedTime() {
+    if (followClock) setScheduleTime();
+    const time = new Date(scheduleTime.value).getTime();
+    if (!Number.isFinite(time) || time < Math.floor(Date.now() / 60000) * 60000) throw Error('Chọn phút hiện tại hoặc tương lai.');
+    return time;
+  }
   const notices = new Set(), noticeQueue = [];
   const reportedResults = new Map();
   let notice;
@@ -19,15 +48,16 @@
     showNotice();
   }
   function showDownloadConfirmation(commands, deviceId) {
-    const run = commands.filter(cmd => cmd.state === 'running' && cmd.result?.confirmation?.expiresAt > Date.now()
+    const scheduled = commands.find(cmd => cmd.state === 'confirming' && cmd.confirmBy > Date.now() && cmd.id !== submittedDownload);
+    const run = scheduled || commands.filter(cmd => cmd.state === 'running' && cmd.result?.confirmation?.expiresAt > Date.now()
       && cmd.downloadDecision?.id !== cmd.result.confirmation.id && cmd.result.confirmation.id !== submittedDownload)
       .sort((a, b) => a.result.confirmation.expiresAt - b.result.confirmation.expiresAt)[0];
-    const confirmation = run?.result.confirmation;
+    const confirmation = scheduled ? { id: scheduled.id, expiresAt: scheduled.confirmBy } : run?.result.confirmation;
     if (downloadPrompt?.id === confirmation?.id) return;
     closeDownloadPrompt();
     if (!confirmation) return;
     const dialog = el('dialog', undefined, 'clip-picker');
-    const title = el('h2', confirmation.reused ? 'Xác nhận dùng video đã lưu' : 'Xác nhận tải video');
+    const title = el('h2', scheduled ? 'Chạy kịch bản theo lịch?' : confirmation.reused ? 'Xác nhận dùng video đã lưu' : 'Xác nhận tải video');
     title.id = 'download-confirmation-title';
     dialog.setAttribute('aria-labelledby', title.id);
     dialog.addEventListener('cancel', event => event.preventDefault());
@@ -41,10 +71,10 @@
         for (const item of actions.children) item.disabled = true;
         error.textContent = '';
         try {
-          await api('/api/download-confirmation', { deviceId, runId: run.id, id: confirmation.id, proceed });
+          await api(scheduled ? '/api/schedule-decision' : '/api/download-confirmation', { deviceId, runId: run.id, id: confirmation.id, proceed });
           submittedDownload = confirmation.id;
           if (downloadPrompt?.id === confirmation.id) closeDownloadPrompt();
-          message('Đã gửi quyết định tải video.');
+          message('Đã gửi quyết định.');
           await refresh();
         } catch (e) {
           error.textContent = e.message;
@@ -58,7 +88,8 @@
       if (seconds <= 0) return closeDownloadPrompt();
       remaining.textContent = `Tự tiếp tục sau ${seconds} giây. No sẽ dừng lượt chạy.`;
     };
-    dialog.append(title, el('p', `${run.payload.scenario} · ${run.payload.profile} · Bước ${confirmation.step}`), file, destination);
+    if (scheduled) dialog.append(title, el('p', `${run.payload.scenario} · ${run.payload.profile}`));
+    else dialog.append(title, el('p', `${run.payload.scenario} · ${run.payload.profile} · Bước ${confirmation.step}`), file, destination);
     if (confirmation.duplicate) dialog.append(el('p', 'URL đã có trong lịch sử tải.'));
     dialog.append(remaining, error, actions);
     downloadPrompt = { id: confirmation.id, dialog, timer: setInterval(update, 250) };
@@ -184,6 +215,8 @@
     $('revoke').disabled = d.revoked;
     const signature = JSON.stringify([d.id, d.metadata.profiles?.map(p => [p.directory, p.name]), d.metadata.scenarios]);
     if (signature !== formSignature) { options($('run-profile'), d.metadata.profiles || [], 'directory', 'name'); options($('run-scenario'), d.metadata.scenarios || [], 'name', 'name'); renderVariables(); formSignature = signature; }
+    if (followClock && document.activeElement !== scheduleTime) setScheduleTime();
+    $('schedule-create').disabled = d.revoked || !$('run-profile').value || !$('run-scenario').value;
     $('run').disabled = !d.online || d.revoked || !$('run-profile').value || !$('run-scenario').value;
   }
   function renderHistory(commands, deviceId) {
@@ -197,6 +230,18 @@
       row.append(el('span', stateName[cmd.state] || cmd.state, 'badge'), el('small', when(cmd.created))); n.append(row);
       n.append(el('h3', cmd.type === 'run' ? `${cmd.payload.scenario} · ${cmd.payload.profile}` : 'Yêu cầu dừng tác vụ'));
       n.append(el('small', `ID: ${cmd.id}`));
+      if (cmd.payload.scheduledAt) n.append(el('p', 'Giờ đã đặt: ' + when(cmd.payload.scheduledAt)));
+      if (cmd.state === 'scheduled') {
+        const cancel = el('button', 'Hủy lịch');
+        cancel.onclick = () => submit(cancel, async () => {
+          await api('/api/schedule-decision', { deviceId, runId: cmd.id, proceed: false });
+          await refresh();
+        });
+        n.append(cancel, editScheduleTime(cmd.payload.scheduledAt, (scheduledAt, button) => submit(button, async () => {
+          await api('/api/schedule-decision', { deviceId, runId: cmd.id, scheduledAt });
+          await refresh();
+        })));
+      }
       const result = cmd.result;
       if (result?.startedAt) n.append(el('p', `Bắt đầu: ${when(result.startedAt)}${result.endedAt ? ' · Kết thúc: ' + when(result.endedAt) : ''}`, 'muted'));
       if (result?.total) { const progress = el('progress'); progress.max = result.total; progress.value = cmd.state === 'succeeded' ? result.total : result.index;
@@ -232,7 +277,7 @@
     } catch (e) { message(e.message, true); }
     finally { busy = false; if (csrf) timer = setTimeout(refresh, 5000); }
   }
-  async function submit(button, fn) { button.disabled = true; try { await fn(); } catch (e) { message(e.message, true); } finally { button.disabled = false; if (csrf && ['run', 'revoke'].includes(button.id)) renderDetail(); } }
+  async function submit(button, fn) { button.disabled = true; try { await fn(); } catch (e) { message(e.message, true); } finally { button.disabled = false; if (csrf && ['run', 'schedule-create', 'revoke'].includes(button.id)) renderDetail(); } }
   $('login-form').addEventListener('submit', event => { event.preventDefault(); void submit(event.submitter, async () => {
     const form = new FormData(event.target); accountView(await api('/api/login', Object.fromEntries(form))); event.target.reset(); message(''); await refresh();
   }); });
@@ -245,11 +290,13 @@
   $('run-form').addEventListener('change', () => { runIntent = null; });
   $('run-form').addEventListener('submit', event => { event.preventDefault(); void submit(event.submitter, async () => {
     const variables = Object.fromEntries([...$('variables').querySelectorAll('input[type=checkbox]:checked')].map(check => [check.dataset.variable, check.closest('.two').querySelector('input:not([type=checkbox])').value]));
-    const payload = { deviceId: selected, type: 'run', profile: $('run-profile').value, scenario: $('run-scenario').value, variables,
+    const scheduled = event.submitter?.id === 'schedule-create';
+    const payload = { ...(scheduled && { scheduledAt: selectedTime() }), deviceId: selected, type: 'run', profile: $('run-profile').value, scenario: $('run-scenario').value, variables,
       ...(Object.keys(clipSelections).length ? { clips: { ...clipSelections } } : {}) };
     // Preserve the key after a lost HTTP response so retry does not create a second run.
+    if (runIntent && Boolean(runIntent.scheduledAt) !== scheduled) runIntent = null;
     runIntent ||= { requestId: crypto.randomUUID(), ...payload };
-    await api('/api/commands', runIntent); runIntent = null; message('Đã gửi lệnh chạy. Máy local sẽ xác nhận và cập nhật tiến độ.'); await refresh();
+    await api('/api/commands', runIntent); runIntent = null; message(scheduled ? 'Đã lưu lịch chạy.' : 'Đã gửi lệnh chạy. Máy local sẽ xác nhận và cập nhật tiến độ.'); await refresh();
   }); });
   $('revoke').addEventListener('click', () => submit($('revoke'), async () => {
     if (!confirm('Thu hồi quyền điều khiển máy này? Máy local sẽ dừng tác vụ remote khi nhận thông báo.')) return;

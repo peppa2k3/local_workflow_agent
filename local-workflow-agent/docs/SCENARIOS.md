@@ -277,3 +277,11 @@ Popup tải video báo khi URL đã có trong lịch sử và hiển thị đư�
 Agent ghi sự kiện upload `pending` trước dispatch và đổi thành `uploaded` sau acknowledgement. Nếu lỗi hoặc mất phản hồi, bản ghi pending vẫn cảnh báo nguy cơ trùng ở lần chạy sau. MongoDB đã cấu hình nhưng không truy vấn được sẽ làm tác vụ thất bại và hiển thị popup; không tự bỏ kiểm tra DB. Trong một process agent, các thao tác media được tuần tự hóa đến kết quả; các service độc lập vẫn cần phối hợp khóa riêng nếu yêu cầu chống chạy đồng thời giữa nhiều máy.
 
 Popup lỗi có nút **Đã hiểu** trên các trang local. Control-server hướng dẫn mở dashboard local khi bước upload đang chờ xác nhận trùng. Các bước click xuất bản riêng của website vẫn cần điều kiện xác nhận tương ứng.
+
+## Lên lịch chạy một lần
+
+Trên dashboard local, chọn profile và kịch bản, chọn ngày giờ rồi bấm **Đặt lịch**. Agent lưu các chỉnh sửa kịch bản hiện tại và đường dẫn upload của lượt chạy. Trên control server, chọn thiết bị và cấu hình lượt chạy trong mục **Chạy kịch bản** rồi bấm **Đặt lịch**. Lịch dùng múi giờ của trình duyệt, mặc định là phút hiện tại. Có thể đổi giờ hoặc hủy lịch đang chờ ngay trong danh sách.
+
+Agent lưu lịch local trong `data/schedules.json`. Control server lưu lịch từ xa trong SQLite. Khi đến giờ, agent phải hoạt động và profile phải rảnh. Lịch chờ qua thời gian máy tắt và được xét lại khi agent hoạt động. Kịch bản dùng bản đã lưu tại thời điểm chạy. Giữ Chrome cùng extension kết nối đúng profile cho các bước trình duyệt.
+
+Popup hiển thị trên dashboard đã đặt lịch và trên màn hình Windows nếu agent chạy trong phiên desktop. Chọn **Yes** để chạy, **No** để hủy. Sau 30 giây hệ thống mặc định chạy dù dashboard đã đóng. Lượt remote giữ nguyên quyền profile/kịch bản và biến đã cấu hình trên máy local.

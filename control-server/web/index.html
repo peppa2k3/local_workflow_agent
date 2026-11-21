@@ -9,7 +9,9 @@
     <h2>Thiết bị của bạn</h2><div id="devices" class="stack"></div>
   </aside><div><div id="empty" class="panel empty">Chọn một thiết bị để xem trạng thái và chạy kịch bản.</div><section id="detail" hidden>
     <div class="panel"><div class="row"><h2 id="device-name"></h2><span id="device-status" class="badge"></span></div><p id="device-seen" class="muted"></p><div id="metrics" class="row"></div><p id="profiles" class="muted"></p><button id="revoke" class="danger">Thu hồi kết nối thiết bị</button></div>
-    <div class="panel"><h2>Chạy kịch bản</h2><p class="muted">Các kịch bản và biến bên dưới đã được máy local cho phép.</p><form id="run-form"><div class="two"><label>Chrome profile<select id="run-profile" required></select></label><label>Kịch bản<select id="run-scenario" required></select></label></div><div id="variables"></div><button id="run" class="primary" type="submit">Chạy trên thiết bị</button></form></div>
+    <div class="panel"><h2>Chạy kịch bản</h2><p class="muted">Các kịch bản và biến bên dưới đã được máy local cho phép.</p><form id="run-form"><div class="two"><label>Chrome profile<select id="run-profile" required></select></label><label>Kịch bản<select id="run-scenario" required></select></label></div><div id="variables"></div><button id="run" class="primary" type="submit">Chạy trên thiết bị</button><div class="two"><label>Ngày và giờ chạy<input id="schedule-at" type="datetime-local" step="60"></label>
+      <button id="schedule-now" type="button">Bây giờ</button>
+      <button id="schedule-later" type="button">Sau 15 phút</button><button id="schedule-create" type="submit">Đặt lịch</button></div></form></div>
     <div class="panel"><div class="row"><h2>Lịch sử điều khiển</h2><small>200 lệnh gần nhất · tự cập nhật</small></div><div id="history"></div></div>
   </section></div></div></section>
   <footer>Local Agent Remote · Thiết bị giữ quyền quyết định kịch bản được phép chạy.</footer>

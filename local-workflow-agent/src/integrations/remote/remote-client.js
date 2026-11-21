@@ -13,6 +13,9 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, performan
   let failures = 0, nextAttempt = 0;
   const save = () => c.atomicJson(file, config);
   const request = (route, data, secret) => c.post(config.url, route, data, secret, { allowHttp, signal: abort.signal });
+  const { createSchedulePopups } = require('../chrome/schedule-popup');
+  const schedulePopups = createSchedulePopups((task, proceed) =>
+    request('/device/schedule-decision', { id: config.device.id, instanceId, runId: task.id, proceed }, config.token));
   function status() {
     return { configured: !!config.device, url: config.url || '', device: config.device || null, policy: config.policy, error, lastContact,
       connected: !!config.device && Date.now() - lastContact < 45000 && !error,
@@ -24,6 +27,7 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, performan
   }
   async function tick() {
     if (closed || pendingBusy || actionBusy || Date.now() < nextAttempt) return;
+    if (!config.device) schedulePopups.sync([]);
     pendingBusy = true;
     try {
       if (config.pending) {
@@ -62,6 +66,9 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, performan
           }) };
         const response = await request('/device/exchange', { id: config.device.id, instanceId, metadata, reports: executor.reports(config.device.id) }, config.token);
         if (closed) return;
+        schedulePopups.sync((response.schedulePrompts || []).map(task => ({
+          ...task, confirmBy: Date.now() + task.confirmBy - response.serverTime
+        })));
         executor.acknowledge(response.ack);
         if (response.command) await executor.execute(response.command, config.device.id);
         executor.confirmDownloads(response.downloadDecisions, config.device.id);
@@ -120,6 +127,6 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, performan
     if (closed || pendingBusy || actionBusy) c.fail('Connection update in progress; retry shortly', 409);
     actionBusy = true;
     try { return await action(route, data); } finally { actionBusy = false; }
-  }, tick, close() { closed = true; clearInterval(timer); abort.abort(); } };
+  }, tick, close() { closed = true; schedulePopups.sync([]); clearInterval(timer); abort.abort(); } };
 }
 module.exports = { createRemoteClient };

@@ -32,7 +32,7 @@ const { chromium } = require('playwright');
     page.on('pageerror', e => errors.push(e.message));
     const id = 'e43c8711-3731-4daa-9725-6721f78f1039';
     const target = 'a'.repeat(64), uploadTarget = 'b'.repeat(64), clip = 'Clip tiếng Việt.mp4';
-    let loggedIn = false, online = true, downloadConfirmation;
+    let loggedIn = false, online = true, downloadConfirmation, scheduledRun;
     await page.route('https://control.test/**', async route => {
       const req = route.request(), url = new URL(req.url());
       if (['/', '/app.js', '/style.css'].includes(url.pathname)) return route.fulfill({ contentType: url.pathname === '/' ? 'text/html' : url.pathname.endsWith('.js') ? 'text/javascript' : 'text/css',
@@ -44,6 +44,18 @@ const { chromium } = require('playwright');
         profiles: [{ directory: 'Default', name: 'Test', extensionConnected: true }], scenarios: [{ name: 'sample', variables: ['caption'], steps: 2,
           clipTargets: [{ id: target, index: 0, action: 'downloadVideo', variable: 'caption' }, { id: uploadTarget, index: 1, action: 'upload' }] }] } }] } });
       if (url.pathname === '/api/commands' && url.searchParams.has('request')) return route.fulfill({ json: { commands: [{ state: 'succeeded', result: { clips: { names: [clip], more: false } } }] } });
+      if (url.pathname === '/api/schedule-decision') {
+        scheduledRun = null;
+        return route.fulfill({ json: { ok: true } });
+      }
+      if (url.pathname === '/api/commands' && req.method() === 'POST' && req.postDataJSON().scheduledAt) {
+        scheduledRun = req.postDataJSON();
+        return route.fulfill({ json: { command: { id: scheduledRun.requestId } } });
+      }
+      if (url.pathname === '/api/commands' && scheduledRun) return route.fulfill({ json: { commands: [{
+        id: scheduledRun.requestId, type: 'run', state: 'confirming', payload: scheduledRun,
+        created: Date.now(), confirmBy: Date.now() + 30000
+      }] } });
       if (url.pathname === '/api/download-confirmation') {
         downloadConfirmation = null;
         return route.fulfill({ json: { ok: true } });
@@ -91,6 +103,15 @@ const { chromium } = require('playwright');
     await page.locator('.device').click();
     await page.locator('#history').getByText('Upload thất bại').waitFor();
     assert.equal(await taskNotice.count(), 0);
+    await page.locator('#schedule-later').click();
+    await page.locator('#schedule-create').click();
+    const scheduleDialog = page.getByRole('dialog', { name: 'Chạy kịch bản theo lịch?' });
+    await scheduleDialog.getByRole('button', { name: 'No', exact: true }).click();
+    await scheduleDialog.waitFor({ state: 'hidden' });
+    const scheduledRequest = posted.find(p => p.data.scheduledAt).data;
+    assert(scheduledRequest.scheduledAt > Date.now() + 13 * 60000);
+    assert.equal(scheduledRequest.profile, 'Default');
+    assert.equal(posted.find(p => p.path === '/api/schedule-decision').data.runId, scheduledRequest.requestId);
     // Local approval UI uses its session header and explicit claim, with fake state only.
     const state = { configured: false, url: 'https://control.test', policy: { profiles: [], scenarios: [], variables: {} }, pending: { id, code: 'FIXTURECODE1', expires: Date.now() + 60000, email: 'user@example.test', claim: 'fixture-claim' },
       available: { profiles: [{ directory: 'Default', name: 'Fixture' }], scenarios: [{ name: 'sample', variables: ['caption'] }] } };
