@@ -13,6 +13,8 @@ function metadata(value) {
   if (!c.object(value) || !Array.isArray(value.profiles) || !Array.isArray(value.scenarios) || value.profiles.length > 100 || value.scenarios.length > 200) c.fail('Invalid device metadata');
   return { version: 'remote-v1', uptime: Number.isFinite(value.uptime) ? value.uptime : 0,
     performance: Object.fromEntries(['cpuPercent', 'memoryMb', 'eventLoopP95Ms'].map(k => [k, Number.isFinite(value.performance?.[k]) ? value.performance[k] : 0])),
+    network: Object.fromEntries(['downloadMbps', 'uploadMbps'].filter(k => Number.isFinite(value.performance?.[k]) && value.performance[k] >= 0)
+      .map(k => [k, value.performance[k]])),
     profiles: value.profiles.map(p => ({ directory: c.text(p.directory, 100), name: c.text(p.name || p.directory, 100),
       extensionConnected: p.extensionConnected === true, running: p.running === true })),
     scenarios: value.scenarios.map(s => {
@@ -23,6 +25,29 @@ function metadata(value) {
         .map(({ id, index, action, variable }) => ({ id, index, action, variable: scenario.variables.includes(variable) ? variable : undefined }));
       return scenario;
     }) };
+}
+function localTaskSnapshot(value, meta) {
+  if (value === undefined) return null;
+  if (!c.object(value) || !Array.isArray(value.tasks) || !Number.isSafeInteger(value.omitted) || value.omitted < 0) c.fail('Invalid local tasks');
+  const ids = new Set();
+  const tasks = value.tasks.map(task => {
+    if (!c.object(task)) c.fail('Invalid local task');
+    const { profile, scenario, state } = task;
+    const id = c.uuid(task.id);
+    if (ids.has(id) || !meta.profiles.some(p => p.directory === profile) || !meta.scenarios.some(s => s.name === scenario)) c.fail('Invalid local task');
+    ids.add(id);
+    if (state === 'running') {
+      const { index, total, startedAt } = task;
+      if (!Number.isInteger(index) || index < 0 || !Number.isInteger(total) || total < 1 || index > total) c.fail('Invalid local progress');
+      validateTime(startedAt);
+      return { id, profile, scenario, state, index, total, startedAt };
+    }
+    if (!['scheduled', 'confirming'].includes(state)) c.fail('Invalid local task state');
+    validateTime(task.scheduledAt);
+    if (state === 'confirming') validateTime(task.confirmBy);
+    return { id, profile, scenario, state, scheduledAt: task.scheduledAt, ...(state === 'confirming' && { confirmBy: task.confirmBy }) };
+  });
+  return { tasks, omitted: value.omitted };
 }
 function snapshot(value, command) {
   if (!c.object(value) || !['running', ...TERMINAL].includes(value.state)) c.fail('Invalid command result');
@@ -104,11 +129,23 @@ function createCommandApi(store) {
     }
     if (route !== '/api/commands' || method !== 'POST') c.fail('Not found', 404);
     const d = owned(user, data.deviceId), id = c.uuid(data.requestId), type = data.type;
-    if (!['run', 'stop', 'browseClips'].includes(type)) c.fail('Unsupported remote command');
+    if (!['run', 'stop', 'browseClips', 'manageLocalTask'].includes(type)) c.fail('Unsupported remote command');
     let payload;
     if (type === 'run') payload = { profile: c.text(data.profile, 100), scenario: c.text(data.scenario, 64), variables: data.variables || {} };
     else if (type === 'stop') payload = { runId: c.uuid(data.runId) };
-    else {
+    else if (type === 'manageLocalTask') {
+      if (!['stop', 'reschedule', 'cancel', 'confirm'].includes(data.action)) c.fail('Invalid local task action');
+      payload = { taskId: c.uuid(data.taskId), action: data.action,
+        profile: c.text(data.profile, 100), scenario: c.text(data.scenario, 64) };
+      if (data.action !== 'stop') {
+        validateTime(data.expectedTime);
+        payload.expectedTime = data.expectedTime;
+      }
+      if (data.action === 'reschedule') {
+        validateTime(data.scheduledAt);
+        payload.scheduledAt = data.scheduledAt;
+      }
+    } else {
       if (!clipTargetId(data.target) || typeof data.query !== 'string' || data.query.length > 255) c.fail('Invalid clip search');
       payload = { scenario: c.text(data.scenario, 64), target: data.target, query: data.query };
     }
@@ -136,7 +173,16 @@ function createCommandApi(store) {
     if (d.revoked || (!payload.scheduledAt && Date.now() - d.lastSeen >= 45000)) c.fail('Device offline or revoked', 409);
     const commands = store.list('command', user.id).filter(v => v.deviceId === d.id);
     if (commands.filter(v => ACTIVE.includes(v.state) || SCHEDULE_STATES.includes(v.state)).length >= 100) c.fail('Device queue full', 409);
-    if (type === 'run') {
+    if (type === 'manageLocalTask') {
+      const task = d.localTasks?.tasks.find(task => task.id === payload.taskId);
+      if (!task || task.profile !== payload.profile || task.scenario !== payload.scenario ||
+          (payload.action === 'stop' ? task.state !== 'running' : task.scheduledAt !== payload.expectedTime)) c.fail('Tác vụ local đã thay đổi.', 409);
+      const confirming = task.state === 'confirming' && task.confirmBy > Date.now();
+      if (payload.action === 'reschedule' && task.state !== 'scheduled' ||
+          payload.action === 'confirm' && !confirming ||
+          payload.action === 'cancel' && task.state !== 'scheduled' && !confirming) c.fail('Lịch local đã thay đổi.', 409);
+      if (payload.action === 'reschedule' && payload.scheduledAt < Math.floor(Date.now() / 60000) * 60000) c.fail('Chọn phút hiện tại hoặc tương lai.');
+    } else if (type === 'run') {
       const scenario = d.metadata.scenarios?.find(s => s.name === payload.scenario);
       if (!d.metadata.profiles?.some(p => p.directory === payload.profile) || !scenario) c.fail('Not allowed by local policy', 403);
       if (Object.entries(payload.variables).some(([k, v]) => !scenario.variables.includes(k) || !['string', 'number', 'boolean'].includes(typeof v) || (typeof v === 'number' && !Number.isFinite(v)))) c.fail('Variable is not allowed by local policy', 403);
@@ -150,7 +196,7 @@ function createCommandApi(store) {
       const run = store.get('command', payload.runId);
       if (!run || run.owner !== user.id || run.deviceId !== d.id || run.type !== 'run') c.fail('Remote run not found', 404);
     }
-    const command = { id, owner: user.id, deviceId: d.id, type, payload, fingerprint, state: payload.scheduledAt ? 'scheduled' : 'queued', created: Date.now(),
+    const command = { id, owner: user.id, deviceId: d.id, type, payload, fingerprint, state: type === 'run' && payload.scheduledAt ? 'scheduled' : 'queued', created: Date.now(),
       expires: Date.now() + 300000, deliveryUntil: 0, seq: 0, result: null };
     store.transaction(() => {
       if (type === 'stop') {
@@ -172,6 +218,7 @@ function createCommandApi(store) {
     if (d.instanceId && d.instanceId !== data.instanceId && d.leaseUntil > now) c.fail('Another agent instance holds this device lease', 409);
     if (!Array.isArray(data.reports) || data.reports.length > 20) c.fail('Invalid reports');
     const meta = metadata(data.metadata), ack = [];
+    const localTasks = localTaskSnapshot(data.localTasks, meta);
     return store.transaction(() => {
       for (const report of data.reports) {
         const cmd = store.get('command', c.uuid(report.id));
@@ -187,7 +234,7 @@ function createCommandApi(store) {
         }
         ack.push({ id: cmd.id, seq: report.seq });
       }
-      Object.assign(d, { metadata: meta, lastSeen: now, instanceId: data.instanceId, leaseUntil: now + 35000 }); store.put('device', d, d.owner);
+      Object.assign(d, { metadata: meta, localTasks, lastSeen: now, instanceId: data.instanceId, leaseUntil: now + 35000 }); store.put('device', d, d.owner);
       const commands = expire(d.owner, d.id);
       const reserved = new Set(commands.filter(cmd => cmd.type === 'run' && RESERVED.includes(cmd.state)).map(cmd => cmd.payload.profile));
       const schedules = commands.filter(cmd => SCHEDULE_STATES.includes(cmd.state)).sort((a, b) => a.payload.scheduledAt - b.payload.scheduledAt);
@@ -209,7 +256,7 @@ function createCommandApi(store) {
       const downloadDecisions = commands.filter(cmd => cmd.state === 'running' && cmd.downloadDecision)
         .map(cmd => ({ runId: cmd.id, ...cmd.downloadDecision }));
       const next = commands.filter(cmd => ['queued', 'dispatched'].includes(cmd.state) && cmd.expires >= now && cmd.deliveryUntil <= now)
-        .sort((a, b) => (a.type === 'stop' ? 0 : 1) - (b.type === 'stop' ? 0 : 1) || a.created - b.created)[0];
+        .sort((a, b) => Number(a.type === 'run' || a.type === 'browseClips') - Number(b.type === 'run' || b.type === 'browseClips') || a.created - b.created)[0];
       if (next) { next.state = 'dispatched'; next.deliveryUntil = now + 10000; store.put('command', next, d.owner); }
       return { ack, schedulePrompts, command: next ? { id: next.id, type: next.type, payload: next.payload, expires: next.expires } : null, serverTime: now, downloadDecisions };
     });

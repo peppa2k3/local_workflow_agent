@@ -2,7 +2,7 @@ const path = require('node:path');
 const c = require('../../../shared/remote-protocol');
 const { clipTargets, isClip, isVideoName, listClips, prefix } = require('../../workflow/clip-library');
 const { overrideVariables } = require('../../workflow/variables');
-function createRemoteExecutor({ dataDir, workflows, scenarios, getPolicy }) {
+function createRemoteExecutor({ dataDir, workflows, scenarios, getPolicy, localTasks }) {
   const file = path.join(dataDir, 'remote-journal.json');
   const journal = c.readJson(file, {});
   const save = () => c.atomicJson(file, journal);
@@ -61,6 +61,9 @@ function createRemoteExecutor({ dataDir, workflows, scenarios, getPolicy }) {
         if (!folder || typeof query !== 'string' || query.length > 255) c.fail('Clip folder changed or search is invalid');
         const clips = await listClips(folder, query);
         record.phase = 'done'; update(record, { state: 'succeeded', clips });
+      } else if (command.type === 'manageLocalTask' && localTasks) {
+        localTasks.manage(command.payload, getPolicy());
+        record.phase = 'done'; update(record, { state: 'succeeded' });
       } else if (command.type === 'stop') {
         const targetId = c.uuid(command.payload.runId), target = journal[targetId];
         if (target && target.deviceId !== deviceId) c.fail('Cannot stop a run from a different pairing');

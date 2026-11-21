@@ -3,13 +3,13 @@ const c = require('../../../shared/remote-protocol');
 const { randomUUID } = require('node:crypto');
 const { createRemoteExecutor } = require('./remote-executor');
 const { clipTargets } = require('../../workflow/clip-library');
-function createRemoteClient({ dataDir, profiles, scenarios, workflows, performance = () => ({}) , allowHttp = false }) {
+function createRemoteClient({ dataDir, profiles, scenarios, workflows, localTasks, network, performance = () => ({}) , allowHttp = false }) {
   const file = path.join(dataDir, 'remote.json');
   let config = c.readJson(file, { policy: { profiles: [], scenarios: [], variables: {} } });
   let pendingBusy = false, actionBusy = false, closed = false, timer, error = '', lastContact = 0;
   const abort = new AbortController();
   const instanceId = randomUUID();
-  const executor = createRemoteExecutor({ dataDir, workflows, scenarios, getPolicy: () => config.policy });
+  const executor = createRemoteExecutor({ dataDir, workflows, scenarios, getPolicy: () => config.policy, localTasks });
   let failures = 0, nextAttempt = 0;
   const save = () => c.atomicJson(file, config);
   const request = (route, data, secret) => c.post(config.url, route, data, secret, { allowHttp, signal: abort.signal });
@@ -39,8 +39,11 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, performan
         const policy = config.policy;
         let clipBudget = 12000;
         executor.stopOwned(config.device.id, policy);
-        const metadata = { uptime: Math.floor(process.uptime()), performance: performance(),
-          profiles: profiles().filter(p => policy.profiles.includes(p.directory)).map(p => ({ directory: p.directory, name: p.name, ...Object.fromEntries(
+        if (network) await network.sample();
+        if (closed) return;
+        const knownProfiles = profiles().filter(p => policy.profiles.includes(p.directory));
+        const metadata = { uptime: Math.floor(process.uptime()), performance: { ...performance(), ...network?.get() },
+          profiles: knownProfiles.map(p => ({ directory: p.directory, name: p.name, ...Object.fromEntries(
             ['running', 'extensionConnected'].map(k => [k, workflows.status(p.directory)[k]])) })),
           scenarios: policy.scenarios.flatMap(name => {
             try {
@@ -64,7 +67,20 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, performan
               return [entry];
             } catch { return []; }
           }) };
-        const response = await request('/device/exchange', { id: config.device.id, instanceId, metadata, reports: executor.reports(config.device.id) }, config.token);
+        const reports = executor.reports(config.device.id);
+        const exchange = { id: config.device.id, instanceId, metadata, reports };
+        if (localTasks) {
+          const tasks = localTasks.snapshot({ profiles: knownProfiles.map(p => p.directory), scenarios: metadata.scenarios.map(s => s.name) });
+          let budget = 127000 - Buffer.byteLength(JSON.stringify(exchange));
+          const visible = [];
+          for (const task of tasks) {
+            budget -= Buffer.byteLength(JSON.stringify(task)) + 1;
+            if (budget < 0) break;
+            visible.push(task);
+          }
+          exchange.localTasks = { tasks: visible, omitted: tasks.length - visible.length };
+        }
+        const response = await request('/device/exchange', exchange, config.token);
         if (closed) return;
         schedulePopups.sync((response.schedulePrompts || []).map(task => ({
           ...task, confirmBy: Date.now() + task.confirmBy - response.serverTime

@@ -79,6 +79,8 @@ function readBody(request) {
     request.on('error', reject);
   });
 }
+const { createNetworkRates } = require('./integrations/remote/network-rates');
+const { createLocalTasks } = require('./integrations/remote/local-tasks');
 const { createSchedules } = require('./workflow/schedules');
 const { createSchedulePopups } = require('./integrations/chrome/schedule-popup');
 const schedules = createSchedules({ dataDir, workflows, scenarios });
@@ -86,7 +88,8 @@ const schedulePopups = createSchedulePopups((task, proceed) => schedules.decide(
 let scheduleTimer;
 const automation = createAutomationApi({ workflows, scenarios, profiles, readBody });
 const dashboardToken = randomBytes(32).toString('hex');
-const remote = createRemoteClient({ dataDir: dataDir,
+const network = createNetworkRates();
+const remote = createRemoteClient({ dataDir, localTasks: createLocalTasks({ schedules, workflows }), network,
   profiles, scenarios, workflows, performance: () => performance, allowHttp: process.env.LOCAL_AGENT_REMOTE_ALLOW_HTTP_LOOPBACK === '1' });
 function dashboardAuthorized(request) {
   const candidate = request.headers['x-local-agent-session'];

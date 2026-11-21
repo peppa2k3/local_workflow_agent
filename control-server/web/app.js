@@ -208,16 +208,61 @@
     $('device-name').textContent = d.name; $('device-status').textContent = d.revoked ? 'Đã thu hồi' : d.online ? 'Online' : 'Offline';
     $('device-status').className = 'badge ' + (d.online ? 'online' : 'offline'); $('device-seen').textContent = `Lần cuối kết nối: ${when(d.lastSeen)}`;
     const p = d.metadata.performance || {};
-    $('metrics').replaceChildren(...[[`${p.cpuPercent || 0}%`, 'CPU agent'], [`${p.memoryMb || 0} MB`, 'RAM agent'], [`${Math.floor((d.metadata.uptime || 0) / 60)} phút`, 'Uptime agent']].map(([v, k]) => {
+    const rate = key => d.online && Number.isFinite(d.metadata.network?.[key]) ? `${d.metadata.network[key].toFixed(2)} Mbps` : '—';
+    $('metrics').replaceChildren(...[[`${p.cpuPercent || 0}%`, 'CPU agent'], [`${p.memoryMb || 0} MB`, 'RAM agent'], [`${Math.floor((d.metadata.uptime || 0) / 60)} phút`, 'Uptime agent'],
+      [rate('downloadMbps'), 'Tải xuống'], [rate('uploadMbps'), 'Tải lên']].map(([v, k]) => {
       const n = el('div', undefined, 'metric'); n.append(el('strong', v), el('small', k)); return n;
     }));
     $('profiles').textContent = (d.metadata.profiles || []).map(p => `${p.name}: ${p.extensionConnected ? 'extension đã kết nối' : 'extension offline'}${p.running ? ' · đang có tác vụ' : ''}`).join(' | ') || 'Máy chưa cấp quyền profile/kịch bản. Thiết lập tại trang Remote của máy local.';
+    renderLocalTasks(d);
     $('revoke').disabled = d.revoked;
     const signature = JSON.stringify([d.id, d.metadata.profiles?.map(p => [p.directory, p.name]), d.metadata.scenarios]);
     if (signature !== formSignature) { options($('run-profile'), d.metadata.profiles || [], 'directory', 'name'); options($('run-scenario'), d.metadata.scenarios || [], 'name', 'name'); renderVariables(); formSignature = signature; }
     if (followClock && document.activeElement !== scheduleTime) setScheduleTime();
     $('schedule-create').disabled = d.revoked || !$('run-profile').value || !$('run-scenario').value;
     $('run').disabled = !d.online || d.revoked || !$('run-profile').value || !$('run-scenario').value;
+  }
+  function renderLocalTasks(device) {
+    $('local-tasks').hidden = !device.localTasks;
+    if (!device.localTasks) return;
+    const { tasks, omitted } = device.localTasks;
+    $('local-tasks-notice').textContent = [
+      !device.online && 'Thiết bị offline · hiển thị dữ liệu từ lần kết nối cuối.',
+      omitted > 0 && `Còn ${omitted} tác vụ vượt giới hạn đồng bộ.`
+    ].filter(Boolean).join(' ');
+    function renderList(id, list, empty) {
+      const target = $(id);
+      const signature = JSON.stringify([device.id, device.online, list]);
+      if (target.dataset.signature === signature) return;
+      target.dataset.signature = signature;
+      const rows = list.map(task => {
+        const row = el('article', undefined, 'run');
+        row.append(el('strong', `${task.scenario} · ${task.profile}`));
+        row.append(el('p', task.state === 'running' ? `Tiến độ ${Math.min(task.index + 1, task.total)}/${task.total}`
+          : `${when(task.scheduledAt)} · ${stateName[task.state]}`));
+        async function manage(action, scheduledAt) {
+          await api('/api/commands', { requestId: crypto.randomUUID(), deviceId: device.id, type: 'manageLocalTask',
+            taskId: task.id, profile: task.profile, scenario: task.scenario, action, expectedTime: task.scheduledAt, scheduledAt });
+          message('Đã gửi yêu cầu đến máy local.');
+          await refresh();
+        }
+        function actionButton(label, action) {
+          const button = el('button', label);
+          button.onclick = () => submit(button, () => manage(action));
+          row.append(button);
+        }
+        if (!device.online) return row;
+        if (task.state === 'running') actionButton('Dừng lượt local', 'stop');
+        if (task.state === 'confirming' && task.confirmBy > Date.now()) actionButton('Chạy ngay', 'confirm');
+        if (task.state === 'scheduled' || task.state === 'confirming' && task.confirmBy > Date.now()) actionButton('Hủy lịch', 'cancel');
+        if (task.state === 'scheduled') row.append(editScheduleTime(task.scheduledAt,
+          (scheduledAt, button) => submit(button, () => manage('reschedule', scheduledAt))));
+        return row;
+      });
+      target.replaceChildren(...(rows.length ? rows : [el('p', empty, 'muted')]));
+    }
+    renderList('local-running', tasks.filter(task => task.state === 'running'), 'Chưa có lượt chạy local.');
+    renderList('local-schedules', tasks.filter(task => task.state !== 'running'), 'Chưa có lịch local đang chờ.');
   }
   function renderHistory(commands, deviceId) {
     const signature = JSON.stringify(commands); if (historySignature === signature) return; historySignature = signature;
@@ -228,7 +273,7 @@
     $('history').replaceChildren(...commands.map(cmd => {
       const n = el('article', undefined, 'run'), row = el('div', undefined, 'row');
       row.append(el('span', stateName[cmd.state] || cmd.state, 'badge'), el('small', when(cmd.created))); n.append(row);
-      n.append(el('h3', cmd.type === 'run' ? `${cmd.payload.scenario} · ${cmd.payload.profile}` : 'Yêu cầu dừng tác vụ'));
+      n.append(el('h3', cmd.type === 'run' ? `${cmd.payload.scenario} · ${cmd.payload.profile}` : cmd.type === 'manageLocalTask' ? `Yêu cầu quản lý tác vụ local · ${cmd.payload.scenario}` : 'Yêu cầu dừng tác vụ'));
       n.append(el('small', `ID: ${cmd.id}`));
       if (cmd.payload.scheduledAt) n.append(el('p', 'Giờ đã đặt: ' + when(cmd.payload.scheduledAt)));
       if (cmd.state === 'scheduled') {

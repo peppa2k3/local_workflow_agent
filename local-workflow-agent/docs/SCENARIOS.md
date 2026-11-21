@@ -285,3 +285,5 @@ Trên dashboard local, chọn profile và kịch bản, chọn ngày giờ rồi
 Agent lưu lịch local trong `data/schedules.json`. Control server lưu lịch từ xa trong SQLite. Khi đến giờ, agent phải hoạt động và profile phải rảnh. Lịch chờ qua thời gian máy tắt và được xét lại khi agent hoạt động. Kịch bản dùng bản đã lưu tại thời điểm chạy. Giữ Chrome cùng extension kết nối đúng profile cho các bước trình duyệt.
 
 Popup hiển thị trên dashboard đã đặt lịch và trên màn hình Windows nếu agent chạy trong phiên desktop. Chọn **Yes** để chạy, **No** để hủy. Sau 30 giây hệ thống mặc định chạy dù dashboard đã đóng. Lượt remote giữ nguyên quyền profile/kịch bản và biến đã cấu hình trên máy local.
+
+Control Server nhận tiến độ của lượt chạy local và các lịch local đang chờ hoặc chờ xác nhận, theo quyền profile và kịch bản đã cấp trong trang Remote. Tài khoản ghép nối có thể dừng lượt chạy, đổi giờ, hủy hoặc xác nhận lịch từ xa khi thiết bị online. Các thao tác áp dụng tại agent sau lần polling tiếp theo. Control Server hiển thị số tác vụ vượt giới hạn dữ liệu của mỗi lần đồng bộ nếu có.

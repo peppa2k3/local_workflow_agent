@@ -36,3 +36,9 @@ Muốn build container từ source bằng GitHub Actions, xem [hướng dẫn de
 Launcher gốc `node remote-control.js` vẫn hoạt động. App ưu tiên `.env` riêng, fallback `.env.control` cũ. SQLite cũ `data/control/control.sqlite` ở gốc tiếp tục được dùng nếu có; standalone dùng `control-server/data/control.sqlite`. Override bằng `CONTROL_ENV_FILE`, `CONTROL_DATABASE`.
 
 Đây là server HTTP polling, không phải server Socket.IO Corebase. Video/Chrome chạy trên local; server chỉ điều phối.
+
+### Tốc độ mạng và tác vụ local
+
+Control Server hiển thị tốc độ tải xuống và tải lên theo Mbps, tính từ lưu lượng thực tế qua các giao diện mạng đang hoạt động trên máy Windows trong khoảng giữa hai lần lấy mẫu. Agent dùng bộ đếm hệ điều hành và hiển thị dấu gạch ngang khi chưa có mẫu hoặc khi thiết bị offline.
+
+Mục **Tác vụ từ máy local** hiển thị lượt chạy và lịch chờ trong phạm vi quyền đã cấp. Có thể dừng lượt chạy, đổi giờ, hủy hoặc xác nhận lịch khi agent online. Khi agent offline, trang giữ ảnh chụp trạng thái cuối.

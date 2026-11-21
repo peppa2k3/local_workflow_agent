@@ -9,6 +9,9 @@ const { createRemoteClient } = require('../local-workflow-agent/src/integrations
 const { createRemoteExecutor } = require('../local-workflow-agent/src/integrations/remote/remote-executor');
 const { createWorkflows } = require('../local-workflow-agent/src/workflow/workflows');
 const { createScenarioStore } = require('../local-workflow-agent/src/workflow/scenario-store');
+const { createSchedules } = require('../local-workflow-agent/src/workflow/schedules');
+const { createLocalTasks } = require('../local-workflow-agent/src/integrations/remote/local-tasks');
+const { createNetworkRates } = require('../local-workflow-agent/src/integrations/remote/network-rates');
 const c = require('../control-server/shared/remote-protocol');
 const { overrideVariables } = require('../local-workflow-agent/src/workflow/variables');
 (async () => {
@@ -45,7 +48,12 @@ const { overrideVariables } = require('../local-workflow-agent/src/workflow/vari
     }
   };
   const policy = { profiles: ['Default'], scenarios: ['sample', 'library'], variables: { sample: ['caption'], library: ['source', 'storage'] }, clipScenarios: ['library'] };
-  const client = createRemoteClient({ dataDir: dir, profiles, scenarios, workflows, allowHttp: true });
+  const localWorkflows = createWorkflows({ scenarios: realScenarios, profiles, defaultProfile: 'Default' });
+  const localSchedules = createSchedules({ dataDir: dir, scenarios: { ...realScenarios, load: scenarios.load }, workflows: localWorkflows });
+  const localTasks = createLocalTasks({ schedules: localSchedules, workflows: localWorkflows });
+  let sample = 0;
+  const network = createNetworkRates(async () => [{ id: 'nic', received: ++sample * 125000, sent: sample * 250000 }], () => sample * 1000);
+  const client = createRemoteClient({ dataDir: dir, profiles, scenarios, workflows, localTasks, network, allowHttp: true });
   try {
     const api = f.browser(), other = f.browser();
     await api('/api/login', { email: 'alice@example.test', password: 'long-password-alice' });
@@ -117,6 +125,38 @@ const { overrideVariables } = require('../local-workflow-agent/src/workflow/vari
     assert.equal(rejected.state, 'rejected');
     await api('/api/commands', second); await client.tick(); assert.equal(started, 2);
     assert.equal(runs.get(second.requestId).state, 'running');
+    const localRun = localWorkflows.start('Default', { steps: [{ action: 'wait', ms: 60000 }] }, '', 'sample');
+    const initialTime = Date.now() + 60000;
+    const localSchedule = localSchedules.create({ profile: 'Default', scenario: 'sample', scheduledAt: initialTime, uploadPath: 'PRIVATE PATH' });
+    localSchedules.create({ profile: 'Default', scenario: 'hidden', scheduledAt: initialTime });
+    async function waitForLocalTasks(matches) {
+      for (let attempt = 0; attempt < 40; attempt++) {
+        await client.tick();
+        const device = (await api('/api/devices')).devices[0];
+        if (matches(device.localTasks.tasks)) return device;
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      assert.fail('Local task snapshot did not converge');
+    }
+    const synced = await waitForLocalTasks(tasks => tasks.some(task => task.id === localSchedule.id));
+    assert.deepEqual(synced.metadata.network, { downloadMbps: 1, uploadMbps: 2 });
+    assert.deepEqual(synced.localTasks.tasks.map(task => task.id), [localRun.runId, localSchedule.id]);
+    assert(!JSON.stringify(synced).includes('PRIVATE PATH'));
+    const manage = { deviceId, type: 'manageLocalTask', profile: 'Default', scenario: 'sample' };
+    const edit = { ...manage, requestId: randomUUID(), taskId: localSchedule.id, action: 'reschedule', expectedTime: initialTime, scheduledAt: initialTime + 60000 };
+    await other('/api/commands', edit, 404);
+    await api('/api/commands', edit);
+    await waitForLocalTasks(tasks => tasks.some(task => task.id === localSchedule.id && task.scheduledAt === edit.scheduledAt));
+    assert.equal(localSchedules.list()[0].scheduledAt, edit.scheduledAt);
+    assert.equal((await api('/api/devices')).devices[0].localTasks.tasks[1].scheduledAt, edit.scheduledAt);
+    await api('/api/commands', { ...edit, requestId: randomUUID() }, 409);
+    await api('/api/commands', { ...manage, requestId: randomUUID(), taskId: localRun.runId, action: 'stop' });
+    await waitForLocalTasks(tasks => !tasks.some(task => task.id === localRun.runId));
+    assert.equal(localWorkflows.getRun(localRun.runId).state, 'cancelled');
+    await api('/api/commands', { ...manage, requestId: randomUUID(), taskId: localSchedule.id, action: 'cancel', expectedTime: edit.scheduledAt });
+    await waitForLocalTasks(tasks => tasks.length === 0);
+    assert.equal(localSchedules.list()[0].state, 'cancelled');
+    assert.deepEqual((await api('/api/devices')).devices[0].localTasks.tasks, []);
     const config = c.readJson(path.join(dir, 'remote.json'));
     await assert.rejects(c.post(f.origin, '/device/exchange', { id: deviceId, instanceId: randomUUID(), metadata: {}, reports: [] }, config.token, { allowHttp: true }), /instance/);
     await api('/api/device-revoke', { id: deviceId }); await client.tick();

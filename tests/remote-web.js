@@ -40,7 +40,10 @@ const { chromium } = require('playwright');
       if (req.method() === 'POST') { assert.equal(req.headers()['x-csrf-token'], url.pathname === '/api/login' ? '' : 'fixture-csrf'); posted.push({ path: url.pathname, data: req.postDataJSON() }); }
       if (url.pathname === '/api/login') { loggedIn = true; return route.fulfill({ json: { email: 'user@example.test', csrf: 'fixture-csrf' } }); }
       if (url.pathname === '/api/me') return route.fulfill({ status: loggedIn ? 200 : 401, json: loggedIn ? { email: 'user@example.test', csrf: 'fixture-csrf' } : { error: 'Login required' } });
-      if (url.pathname === '/api/devices') return route.fulfill({ json: { devices: [{ id, name: '<img src=x onerror=alert(1)>', online, revoked: false, lastSeen: Date.now(), metadata: {
+      if (url.pathname === '/api/devices') return route.fulfill({ json: { devices: [{ id, name: '<img src=x onerror=alert(1)>', online, revoked: false, lastSeen: Date.now(), localTasks: { omitted: 0, tasks: [
+          { id: uploadTarget, profile: 'Default', scenario: 'sample', state: 'running', index: 0, total: 2 },
+          { id: target, profile: 'Default', scenario: 'sample', state: 'scheduled', scheduledAt: Date.now() + 600000 }
+        ] }, metadata: { network: { downloadMbps: 8.25, uploadMbps: 1.75 },
         profiles: [{ directory: 'Default', name: 'Test', extensionConnected: true }], scenarios: [{ name: 'sample', variables: ['caption'], steps: 2,
           clipTargets: [{ id: target, index: 0, action: 'downloadVideo', variable: 'caption' }, { id: uploadTarget, index: 1, action: 'upload' }] }] } }] } });
       if (url.pathname === '/api/commands' && url.searchParams.has('request')) return route.fulfill({ json: { commands: [{ state: 'succeeded', result: { clips: { names: [clip], more: false } } }] } });
@@ -103,6 +106,11 @@ const { chromium } = require('playwright');
     await page.locator('.device').click();
     await page.locator('#history').getByText('Upload thất bại').waitFor();
     assert.equal(await taskNotice.count(), 0);
+    assert.match(await page.locator('#metrics').textContent(), /8.25 Mbps/);
+    await page.locator('#local-running').getByRole('button', { name: 'Dừng lượt local' }).click();
+    await page.waitForFunction(() => document.getElementById('message').textContent === 'Đã gửi yêu cầu đến máy local.');
+    assert.equal(posted.find(p => p.data.type === 'manageLocalTask').data.taskId, uploadTarget);
+    assert.equal(await page.locator('#local-schedules').getByRole('button', { name: 'Hủy lịch' }).count(), 1);
     await page.locator('#schedule-later').click();
     await page.locator('#schedule-create').click();
     const scheduleDialog = page.getByRole('dialog', { name: 'Chạy kịch bản theo lịch?' });

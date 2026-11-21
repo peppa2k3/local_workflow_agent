@@ -12,6 +12,11 @@
     <div class="panel"><h2>Chạy kịch bản</h2><p class="muted">Các kịch bản và biến bên dưới đã được máy local cho phép.</p><form id="run-form"><div class="two"><label>Chrome profile<select id="run-profile" required></select></label><label>Kịch bản<select id="run-scenario" required></select></label></div><div id="variables"></div><button id="run" class="primary" type="submit">Chạy trên thiết bị</button><div class="two"><label>Ngày và giờ chạy<input id="schedule-at" type="datetime-local" step="60"></label>
       <button id="schedule-now" type="button">Bây giờ</button>
       <button id="schedule-later" type="button">Sau 15 phút</button><button id="schedule-create" type="submit">Đặt lịch</button></div></form></div>
+    <section id="local-tasks" class="panel" hidden><h2>Tác vụ từ máy local</h2>
+      <p id="local-tasks-notice" class="muted"></p>
+      <h3>Đang chạy</h3><div id="local-running"></div>
+      <h3>Đã lên lịch</h3><div id="local-schedules"></div>
+    </section>
     <div class="panel"><div class="row"><h2>Lịch sử điều khiển</h2><small>200 lệnh gần nhất · tự cập nhật</small></div><div id="history"></div></div>
   </section></div></div></section>
   <footer>Local Agent Remote · Thiết bị giữ quyền quyết định kịch bản được phép chạy.</footer>

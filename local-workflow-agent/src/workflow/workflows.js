@@ -47,7 +47,7 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
   function status(profile) {
     const s = session(profile);
     return {
-      profile: s.profile, running: s.running, runId: s.runId, index: s.index,
+      profile: s.profile, remote: s.remote === true, running: s.running, runId: s.runId, index: s.index,
       executionId: s.executionId || null, state: s.running ? 'running' : s.outcome || 'idle', scenario: s.scenarioName || null,
       total: s.workflow?.steps.length || 0, action: s.workflow?.steps[s.index]?.action || null,
       stepLabel: s.currentStep?.label?.trim() || s.workflow?.steps[s.index]?.label?.trim() || `Bước ${s.index + 1}`,
