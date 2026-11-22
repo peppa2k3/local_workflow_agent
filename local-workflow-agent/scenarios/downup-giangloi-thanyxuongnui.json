@@ -1,20 +1,25 @@
 {
   "name": "Tải clip → upload Reels và điền tên phim (bản sao)",
   "variables": {
-    "video_url": "https://www.youtube.com/watch?v=n0BUkf2iU_A&pp=ygUPY2jhu4sgZMOidSBi4buL",
-    "thu_muc_tai": "D:\\Videos\\khoahoc",
-    "reels_url": "https://www.facebook.com/profile.php?id=61594335706080&sk=reels_tab",
+    "video_url": "clip:[Trọn bộ] Chiến Thần Y Tiên Xuống Núi Cưới Nữ Tổng Tài, Lộ Thân Thế Quét Sạch Kẻ Thù Mùa 1 #phimhay.mp4",
+    "thu_muc_tai": "D:\\Videos\\giangloi",
+    "reels_url": "https://www.facebook.com/profile.php?id=61551343781361&sk=reels_tab",
     "ten_phim": "{{download_title}}",
     "ten_file": "{{download_file_name}}"
   },
   "steps": [
     {
       "action": "downloadVideo",
-      "label": "Tải clip và xác nhận file hoàn tất",
+      "label": "Tải clip và xác nhận file hoàn tất liliphim",
       "url": "{{video_url}}",
       "directory": "{{thu_muc_tai}}",
       "quality": 1080,
       "downloadTimeoutMs": 1800000
+    },
+    {
+      "action": "wait",
+      "ms": 5000,
+      "label": "Chờ 5s"
     },
     {
       "action": "openUrl",
@@ -28,23 +33,10 @@
       "navigationTimeoutMs": 60000
     },
     {
-      "action": "click",
-      "locatorType": "role",
-      "role": "button",
-      "locator": "Tạo thước phim",
-      "timeoutMs": 5000,
-      "label": "Click Tạo thước fim"
-    },
-    {
-      "action": "wait",
-      "ms": 5000,
-      "label": "Chờ 5s"
-    },
-    {
       "action": "upload",
       "label": "Upload chính clip vừa tải",
       "locatorType": "role",
-      "locator": "Tải video lên cho Thước phim",
+      "locator": "Tạo thước phim",
       "filePath": "{{download_file_path}}",
       "timeoutMs": 30000,
       "navigationTimeoutMs": 300000,
@@ -55,36 +47,6 @@
         "state": "enabled"
       },
       "role": "button"
-    },
-    {
-      "action": "wait",
-      "ms": 5000,
-      "label": "Wait 5s for upload"
-    },
-    {
-      "action": "click",
-      "locatorType": "text",
-      "role": "button",
-      "locator": "Tiếp",
-      "timeoutMs": 5000,
-      "label": "Click Tiếp 2",
-      "completion": {
-        "state": "visible",
-        "locatorType": "text"
-      }
-    },
-    {
-      "action": "click",
-      "locatorType": "role",
-      "role": "button",
-      "locator": "Tiếp",
-      "timeoutMs": 5000,
-      "label": "Click Tiếp 1"
-    },
-    {
-      "action": "wait",
-      "ms": 5000,
-      "label": "wait 5s"
     },
     {
       "action": "type",
@@ -98,16 +60,24 @@
     },
     {
       "action": "click",
+      "label": "nhap tiep",
       "locatorType": "role",
       "role": "button",
-      "locator": "Đăng",
+      "locator": "Tiếp",
       "timeoutMs": 30000,
       "completion": {
         "locatorType": "label",
         "locator": "Mô tả thước phim của bạn...",
         "state": "visible"
-      },
-      "label": "Đăng"
+      }
+    },
+    {
+      "action": "click",
+      "locatorType": "role",
+      "role": "button",
+      "locator": "Đăng",
+      "timeoutMs": 5000,
+      "label": "Đăng clip"
     }
   ]
 }
