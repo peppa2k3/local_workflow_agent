@@ -6,8 +6,10 @@ const { resolveVariables, hasRuntime, resolveRuntime } = require('./variables');
 const { validateUploadMetadata } = require('../storage/activity-store');
 const { clipFile, isClip, prefix, uploadFolders } = require('./clip-library');
 
+const supportedActions = ['downloadVideo', 'openUrl', 'openFolder', 'wait', 'waitFor', 'click', 'type', 'setDate', 'setTime', 'scroll', 'upload', 'closeTab'];
+
 function validateStep(step, uploadPath = '') {
-  if (!['downloadVideo', 'openUrl', 'openFolder', 'wait', 'waitFor', 'click', 'type', 'setDate', 'setTime', 'scroll', 'upload'].includes(step.action)) throw new Error(`Unsupported action: ${step.action}`);
+  if (!supportedActions.includes(step.action)) throw new Error(`Unsupported action: ${step.action}`);
   for (const key of ['url', 'path', 'text', 'locator', 'selector', 'role', 'filePath', 'folder', 'filename', 'value', 'format']) {
     if (step[key] !== undefined) step[key] = String(step[key]);
   }
@@ -96,15 +98,20 @@ function createScenarioStore(scenariosDir) {
       }
       const prepared = resolveVariables(scenario);
       const folders = uploadFolders(prepared.steps);
-      let downloaded = false;
+      let downloaded = false, openTabs = 0;
       for (const [index, step] of prepared.steps.entries()) {
         if (step.action === 'upload' && isClip(step.filePath) && !step.folder && folders[index]) step.folder = folders[index];
         if (hasRuntime(step)) {
           if (!downloaded) throw new Error('Runtime download references require an earlier downloadVideo step');
-          if (!['downloadVideo', 'openUrl', 'openFolder', 'wait', 'waitFor', 'click', 'type', 'setDate', 'setTime', 'scroll', 'upload'].includes(step.action)) throw new Error(`Unsupported action: ${step.action}`);
+          if (!supportedActions.includes(step.action)) throw new Error(`Unsupported action: ${step.action}`);
         } else validateStep(step.action === 'upload' && isClip(step.filePath) ? { ...step } : step, uploadPath);
         if (step.label !== undefined && typeof step.label !== 'string') throw new Error('Step label must be text');
         if (step.action === 'downloadVideo') downloaded = true;
+        if (step.action === 'openUrl') openTabs++;
+        if (step.action === 'closeTab') {
+          if (openTabs === 0) throw new Error(`Bước ${index + 1}: Đóng tab cần một bước Mở URL chưa được đóng trước đó.`);
+          openTabs--;
+        }
       }
       return prepared;
     }

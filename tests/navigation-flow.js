@@ -82,6 +82,7 @@ const { createScenarioStore } = require('../local-workflow-agent/src/workflow/sc
         onCreated: event(), create: createTab,
         get: async id => { const tab = tabs.get(id); if (!tab) throw new Error('Tab closed'); return { id, status: tab.status, url: tab.page.url() }; },
         query: async () => [],
+        remove: async id => { await tabs.get(id).page.close(); tabs.delete(id); },
         sendMessage: async (id, message) => tabs.get(id).page.evaluate(message => {
           if (!window.bridgeListener) throw new Error('No content script');
           return new Promise(resolve => window.bridgeListener(message, {}, resolve));
@@ -224,6 +225,45 @@ const { createScenarioStore } = require('../local-workflow-agent/src/workflow/sc
     assert.equal(await tabs.get(job.tabId).page.locator('#text').inputValue(), 'Tên clip mới tải');
     await assert.rejects(execute(job, { action: 'upload', selector: '#upload', filePath: '{{download_file_path}}' }), /resolved final/);
     assert.equal(debuggerQueries, 2, 'one debugger lookup per tab, reused for upload and typing');
+    const preservedTabId = job.tabId;
+    assert.throws(() => pipeline.start('Profile 1', { steps: [{ action: 'closeTab' }] }), /cần một bước Mở URL/);
+    pipeline.start('Profile 1', { steps: [
+      { action: 'openUrl', url: base + '/start' },
+      { action: 'openUrl', url: base + '/start' },
+      { action: 'click', selector: '#noop' },
+      { action: 'closeTab', closeTabId: preservedTabId },
+      { action: 'closeTab' }
+    ] });
+    const opened = [];
+    for (let i = 0; i < 2; i++) {
+      const next = pipeline.next(session);
+      await execute(job, next.step);
+      opened.push(job.tabId);
+      pipeline.result(session, { runId: next.runId, id: next.step.id, ok: true, tabId: job.tabId });
+    }
+    // A click can transfer execution to another tab. Only openUrl tabs are eligible to close.
+    const click = pipeline.next(session);
+    pipeline.result(session, { runId: click.runId, id: click.step.id, ok: true, tabId: preservedTabId });
+    for (const tabId of opened.reverse()) {
+      const next = pipeline.next(session);
+      assert.equal(next.step.closeTabId, tabId);
+      job.tabId = next.tabId;
+      await execute(job, next.step);
+      pipeline.result(session, { runId: next.runId, id: next.step.id, ok: true, tabId: job.tabId });
+      assert(!tabs.has(tabId));
+      assert(tabs.has(preservedTabId));
+    }
+    assert.equal(pipeline.status('Profile 1').state, 'succeeded');
+    assert.equal(pipeline.status('Profile 1').tabId, preservedTabId);
+    pipeline.start('Profile 1', { steps: [{ action: 'openUrl', url: base + '/start' }, { action: 'closeTab' }] });
+    for (let i = 0; i < 2; i++) {
+      const next = pipeline.next(session);
+      job.tabId = next.tabId;
+      await execute(job, next.step);
+      pipeline.result(session, { runId: next.runId, id: next.step.id, ok: true, tabId: job.tabId });
+    }
+    assert.equal(pipeline.status('Profile 1').tabId, null);
+    assert.equal(pipeline.status('Profile 1').state, 'succeeded');
     // Return to the original page for the remaining existing checks.
     job.tabId = [...tabs.values()].find(tab => tab.page === targetPage).id;
 

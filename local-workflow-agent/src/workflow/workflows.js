@@ -180,7 +180,7 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
     Object.assign(s, { workflow, remote, scenarioName: scenarioName || scenario.name || null, uploadPath, currentStep: null, currentUrl: '', uploadFile: null,
       steps: workflow.steps.map((step, index) => ({ index, number: index + 1, action: step.action, label: step.label?.trim() || `Bước ${index + 1}`,
         state: 'pending', started_at: null, ended_at: null, error: '' })),
-      runtime: {}, index: 0, download: null, error: '', tabId: null, running: true, startedAt: Date.now(), endedAt: null, lastStepMs: null });
+      runtime: {}, index: 0, download: null, error: '', tabId: null, openedTabIds: [], running: true, startedAt: Date.now(), endedAt: null, lastStepMs: null });
     s.executionId = executionId || s.runId; s.outcome = 'running';
     s.runDeadline = Date.now() + timeoutMs;
     try { persist(s); } catch (error) { s.running = false; s.outcome = 'failed'; throw error; }
@@ -209,6 +209,7 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
         (step.waitAfterMs || 0) + (step.times || 1) * (step.intervalMs || 2500) + 30000;
       s.deadline = Date.now() + budget;
       answer.step = { ...step, id: s.index };
+      if (step.action === 'closeTab') answer.step.closeTabId = s.openedTabIds.at(-1) ?? null;
     }
     return answer;
   }
@@ -218,7 +219,16 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
     if (typeof body.actionUrl === 'string') s.steps[s.index].action_url = body.actionUrl;
     if (!body.ok) return fail(s, `Step ${s.index + 1}: ${body.error || 'Action failed'}`);
     s.lastStepMs = Date.now() - s.stepStartedAt;
-    if (Number.isInteger(body.tabId)) s.tabId = body.tabId;
+    if (s.currentStep.action === 'closeTab') {
+      const closedTabId = s.openedTabIds.pop();
+      if (s.tabId === closedTabId) {
+        s.tabId = null;
+        s.currentUrl = '';
+      }
+    } else if (Number.isInteger(body.tabId)) {
+      s.tabId = body.tabId;
+      if (s.currentStep.action === 'openUrl') s.openedTabIds.push(body.tabId);
+    }
     if (typeof body.pageUrl === 'string' && /^https?:\/\//.test(body.pageUrl)) s.currentUrl = body.pageUrl;
     else if (s.currentStep.action === 'openUrl') s.currentUrl = s.currentStep.url;
     try {

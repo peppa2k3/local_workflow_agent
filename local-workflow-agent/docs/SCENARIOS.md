@@ -41,6 +41,7 @@ Edit a JSON file in `scenarios` and run it again. Steps run in order:
 | Action | Fields | Effect |
 | --- | --- | --- |
 | `openUrl` | `url`, optional `navigationTimeoutMs`, `settleMs`, `completion` | Opens a new tab in the selected connected profile and waits for loading to finish. |
+| `closeTab` | None | Closes the most recent unmatched tab created by an `openUrl` step in the same run. |
 | `openFolder` | `path` | Opens a local directory in Windows Explorer. |
 | `wait` | `ms` | Waits for a duration. |
 | `waitFor` | `locatorType`, `locator`, optional `role`, `index`, `timeoutMs` | Waits for a visible matching element (default 10 seconds). |
@@ -86,7 +87,7 @@ visible match count to make stale locator/index settings easier to diagnose.
 
 ## Waiting for actions to finish
 
-Only one step is issued at a time **per profile**. The next step, including local `wait`/`openFolder`, starts after the extension acknowledges completion. `openUrl` and `click` wait for Chrome's tab load status and `document.readyState === 'complete'`. `openUrl` then waits for a quiet DOM/URL interval (`settleMs`, default 350 ms); `click` defaults to `settleMs: 0` so video/progress updates cannot block an already delivered click. The background worker owns navigation, so replacing the old document or redirecting does not lose the completion acknowledgement. A click observes navigation/new-tab creation for at least 500 ms; if it opens a new tab during that interval, later steps use that tab. The selected target tab remains bound even if you switch to another tab.
+Only one step is issued at a time **per profile**. The next step, including local `wait`/`openFolder`, starts after the extension acknowledges completion. `openUrl` and `click` wait for Chrome's tab load status and `document.readyState === 'complete'`. `openUrl` then waits for a quiet DOM/URL interval (`settleMs`, default 350 ms); `click` defaults to `settleMs: 0` so video/progress updates cannot block an already delivered click. The background worker owns navigation, so replacing the old document or redirecting does not lose the completion acknowledgement. A click observes navigation/new-tab creation for at least 500 ms; if it opens a new tab during that interval, later steps use that tab. The selected target tab remains bound even if you switch to another tab. Add **Đóng tab đã mở** (`{ "action": "closeTab" }`) after the steps that use a tab opened by **Mở URL**. With several open steps, close steps work from newest to oldest. The action closes the recorded tab even if a click switched the workflow to another tab. It reports a step error if the recorded tab has already been closed. Reload the Chrome extension after updating the agent to use this action.
 
 Page load does not tell an agent when a website's business operation is finished. For AJAX, delayed navigation, upload processing, or pages with continuously changing content, set **Chờ phần tử kết quả** in the dashboard or add `completion` to the action. It works on `openUrl`, `click`, `type`, `setDate`, `setTime`, and `upload` and accepts normal locator fields plus `state`: `visible` (default), `hidden`, or `enabled` (can receive a pointer click). For example:
 

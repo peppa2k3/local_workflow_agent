@@ -102,6 +102,13 @@ async function execute(job, step) {
   if (step.action === 'upload' && (!step.filePath || step.filePath.startsWith('clip:') || /\.(part|ytdl|tmp)$/i.test(step.filePath) || /\{\{\s*download_[a-z_]+\s*\}\}/.test(step.filePath))) throw new Error('Upload requires a resolved final video path from the agent');
   if (step.action === 'upload' && [step.pageId, step.pageName, step.pageUrl, step.platform].some(value => typeof value === 'string' && /\{\{\s*[a-zA-Z_][a-zA-Z0-9_]*\s*\}\}/.test(value))) throw new Error('Upload page metadata must be resolved by the agent before selecting the file');
   if (step.action === 'downloadVideo') throw new Error('downloadVideo runs in the local agent. Restart node local-agent.js.');
+  if (step.action === 'closeTab') {
+    if (!Number.isInteger(step.closeTabId)) throw new Error('Không tìm thấy tab do bước Mở URL tạo trong lượt chạy này.');
+    await checkRunning(job);
+    await chrome.tabs.remove(step.closeTabId);
+    if (job.tabId === step.closeTabId) job.tabId = null;
+    return;
+  }
   if (step.action === 'openUrl') {
     const url = new URL(step.url);
     if (!['http:', 'https:'].includes(url.protocol)) throw new Error('openUrl requires http or https');
@@ -169,7 +176,7 @@ async function poll() {
     let result;
     try {
       await execute(job, next.step);
-      result = { ok: true, actionUrl: job.actionUrl || '', pageUrl: (await chrome.tabs.get(job.tabId)).url || '' };
+      result = { ok: true, actionUrl: job.actionUrl || '', pageUrl: next.step.action === 'closeTab' ? '' : (await chrome.tabs.get(job.tabId)).url || '' };
     } catch (error) { result = { ok: false, actionUrl: job.actionUrl || '', error: String(error.message || error) }; }
     finally { clearInterval(keepAlive); }
     // Retry acknowledgement without repeating a potentially destructive action.

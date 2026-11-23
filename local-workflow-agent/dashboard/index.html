@@ -167,6 +167,7 @@
   <script>
     const actions = {
       downloadVideo: { label: 'Tải video (yt-dlp + FFmpeg)', fields: [['url', 'URL video (tự lấy tiêu đề làm tên file)', 'text'], ['directory', 'Thư mục lưu (đường dẫn tuyệt đối)', 'text'], ['downloadTimeoutMs', 'Timeout tải (ms)', 'number']] },
+      closeTab: { label: 'Đóng tab đã mở', fields: [] },
       openUrl: { label: 'Mở URL', fields: [['url', 'URL', 'text']] },
       openFolder: { label: 'Mở thư mục', fields: [['path', 'Đường dẫn thư mục', 'text']] },
       wait: { label: 'Chờ thời gian', fields: [['ms', 'Mili giây', 'number']] },
@@ -199,6 +200,7 @@
     );
     const defaults = {
       downloadVideo: { url: '', directory: 'D:\\Videos', quality: 1080, language: 'vi', downloadTimeoutMs: 1800000 },
+      closeTab: {},
       openUrl: { url: 'https://www.facebook.com/' }, openFolder: { path: 'C:\\Users\\Administrator\\Downloads' },
       wait: { ms: 1000 }, waitFor: { locatorType: 'text', locator: 'Tiếp', timeoutMs: 5000 },
       click: { locatorType: 'role', role: 'button', locator: 'Tiếp', timeoutMs: 5000 },
@@ -536,6 +538,11 @@
         });
         nameField.style.margin = '10px 0';
 
+        if (step.action === 'closeTab') {
+          const help = document.createElement('p');
+          help.textContent = 'Đóng tab gần nhất được tạo bởi bước Mở URL trong lượt chạy này.';
+          body.append(help);
+        }
         for (const [key, label, type] of actions[step.action].fields) {
           const [parent, child] = key.split('.');
           const value = child ? step[parent]?.[child] : step[parent];
