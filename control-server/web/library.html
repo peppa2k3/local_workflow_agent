@@ -1,0 +1,8 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kho video · Control Server</title>
+<link rel="stylesheet" href="/style.css"><script defer src="/library.js"></script></head><body><main class="shell">
+<a href="/">← Điều khiển thiết bị</a><h1>Kho video</h1><p id="feedback" role="status"></p>
+<section class="panel" id="library" hidden><div class="two"><label>Tìm theo tiêu đề, topic, ID hoặc máy gửi<input id="query" type="search"></label>
+<label>Trạng thái sử dụng<select id="used"><option value="">Tất cả</option><option value="false">Chưa dùng</option><option value="true">Đã dùng</option></select></label></div>
+<div class="two"><label>Máy đích<select id="device"></select></label><label>Kịch bản lấy biến<select id="scenario"></select></label></div>
+<button id="refresh">Làm mới</button><div id="videos"></div><div class="row"><button id="prev">Trang trước</button><span id="page"></span><button id="next">Trang sau</button></div></section></main></body></html>

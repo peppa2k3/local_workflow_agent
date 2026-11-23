@@ -3,6 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const c = require('../shared/remote-protocol');
+const library = require('./video-library');
 const { createClientIp } = require('./proxy');
 async function addUser(store, email, password) {
   email = c.text(email, 254).toLowerCase();
@@ -46,14 +47,14 @@ function createControlServer({ store, publicUrl, allowHttp = false, trustProxy =
       if (req.headers.host !== new URL(publicUrl).host) c.fail('Host not allowed', 403);
       const url = new URL(req.url, publicUrl), route = url.pathname;
       if (route === '/health' && req.method === 'GET') return json(200, { ok: true });
-      if (req.method === 'GET' && ['/', '/app.js', '/style.css'].includes(route)) {
-        const file = path.resolve(__dirname, '../web', route === '/' ? 'index.html' : route.slice(1));
+      if (req.method === 'GET' && ['/', '/library', '/library.js', '/app.js', '/style.css'].includes(route)) {
+        const file = path.resolve(__dirname, '../web', route === '/' ? 'index.html' : route === '/library' ? 'library.html' : route.slice(1));
         if (!fs.existsSync(file)) { res.writeHead(200, { ...headers, 'content-type': 'text/plain; charset=utf-8' }); return res.end('Control core ready. Web UI follows in feature 04.'); }
-        res.writeHead(200, { ...headers, 'content-type': route === '/' ? 'text/html; charset=utf-8' : route.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/css; charset=utf-8' });
+        res.writeHead(200, { ...headers, 'content-type': ['/', '/library'].includes(route) ? 'text/html; charset=utf-8' : route.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/css; charset=utf-8' });
         return res.end(fs.readFileSync(file));
       }
       if (req.method !== 'GET' && req.method !== 'POST') c.fail('Method not allowed', 405);
-      const isDevice = route.startsWith('/device/');
+      const isDevice = route.startsWith('/device/') || (route === '/api/scanner/videos' && req.method === 'POST');
       if (isDevice && (req.headers.origin || req.method !== 'POST')) c.fail('Device API requires a native client', 403);
       if (!isDevice && req.method === 'POST' && req.headers.origin !== publicUrl) c.fail('Origin not allowed', 403);
       const ip = clientIp(req);
@@ -92,6 +93,7 @@ function createControlServer({ store, publicUrl, allowHttp = false, trustProxy =
         });
         return json(200, { id: pair.id, email: pair.email });
       }
+      if (route === '/api/scanner/videos' && req.method === 'POST') return json(200, library.receive(store, device(req,data), data));
       if (route === '/device/revoke') {
         const d = device(req, data); d.revoked = true; store.put('device', d, d.owner); return json(200, { ok: true });
       }
@@ -119,6 +121,20 @@ function createControlServer({ store, publicUrl, allowHttp = false, trustProxy =
         if (!pair || !['waiting', 'claimed'].includes(pair.state) || (pair.owner && pair.owner !== user.id)) c.fail('Pairing code invalid or unavailable', 404);
         Object.assign(pair, { owner: user.id, email: user.email, claim: pair.claim || c.token(), state: 'claimed' }); store.put('pair', pair);
         return json(200, { name: pair.name, state: 'Awaiting approval on the local device', expires: pair.expires });
+      }
+      if (route === '/api/scanner/videos' && req.method === 'GET') {
+        const query = (url.searchParams.get('q') || '').trim().toLocaleLowerCase('vi');
+        const used = url.searchParams.get('used'), page = Number(url.searchParams.get('page') || 0);
+        if (!Number.isSafeInteger(page) || page < 0) c.fail('Invalid page');
+        const rows = store.list('video', user.id).reverse().filter(v =>
+          (!used || String(v.used) === used) && [v.title,v.type_topic,v.source_name,v.video_id,v.source_device_id].some(s => s.toLocaleLowerCase('vi').includes(query)));
+        return json(200, { videos:rows.slice(page*50,page*50+50), total:rows.length });
+      }
+      if (route === '/api/scanner/variables' && req.method === 'POST') {
+        const v = store.get('video',c.uuid(data.record_id)), d = store.get('device',c.uuid(data.device_id));
+        if (!v || !d || d.revoked || d.owner !== user.id || v.owner !== user.id) c.fail('Video or device unavailable',404);
+        const target = d.metadata.scenarios?.find(s=>s.name===data.scenario)?.libraryTarget;
+        return json(200,library.variables(v,target));
       }
       if (route === '/api/devices' && req.method === 'GET') return json(200, { devices: store.list('device', user.id).map(({ tokenHash, ...d }) => ({ ...d, online: !d.revoked && Date.now() - d.lastSeen < 45000 })) });
       if (route === '/api/device-revoke' && req.method === 'POST') {

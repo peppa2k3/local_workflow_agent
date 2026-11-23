@@ -42,3 +42,21 @@ Launcher gốc `node remote-control.js` vẫn hoạt động. App ưu tiên `.en
 Control Server hiển thị tốc độ tải xuống và tải lên theo Mbps, tính từ lưu lượng thực tế qua các giao diện mạng đang hoạt động trên máy Windows trong khoảng giữa hai lần lấy mẫu. Agent dùng bộ đếm hệ điều hành và hiển thị dấu gạch ngang khi chưa có mẫu hoặc khi thiết bị offline.
 
 Mục **Tác vụ từ máy local** hiển thị lượt chạy và lịch chờ trong phạm vi quyền đã cấp. Có thể dừng lượt chạy, đổi giờ, hủy hoặc xác nhận lịch khi agent online. Khi agent offline, trang giữ ảnh chụp trạng thái cuối.
+
+## Kho video
+
+1. Chạy `node index.js` trong thư mục `control-server` theo cấu hình bên trên. Giữ file SQLite ở volume bền vững khi triển khai Docker. Khởi chạy local bằng `node local-agent.js --daemon` từ gốc repo.
+2. Đăng nhập Control Server. Ghép thiết bị ở trang **Remote Control** của dashboard local và cấp quyền cho profile, scenario đích. Trên trang **Scan YouTube** của máy local, cấu hình nguồn, bộ lọc rồi bật quét theo [guide scanner](../local-workflow-agent/docs/SCANNER.md).
+3. Chọn thiết bị trên Control Server để xem scan bật/tắt, đang quét, các lượt chạy được cấp quyền và thời điểm snapshot. Hai hoạt động có thể diễn ra đồng thời. Khả năng nhận task cần profile được cấp quyền đang rảnh và scenario phù hợp; bước Chrome cần extension kết nối. Sau 45 giây thiếu heartbeat, máy chuyển offline và UI hiển thị trạng thái cuối. Snapshot mới được gửi lại khi agent kết nối.
+4. Mở **Kho video** tại `/library`. Tìm theo tiêu đề, ID, topic hoặc máy gửi, lọc đã dùng/chưa dùng và mở kết quả từng check. Mỗi bản ghi hiển thị nguồn gửi, thời điểm đo/nhận và danh sách ID job liên kết. Lệnh chạy/đặt lịch từ Control Server có biến `video_url` khớp clip trong kho sẽ được liên kết bằng ID job. Clip mới có `used=false` và danh sách job rỗng. Copy URL hoặc JSON không đánh dấu clip đã dùng.
+5. Để **Copy biến scenario**, chọn máy và scenario đã cấp quyền có các biến `video_url`, `thu_muc_tai`, `reels_url`, `ten_phim`, `ten_file`. Điền thư mục tuyệt đối và URL đăng Reels trong scenario trước. Agent chia sẻ hai giá trị đích đó qua heartbeat. JSON sao chép lấy URL từ clip và giữ nguyên `{{download_title}}`, `{{download_file_name}}`. Dùng trường `variables` trong JSON cho scenario. Khi quyền hoặc đường dẫn thay đổi, đợi heartbeat tiếp theo rồi bấm **Làm mới** trong kho. Clipboard cần HTTPS hoặc localhost.
+
+### Giao thức nhận và chống trùng
+
+Local dùng cùng device Bearer token và ID máy của phiên ghép nối khi POST tới `/api/scanner/videos`. Dữ liệu và các khóa chống trùng được phân vùng theo tài khoản. Server chỉ ghi kết quả khi toàn bộ check bắt buộc đạt và URL khớp ID. Giao dịch SQLite ghi bản ghi, khóa nhận diện và biên nhận cùng lúc.
+
+Phản hồi gồm `status`, `record_id`, `reason`. Lần đầu là `accepted`; gửi lại bản accepted với cùng submission từ cùng máy là `replayed`. Với submission khác trùng video, server trả `duplicate` và ID bản gốc, kể cả khi gửi lại sau mất phản hồi. Cùng submission nhưng metadata thay đổi nhận HTTP 409. Agent giữ hàng đợi khi mạng lỗi.
+
+Nếu local có SHA-256 đã tính từ byte media thực, có thể gửi thêm `content_hash: { "algorithm": "sha256", "verified": true, "value": "<64 ký tự hex>" }`. Server tin chứng thực hash từ thiết bị đã ghép nối. Scanner gửi metadata trước khi tải nên thông thường so theo ID YouTube. Hai ID khác nhau chỉ trùng tiêu đề vẫn là hai bản ghi, được gắn nhãn nghi trùng.
+
+Kiểm thử từ gốc repo bằng `node tests/video-library.js` (HTTP loopback, SQLite và Chrome test riêng) hoặc `npm test`.

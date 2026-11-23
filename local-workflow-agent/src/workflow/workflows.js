@@ -2,7 +2,7 @@ const { randomUUID } = require('crypto');
 const { setTimeout: delay } = require('timers/promises');
 const { overrideVariables } = require('./variables');
 
-function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, downloadVideo, activity, prepareUpload, mediaGuard }) {
+function createWorkflows({ scenarios, defaultProfile, profiles, onChange = () => {}, openFolder, downloadVideo, activity, prepareUpload, mediaGuard }) {
   const sessions = new Map();
   const completed = new Map();
   activity?.onPageRemap?.(remap => {
@@ -25,6 +25,7 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
     s.running = false; s.endedAt = Date.now(); s.outcome = outcome;
     try { persist(s); } catch (error) { s.error = `Cannot persist workflow history: ${error.message}`; s.outcome = 'failed'; }
     if (s.executionId) completed.set(s.executionId, runStatus(s));
+    onChange();
     while (completed.size > 200) completed.delete(completed.keys().next().value);
   }
   function getRun(id) {
@@ -184,6 +185,7 @@ function createWorkflows({ scenarios, defaultProfile, profiles, openFolder, down
     s.executionId = executionId || s.runId; s.outcome = 'running';
     s.runDeadline = Date.now() + timeoutMs;
     try { persist(s); } catch (error) { s.running = false; s.outcome = 'failed'; throw error; }
+    onChange();
     void advance(s, s.runId);
     return getRun(s.executionId);
   }

@@ -50,3 +50,7 @@ Không move dữ liệu khi agent còn chạy. Dừng agent rồi chạy `npm ru
 ## Scanner YouTube trên máy local
 
 Xem [cấu hình từ khóa, quota, lịch quét, đồng bộ và tải clip](local-workflow-agent/docs/SCANNER.md).
+
+## Theo dõi local và mở Kho video
+
+Khởi chạy Control Server rồi agent local, ghép thiết bị và cấp quyền scenario trong trang Remote. Bật Scan YouTube ở dashboard local. Trên Control Server, chọn thiết bị để xem trạng thái quét, lượt chạy song song và khả năng nhận task. Mở **Kho video** để lọc clip đã đồng bộ, chọn máy/kịch bản đích và sao chép JSON biến. [Hướng dẫn cấu hình, kiểm tra và xử lý lỗi](control-server/README.md#kho-video).

@@ -1,4 +1,5 @@
 const c = require('../shared/remote-protocol');
+const { linkRun } = require('./video-library');
 const ACTIVE = ['queued', 'dispatched', 'running'];
 const SCHEDULE_STATES = ['scheduled', 'confirming', 'approved'];
 const RESERVED = [...ACTIVE, 'confirming', 'approved'];
@@ -20,6 +21,13 @@ function metadata(value) {
     scenarios: value.scenarios.map(s => {
       if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(s.name) || !Number.isInteger(s.steps) || s.steps < 1 || s.steps > 10000 || !Array.isArray(s.variables) || s.variables.length > 100) c.fail('Invalid scenario metadata');
       const scenario = { name: s.name, steps: s.steps, variables: s.variables.map(v => c.text(v, 100)) };
+      if (s.libraryTarget) {
+        const folder = c.text(s.libraryTarget.thu_muc_tai,1024), target = c.text(s.libraryTarget.reels_url,2048);
+        let url;
+        try { url = new URL(target); } catch {}
+        if (require('node:path').win32.isAbsolute(folder) && url && ['https:','http:'].includes(url.protocol) && !url.username && !url.password)
+          scenario.libraryTarget = { thu_muc_tai:folder, reels_url:target };
+      }
       if (Array.isArray(s.clipTargets)) scenario.clipTargets = s.clipTargets.slice(0, 150)
         .filter(t => c.object(t) && clipTargetId(t.id) && Number.isInteger(t.index) && t.index >= 0 && t.index < s.steps && ['upload', 'downloadVideo'].includes(t.action))
         .map(({ id, index, action, variable }) => ({ id, index, action, variable: scenario.variables.includes(variable) ? variable : undefined }));
@@ -204,10 +212,30 @@ function createCommandApi(store) {
         if (run.state === 'queued' || SCHEDULE_STATES.includes(run.state)) { run.state = 'cancelled'; run.updated = Date.now(); store.put('command', run, user.id); command.state = 'succeeded'; }
       }
       store.put('command', command, user.id);
+      linkRun(store, command);
     });
     return { command };
   }
+  function recordActivity(d, data) {
+    const a = data.activity;
+    if (a === undefined) {
+      if (d.instanceId !== data.instanceId) delete d.activity;
+      return;
+    }
+    if (!c.object(a) || !Number.isSafeInteger(a.seq) || a.seq < 1 || !Number.isSafeInteger(a.updatedAt) ||
+        !Number.isSafeInteger(a.runningCount) || a.runningCount < 0 || !Array.isArray(a.active) ||
+        a.active.length > 100 || a.active.length > a.runningCount ||
+        !['canAccept','enabled','scanning'].every(k=>typeof a[k] === 'boolean')) c.fail('Invalid activity snapshot');
+    if (d.instanceId === data.instanceId && d.activity?.seq >= a.seq) return;
+    d.activity = {seq:a.seq,updatedAt:a.updatedAt, runningCount:a.runningCount,canAccept:a.canAccept,enabled:a.enabled,scanning:a.scanning,
+      active:a.active.map(run=>({id:c.uuid(run.id), profile:c.text(run.profile,100), scenario:c.text(run.scenario,64), remote:run.remote === true}))};
+  }
   function device(route, d, data) {
+    if (route === '/device/activity') {
+      if (c.uuid(data.instanceId) !== d.instanceId || d.leaseUntil <= Date.now()) c.fail('Device lease expired',409);
+      recordActivity(d,data); store.put('device',d,d.owner);
+      return { ok:true };
+    }
     if (route === '/device/schedule-decision') {
       if (d.instanceId !== c.uuid(data.instanceId) || d.leaseUntil <= Date.now()) c.fail('Device lease expired', 409);
       return scheduleDecision(d, { runId: data.runId, proceed: data.proceed });
@@ -234,6 +262,7 @@ function createCommandApi(store) {
         }
         ack.push({ id: cmd.id, seq: report.seq });
       }
+      recordActivity(d,data);
       Object.assign(d, { metadata: meta, localTasks, lastSeen: now, instanceId: data.instanceId, leaseUntil: now + 35000 }); store.put('device', d, d.owner);
       const commands = expire(d.owner, d.id);
       const reserved = new Set(commands.filter(cmd => cmd.type === 'run' && RESERVED.includes(cmd.state)).map(cmd => cmd.payload.profile));

@@ -207,6 +207,12 @@
     const d = devices.find(d => d.id === selected); $('detail').hidden = !d; $('empty').hidden = !!d; if (!d) return;
     $('device-name').textContent = d.name; $('device-status').textContent = d.revoked ? 'Đã thu hồi' : d.online ? 'Online' : 'Offline';
     $('device-status').className = 'badge ' + (d.online ? 'online' : 'offline'); $('device-seen').textContent = `Lần cuối kết nối: ${when(d.lastSeen)}`;
+    const activity = d.activity;
+    $('activity').textContent = activity ? [
+      activity.enabled ? 'Scan bật' : 'Scan tắt', activity.scanning ? 'Đang quét' : 'Chờ quét',
+      activity.runningCount + ' scenario đang chạy', ...activity.active.map(run => run.scenario + ' (' + run.profile + ', ' + (run.remote ? 'remote' : 'local') + ', ' + run.id + ')'),
+      d.online && activity.canAccept ? 'Có thể nhận task' : 'Chưa thể nhận task', when(activity.updatedAt)
+    ].join(' · ') : 'Chưa có trạng thái scanner.';
     const p = d.metadata.performance || {};
     const rate = key => d.online && Number.isFinite(d.metadata.network?.[key]) ? `${d.metadata.network[key].toFixed(2)} Mbps` : '—';
     $('metrics').replaceChildren(...[[`${p.cpuPercent || 0}%`, 'CPU agent'], [`${p.memoryMb || 0} MB`, 'RAM agent'], [`${Math.floor((d.metadata.uptime || 0) / 60)} phút`, 'Uptime agent'],

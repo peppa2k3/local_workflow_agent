@@ -3,7 +3,7 @@ const c = require('../../../shared/remote-protocol');
 const { randomUUID } = require('node:crypto');
 const { createRemoteExecutor } = require('./remote-executor');
 const { clipTargets } = require('../../workflow/clip-library');
-function createRemoteClient({ dataDir, profiles, scenarios, workflows, localTasks, network, performance = () => ({}) , allowHttp = false }) {
+function createRemoteClient({ dataDir, profiles, scenarios, workflows, localTasks, network, scanActivity, performance = () => ({}) , allowHttp = false }) {
   const file = path.join(dataDir, 'remote.json');
   let config = c.readJson(file, { policy: { profiles: [], scenarios: [], variables: {} } });
   let pendingBusy = false, actionBusy = false, closed = false, timer, error = '', lastContact = 0;
@@ -16,6 +16,38 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, localTask
   const { createSchedulePopups } = require('../chrome/schedule-popup');
   const schedulePopups = createSchedulePopups((task, proceed) =>
     request('/device/schedule-decision', { id: config.device.id, instanceId, runId: task.id, proceed }, config.token));
+  let activitySeq = 0;
+  function activitySnapshot() {
+    const policy = config.policy, active = [];
+    let free = false, browserReady = false, runningCount = 0;
+    for (const p of profiles()) {
+      const state = workflows.status(p.directory);
+      if (state.running) runningCount++;
+      if (!policy.profiles.includes(p.directory)) continue;
+      if (!state.running) {
+        free = true;
+        if (state.extensionConnected) browserReady = true;
+      }
+      if (state.running && state.executionId && policy.scenarios.includes(state.scenario)) {
+        active.push({ id:state.executionId, profile:p.directory, scenario:state.scenario, remote:state.remote === true });
+      }
+    }
+    const canAccept = free && policy.scenarios.some(name => {
+      try {
+        const { steps } = scenarios.load(name);
+        return steps.length > 0 && (browserReady || steps.every(step => ['downloadVideo','wait','openFolder'].includes(step.action)));
+      } catch { return false; }
+    });
+    return { seq:++activitySeq, updatedAt:Date.now(), ...scanActivity(), runningCount, active, canAccept };
+  }
+  function activityChanged() {
+    if (!config.device || closed || !scanActivity) return;
+    // Sequence numbers order concurrent event notifications against the periodic snapshot.
+    try {
+      const data = { id:config.device.id, instanceId, activity:activitySnapshot() };
+      void request('/device/activity',data,config.token).catch(() => {});
+    } catch { /* A transient local read failure is retried by the next heartbeat. */ }
+  }
   function status() {
     return { configured: !!config.device, url: config.url || '', device: config.device || null, policy: config.policy, error, lastContact,
       connected: !!config.device && Date.now() - lastContact < 45000 && !error,
@@ -37,7 +69,7 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, localTask
       }
       if (config.device) {
         const policy = config.policy;
-        let clipBudget = 12000;
+        let clipBudget = 12000, targetBudget = 12000;
         executor.stopOwned(config.device.id, policy);
         if (network) await network.sample();
         if (closed) return;
@@ -49,6 +81,14 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, localTask
             try {
               const s = scenarios.load(name), variables = (policy.variables[name] || []).filter(v => Object.hasOwn(s.variables || {}, v));
               const entry = { name, steps: s.steps.length, variables };
+              const { thu_muc_tai, reels_url } = s.variables || {};
+              if (typeof thu_muc_tai === 'string' && thu_muc_tai.length <= 1024 && path.win32.isAbsolute(thu_muc_tai) &&
+                  typeof reels_url === 'string' && /^https?:\/\//.test(reels_url) && reels_url.length <= 2048 &&
+                  ['video_url','ten_phim','ten_file'].every(key => Object.hasOwn(s.variables,key))) {
+                const target = {thu_muc_tai,reels_url};
+                const bytes = Buffer.byteLength(JSON.stringify(target)) + 20;
+                if (bytes <= targetBudget) { entry.libraryTarget = target; targetBudget -= bytes; }
+              }
               if (policy.clipScenarios?.includes(name)) {
                 try {
                   const targets = clipTargets(s), foldersByVariable = new Map();
@@ -68,7 +108,7 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, localTask
             } catch { return []; }
           }) };
         const reports = executor.reports(config.device.id);
-        const exchange = { id: config.device.id, instanceId, metadata, reports };
+        const exchange = { id: config.device.id, instanceId, metadata, reports, ...(scanActivity && {activity:activitySnapshot()}) };
         if (localTasks) {
           const tasks = localTasks.snapshot({ profiles: knownProfiles.map(p => p.directory), scenarios: metadata.scenarios.map(s => s.name) });
           let budget = 127000 - Buffer.byteLength(JSON.stringify(exchange));
@@ -139,7 +179,7 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, localTask
     return status();
   }
   timer = setInterval(() => { void tick(); }, 3000); timer.unref();
-  return { status, submitScanner(payload) {
+  return { status, activityChanged, submitScanner(payload) {
     if (!config.device) throw Error('Chưa ghép nối Control Server.');
     return request('/api/scanner/videos', { ...payload, id: config.device.id }, config.token);
   }, async action(route, data) {

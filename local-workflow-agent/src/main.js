@@ -36,7 +36,7 @@ const mongoSync = createMongoSync(activity, { settings: mongoSettings });
 const content = createContentApi({ mongo: mongoSync, activity, readBody });
 const mediaGuard = createMediaGuard({ activity, mongo: mongoSync });
 const cachedDownloader = createCachedDownloader(activity, downloadVideo);
-const workflows = createWorkflows({ scenarios, defaultProfile: profile, profiles, activity, mediaGuard, prepareUpload: content.prepareUpload, async downloadVideo(step, signal, context) {
+const workflows = createWorkflows({ onChange: () => remote.activityChanged(), scenarios, defaultProfile: profile, profiles, activity, mediaGuard, prepareUpload: content.prepareUpload, async downloadVideo(step, signal, context) {
   if (isClip(step.url)) {
     const clip = await downloadVideo(step, signal);
     const file = await activity.registerFile(clip.filePath, { duration: clip.duration, tag: step.folderTag || 'automation', signal });
@@ -89,10 +89,10 @@ let scheduleTimer;
 const automation = createAutomationApi({ workflows, scenarios, profiles, readBody });
 const dashboardToken = randomBytes(32).toString('hex');
 const network = createNetworkRates();
-const remote = createRemoteClient({ dataDir, localTasks: createLocalTasks({ schedules, workflows }), network,
+const remote = createRemoteClient({ dataDir, scanActivity: () => scanner.activity(), localTasks: createLocalTasks({ schedules, workflows }), network,
   profiles, scenarios, workflows, performance: () => performance, allowHttp: process.env.LOCAL_AGENT_REMOTE_ALLOW_HTTP_LOOPBACK === '1' });
 const { createScanner } = require('./scanner/scanner');
-const scanner = createScanner({ directory: path.join(dataDir, 'scanner'), submit: remote.submitScanner });
+const scanner = createScanner({ directory: path.join(dataDir, 'scanner'), submit: remote.submitScanner, onChange: () => remote.activityChanged() });
 function dashboardAuthorized(request) {
   const candidate = request.headers['x-local-agent-session'];
   return typeof candidate === 'string' && /^[a-f0-9]{64}$/.test(candidate)

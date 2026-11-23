@@ -19,7 +19,7 @@ function settings(raw) {
       !Array.isArray(cfg.subtitleLanguages) || !cfg.subtitleLanguages.length || !cfg.subtitleLanguages.every(l => /^[a-z]{2,3}(-[A-Za-z0-9]+)*$/.test(l))) throw Error('Cấu hình phụ đề không hợp lệ');
   return cfg;
 }
-function createScanner({ directory, submit, inspect = media.inspect, request = fetch, extraChecks = {}, key = process.env.YOUTUBE_API_KEY }) {
+function createScanner({ directory, submit, onChange = () => {}, inspect = media.inspect, request = fetch, extraChecks = {}, key = process.env.YOUTUBE_API_KEY }) {
   fs.mkdirSync(directory, { recursive: true });
   const configFile = path.join(directory, 'config.json'), keywordFile = path.join(directory, 'keywords.txt');
   for (const [file, content] of [[configFile, JSON.stringify(defaults,null,2)], [keywordFile,sample]]) {
@@ -93,7 +93,7 @@ function createScanner({ directory, submit, inspect = media.inspect, request = f
   }
   async function scan() {
     if (scanning || !get('enabled') || abort.signal.aborted) return;
-    scanning = true;
+    scanning = true; onChange();
     try {
       const cfg = config(), groups = topics();
       if (!groups.length || [cfg.minViews,cfg.minDays,cfg.maxDays].includes(null)) throw Error('Thiếu nhóm từ khóa hoặc ngưỡng minViews/minDays/maxDays');
@@ -136,7 +136,7 @@ function createScanner({ directory, submit, inspect = media.inspect, request = f
       let minutes = 5;
       try { minutes = config().minutes; } catch {}
       set('next',Date.now()+minutes*60000);
-      scanning = false;
+      scanning = false; onChange();
     }
   }
   async function flush() {
@@ -167,9 +167,9 @@ function createScanner({ directory, submit, inspect = media.inspect, request = f
   function exportVideos() {
     return db.prepare("SELECT data FROM clips WHERE status IN ('pending','synced') ORDER BY rowid").all().map(row => JSON.parse(row.data));
   }
-  return { status, exportVideos, scan, flush, audit, toggle(enabled) {
+  return { activity: () => ({enabled:Boolean(get('enabled')), scanning}), status, exportVideos, scan, flush, audit, toggle(enabled) {
     if (typeof enabled !== 'boolean') throw Error('enabled phải là boolean');
-    set('enabled',enabled); if (enabled) set('next',0);
+    set('enabled',enabled); if (enabled) set('next',0); onChange();
   }, start() {
     timer = setInterval(() => {
       if (get('enabled') && Date.now() >= (get('next') || 0)) void scan();
