@@ -55,7 +55,7 @@ async function body(request, limit = 128000) {
 }
 async function post(origin, route, data, credential, { allowHttp = false, signal } = {}) {
   origin = baseUrl(origin, allowHttp);
-  if (!/^\/device\/[a-z-]+$/.test(route)) fail('Invalid device route');
+  if (route !== '/api/scanner/videos' && !/^\/device\/[a-z-]+$/.test(route)) fail('Invalid device route');
   const response = await fetch(origin + route, { method: 'POST', redirect: 'error',
     signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000),
     headers: { 'content-type': 'application/json', ...(credential ? { authorization: `Bearer ${credential}` } : {}) }, body: JSON.stringify(data) });

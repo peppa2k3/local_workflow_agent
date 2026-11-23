@@ -139,7 +139,10 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, localTask
     return status();
   }
   timer = setInterval(() => { void tick(); }, 3000); timer.unref();
-  return { status, async action(route, data) {
+  return { status, submitScanner(payload) {
+    if (!config.device) throw Error('Chưa ghép nối Control Server.');
+    return request('/api/scanner/videos', { ...payload, id: config.device.id }, config.token);
+  }, async action(route, data) {
     if (closed || pendingBusy || actionBusy) c.fail('Connection update in progress; retry shortly', 409);
     actionBusy = true;
     try { return await action(route, data); } finally { actionBusy = false; }

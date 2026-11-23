@@ -46,3 +46,7 @@ Lệnh thử remote local và triển khai VPS: [tài liệu tổng hợp](docs/
 ## 5. Chuyển installation cũ
 
 Không move dữ liệu khi agent còn chạy. Dừng agent rồi chạy `npm run migrate:legacy` trong local app để chuyển `.env`, scenarios, tools và data/agent cũ vào app. Nếu đích đã tồn tại, script dừng để bạn đối chiếu thay vì ghi đè. Cổng mặc định/configured còn mở cũng chặn migration.
+
+## Scanner YouTube trên máy local
+
+Xem [cấu hình từ khóa, quota, lịch quét, đồng bộ và tải clip](local-workflow-agent/docs/SCANNER.md).

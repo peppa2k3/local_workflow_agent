@@ -1,0 +1,284 @@
+[
+  {
+    "url": "https://www.youtube.com/watch?v=JXfrtQlJGHM&pp=ugUEEgJ2aQ%3D%3D",
+    "source": "yt-dlp",
+    "error": "Thiếu YOUTUBE_API_KEY",
+    "verdict": "reject",
+    "preflight": false,
+    "payload": {
+      "platform": "youtube",
+      "video_id": "JXfrtQlJGHM",
+      "video_url": "https://www.youtube.com/watch?v=JXfrtQlJGHM",
+      "title": "1980s Fisherman: A Journey of Sustainable Fishing and Ocean Miracles",
+      "type_topic": null,
+      "matched_phrases": [],
+      "view_count": 1728990,
+      "published_at": "2026-11-09T03:30:31.000Z",
+      "measured_at": "2026-11-23T18:46:04.201Z",
+      "duration_seconds": 5097,
+      "resolution": {
+        "width": 1080,
+        "height": 1440
+      },
+      "subtitle_languages": [
+        "ar-orig",
+        "ar",
+        "en",
+        "pl",
+        "bn",
+        "pt",
+        "iw",
+        "de",
+        "nl",
+        "ko",
+        "hi",
+        "id",
+        "ml",
+        "ru",
+        "ja",
+        "fr",
+        "pa",
+        "ta",
+        "es",
+        "te",
+        "it",
+        "en-orig",
+        "pl-orig",
+        "bn-orig",
+        "pt-orig",
+        "iw-orig",
+        "de-orig",
+        "nl-orig",
+        "ko-orig",
+        "hi-orig",
+        "id-orig",
+        "ml-orig",
+        "ru-orig",
+        "ja-orig",
+        "fr-orig",
+        "pa-orig",
+        "ta-orig",
+        "es-orig",
+        "te-orig",
+        "it-orig"
+      ],
+      "checks": {
+        "id": {
+          "status": "pass",
+          "reason": "JXfrtQlJGHM"
+        },
+        "keyword": {
+          "status": "reject",
+          "reason": "Không khớp cụm từ"
+        },
+        "views": {
+          "status": "unknown",
+          "reason": "1728990 / min null"
+        },
+        "age": {
+          "status": "unknown",
+          "reason": "14.64 ngày / null–null"
+        },
+        "duration": {
+          "status": "pass",
+          "reason": "5097 giây"
+        },
+        "audio": {
+          "status": "pass",
+          "reason": "Có track tiếng Việt"
+        },
+        "resolution": {
+          "status": "pass",
+          "reason": "{\"width\":1080,\"height\":1440}"
+        },
+        "subtitles": {
+          "status": "reject",
+          "reason": "ar-orig, ar, en, pl, bn, pt, iw, de, nl, ko, hi, id, ml, ru, ja, fr, pa, ta, es, te, it, en-orig, pl-orig, bn-orig, pt-orig, iw-orig, de-orig, nl-orig, ko-orig, hi-orig, id-orig, ml-orig, ru-orig, ja-orig, fr-orig, pa-orig, ta-orig, es-orig, te-orig, it-orig"
+        }
+      }
+    }
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=SBmmznojJ_s",
+    "source": "yt-dlp",
+    "error": "Thiếu YOUTUBE_API_KEY",
+    "verdict": "reject",
+    "preflight": false,
+    "payload": {
+      "platform": "youtube",
+      "video_id": "SBmmznojJ_s",
+      "video_url": "https://www.youtube.com/watch?v=SBmmznojJ_s",
+      "title": "Phần 3 Bé Gái Có Không Gian Thần Kỳ, Mang Hạt Giống Và Máy Móc Hiện Đại Về Cổ Đại Giúp Cả Làng No Đủ",
+      "type_topic": null,
+      "matched_phrases": [],
+      "view_count": 459453,
+      "published_at": "2026-11-12T06:44:20.000Z",
+      "measured_at": "2026-11-23T18:46:09.283Z",
+      "duration_seconds": 10446,
+      "resolution": {
+        "width": 1080,
+        "height": 1440
+      },
+      "subtitle_languages": [
+        "vi-orig",
+        "vi"
+      ],
+      "checks": {
+        "id": {
+          "status": "pass",
+          "reason": "SBmmznojJ_s"
+        },
+        "keyword": {
+          "status": "reject",
+          "reason": "Không khớp cụm từ"
+        },
+        "views": {
+          "status": "unknown",
+          "reason": "459453 / min null"
+        },
+        "age": {
+          "status": "unknown",
+          "reason": "11.50 ngày / null–null"
+        },
+        "duration": {
+          "status": "pass",
+          "reason": "10446 giây"
+        },
+        "audio": {
+          "status": "pass",
+          "reason": "Có track tiếng Việt"
+        },
+        "resolution": {
+          "status": "pass",
+          "reason": "{\"width\":1080,\"height\":1440}"
+        },
+        "subtitles": {
+          "status": "pass",
+          "reason": "vi-orig, vi"
+        }
+      }
+    }
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=zBEVoz3lKqI",
+    "source": "yt-dlp",
+    "error": "Thiếu YOUTUBE_API_KEY",
+    "verdict": "reject",
+    "preflight": false,
+    "payload": {
+      "platform": "youtube",
+      "video_id": "zBEVoz3lKqI",
+      "video_url": "https://www.youtube.com/watch?v=zBEVoz3lKqI",
+      "title": "Bé Gái Xuống Núi Phát Hiện Cả Hào Môn Sắp Gặp Đại Nạn, Một Mình Ra Tay Cứu Cả Gia Tộc!",
+      "type_topic": null,
+      "matched_phrases": [],
+      "view_count": 429143,
+      "published_at": "2026-11-11T08:53:22.000Z",
+      "measured_at": "2026-11-23T18:46:12.568Z",
+      "duration_seconds": 9528,
+      "resolution": {
+        "width": 1080,
+        "height": 1920
+      },
+      "subtitle_languages": [
+        "vi-orig",
+        "vi"
+      ],
+      "checks": {
+        "id": {
+          "status": "pass",
+          "reason": "zBEVoz3lKqI"
+        },
+        "keyword": {
+          "status": "reject",
+          "reason": "Không khớp cụm từ"
+        },
+        "views": {
+          "status": "unknown",
+          "reason": "429143 / min null"
+        },
+        "age": {
+          "status": "unknown",
+          "reason": "12.41 ngày / null–null"
+        },
+        "duration": {
+          "status": "pass",
+          "reason": "9528 giây"
+        },
+        "audio": {
+          "status": "pass",
+          "reason": "Có track tiếng Việt"
+        },
+        "resolution": {
+          "status": "pass",
+          "reason": "{\"width\":1080,\"height\":1920}"
+        },
+        "subtitles": {
+          "status": "pass",
+          "reason": "vi-orig, vi"
+        }
+      }
+    }
+  },
+  {
+    "url": "https://youtu.be/B1fAkGWQ8KE?si=q2hpBBh3PkJbIM7y",
+    "source": "yt-dlp",
+    "error": "Thiếu YOUTUBE_API_KEY",
+    "verdict": "reject",
+    "preflight": false,
+    "payload": {
+      "platform": "youtube",
+      "video_id": "B1fAkGWQ8KE",
+      "video_url": "https://www.youtube.com/watch?v=B1fAkGWQ8KE",
+      "title": "ชาวประมงหนุ่มถูกญาติหลอกเอาเงินจนหมดแล้วทอดทิ้ง แต่เทพสมุทรประทานพรให้เป็นมหาเศรษฐีกลับมาแก้แค้น",
+      "type_topic": null,
+      "matched_phrases": [],
+      "view_count": 153693,
+      "published_at": "2026-11-23T01:30:07.000Z",
+      "measured_at": "2026-11-23T18:46:16.687Z",
+      "duration_seconds": 2421,
+      "resolution": {
+        "width": 1080,
+        "height": 1920
+      },
+      "subtitle_languages": [
+        "th-orig",
+        "th"
+      ],
+      "checks": {
+        "id": {
+          "status": "pass",
+          "reason": "B1fAkGWQ8KE"
+        },
+        "keyword": {
+          "status": "reject",
+          "reason": "Không khớp cụm từ"
+        },
+        "views": {
+          "status": "unknown",
+          "reason": "153693 / min null"
+        },
+        "age": {
+          "status": "unknown",
+          "reason": "0.72 ngày / null–null"
+        },
+        "duration": {
+          "status": "pass",
+          "reason": "2421 giây"
+        },
+        "audio": {
+          "status": "pass",
+          "reason": "Có track tiếng Việt"
+        },
+        "resolution": {
+          "status": "pass",
+          "reason": "{\"width\":1080,\"height\":1920}"
+        },
+        "subtitles": {
+          "status": "reject",
+          "reason": "th-orig, th"
+        }
+      }
+    }
+  }
+]

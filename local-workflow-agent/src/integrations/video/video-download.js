@@ -167,4 +167,4 @@ async function downloadVideo(step, signal, confirm) {
     await fs.promises.rm(staging, { recursive: true, force: true });
   }
 }
-module.exports = { validateVideo, inspectVideo, downloadVideo, run, selectionArgs, videoOptions, publishVideo, transferArgs };
+module.exports = { baseArgs, binary, probeVideo, validateVideo, inspectVideo, downloadVideo, run, selectionArgs, videoOptions, publishVideo, transferArgs };

@@ -11,7 +11,7 @@ const { chromium } = require('playwright');
     const navigation = await browser.newPage();
     await navigation.route('https://navigation.test/**', async route => {
       const pathname = new URL(route.request().url()).pathname;
-      const file = { '/': 'index.html', '/content': 'content.html', '/remote': 'remote.html' }[pathname];
+      const file = { '/': 'index.html', '/content': 'content.html', '/remote': 'remote.html', '/scanner': 'scanner.html' }[pathname];
       if (file) return route.fulfill({ contentType: 'text/html', body: fs.readFileSync(path.join(__dirname, '../local-workflow-agent/dashboard', file), 'utf8').replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '') });
       if (pathname === '/remote.css') return route.fulfill({ contentType: 'text/css', body: fs.readFileSync(path.join(__dirname, '../local-workflow-agent/dashboard/remote.css'), 'utf8') });
       return route.fulfill({ status: 404, body: '' });
@@ -19,12 +19,12 @@ const { chromium } = require('playwright');
     for (const width of [1280, 390]) {
       await navigation.setViewportSize({ width, height: 844 });
       await navigation.goto('https://navigation.test/');
-      for (const route of ['/content', '/remote', '/']) {
+      for (const route of ['/content', '/remote', '/scanner', '/']) {
         await navigation.locator('.site-nav .site-links a[href="' + route + '"]').click();
         await navigation.waitForURL('https://navigation.test' + route);
         const nav = navigation.getByRole('navigation', { name: 'Điều hướng chính', exact: true });
         assert.equal(await nav.locator('[aria-current=page]').getAttribute('href'), route);
-        assert.equal(await nav.locator('.site-links a').count(), 3);
+        assert.equal(await nav.locator('.site-links a').count(), 4);
         assert(await nav.evaluate(el => el.scrollWidth <= el.clientWidth));
       }
     }

@@ -46,6 +46,18 @@ const { spawn } = require('node:child_process');
     await api('/api/remote/status', undefined, 'GET', 403);
     const remotePage = await fetch(base + '/remote'); assert.equal(remotePage.status, 200);
     const remoteHtml = await remotePage.text(), localSession = remoteHtml.match(/name="local-agent-session" content="([a-f0-9]{64})"/)[1];
+    await api('/api/scanner/status', undefined, 'GET', 403);
+    const scannerToken = { 'x-local-agent-session': localSession, 'Content-Type': 'application/json' };
+    const scannerPage = await fetch(base + '/scanner');
+    assert.match(await scannerPage.text(), /scanner.js/);
+    for (const enabled of [true, false]) {
+      const toggle = await fetch(base + '/api/scanner/toggle', { method: 'POST', headers: scannerToken, body: JSON.stringify({ enabled }) });
+      assert.equal(toggle.status, 200);
+      const scannerState = await (await fetch(base + '/api/scanner/status', { headers: scannerToken })).json();
+      assert.equal(scannerState.enabled, enabled);
+      assert.equal(scannerState.topics[0].code, 'gia-dinh');
+    }
+    assert.deepEqual(await (await fetch(base + '/api/scanner/export', { headers: scannerToken })).json(), []);
     const remoteResponse = await fetch(base + '/api/remote/status', { headers: { 'x-local-agent-session': localSession } });
     assert.equal(remoteResponse.status, 200); assert.equal((await remoteResponse.json()).configured, false);
     assert.equal((await fetch(base + '/api/remote/status', { headers: { origin: 'chrome-extension://abcd', 'x-local-agent-session': localSession } })).status, 403);

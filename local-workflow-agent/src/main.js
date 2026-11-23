@@ -91,6 +91,8 @@ const dashboardToken = randomBytes(32).toString('hex');
 const network = createNetworkRates();
 const remote = createRemoteClient({ dataDir, localTasks: createLocalTasks({ schedules, workflows }), network,
   profiles, scenarios, workflows, performance: () => performance, allowHttp: process.env.LOCAL_AGENT_REMOTE_ALLOW_HTTP_LOOPBACK === '1' });
+const { createScanner } = require('./scanner/scanner');
+const scanner = createScanner({ directory: path.join(dataDir, 'scanner'), submit: remote.submitScanner });
 function dashboardAuthorized(request) {
   const candidate = request.headers['x-local-agent-session'];
   return typeof candidate === 'string' && /^[a-f0-9]{64}$/.test(candidate)
@@ -109,16 +111,29 @@ const server = http.createServer(async (request, response) => {
   if (request.headers.host !== `127.0.0.1:${port}` && request.headers.host !== `localhost:${port}`) return json(403, { error: 'Host not allowed' });
   const origin = request.headers.origin;
   if (origin && origin !== `http://127.0.0.1:${port}` && !/^chrome-extension:\/\/[a-z]+$/.test(origin)) return json(403, { error: 'Origin not allowed' });
-  if (request.method === 'GET' && ['/remote.js', '/remote.css', '/issues.js'].includes(route)) {
+  if (request.method === 'GET' && ['/scanner.js', '/remote.js', '/remote.css', '/issues.js'].includes(route)) {
     response.writeHead(200, { 'Content-Type': route.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/css; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
     response.end(fs.readFileSync(route.endsWith('.js') ? path.join(path.dirname(dashboardPath), route.slice(1)) : path.join(path.dirname(dashboardPath), 'remote.css'))); return;
   }
-  if (request.method === 'GET' && ['/', '/content', '/content/', '/remote', '/remote/'].includes(route)) {
+  if (request.method === 'GET' && ['/', '/scanner', '/scanner/', '/content', '/content/', '/remote', '/remote/'].includes(route)) {
     response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-    response.end(fs.readFileSync(route === '/' ? dashboardPath : path.join(path.dirname(dashboardPath), route.startsWith('/remote') ? 'remote.html' : 'content.html'), 'utf8').replaceAll('__LOCAL_AGENT_DASHBOARD_TOKEN__', dashboardToken));
+    response.end(fs.readFileSync(route === '/' ? dashboardPath : path.join(path.dirname(dashboardPath), route.startsWith('/scanner') ? 'scanner.html' : route.startsWith('/remote') ? 'remote.html' : 'content.html'), 'utf8').replaceAll('__LOCAL_AGENT_DASHBOARD_TOKEN__', dashboardToken));
     return;
   }
   try {
+    if (route.startsWith('/api/scanner/')) {
+      if (!dashboardAuthorized(request) || (origin && origin !== `http://127.0.0.1:${port}`)) return json(403, { error: 'Local dashboard approval required' });
+      if (route === '/api/scanner/export' && request.method === 'GET') return json(200, scanner.exportVideos());
+      if (route === '/api/scanner/status' && request.method === 'GET') return json(200, scanner.status());
+      if (request.method === 'POST' && route === '/api/scanner/toggle') {
+        scanner.toggle((await readBody(request)).enabled);
+        return json(200, { ok: true });
+      }
+      if (request.method === 'POST' && route === '/api/scanner/download') {
+        return json(200, { file: await scanner.download((await readBody(request)).video_id) });
+      }
+      return json(404, { error: 'Unknown scanner route' });
+    }
     if (route.startsWith('/api/remote/')) {
       if (!dashboardAuthorized(request) || (origin && origin !== `http://127.0.0.1:${port}`)) return json(403, { error: 'Local dashboard approval required' });
       if (request.method === 'GET' && route === '/api/remote/status') return json(200, remote.status());
@@ -271,6 +286,7 @@ const performanceTimer = setInterval(() => {
 }, 2000);
 performanceTimer.unref();
 profileCache.ready.then(() => { if (closing) return; server.listen(port, '127.0.0.1', () => {
+  scanner.start();
   scheduleTimer = setInterval(() => {
     try {
       schedules.tick();
@@ -316,7 +332,7 @@ async function shutdown() {
   profiles().forEach(item => workflows.stop(item.directory));
   server.close(); server.closeIdleConnections();
   const timeout = setTimeout(() => process.exit(process.exitCode || 0), 15000); timeout.unref();
-  await mongoSync.close();
+  await Promise.all([scanner.close(), mongoSync.close()]);
 }
 terminal?.on('close', () => { void shutdown(); });
 process.on('SIGTERM', () => { void shutdown(); });

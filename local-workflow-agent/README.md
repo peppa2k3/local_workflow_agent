@@ -36,3 +36,5 @@ Launcher `node local-agent.js` ở gốc vẫn hoạt động. Checkout cũ ti�
 Muốn gom dữ liệu cũ vào app: dừng agent rồi chạy `npm run migrate:legacy`. Script kiểm tra xung đột trước khi move và từ chối khi cổng agent còn hoạt động. Không copy machine ID/credential sang máy mới.
 
 Hướng dẫn: [SETUP](docs/SETUP.md), [SCENARIOS](docs/SCENARIOS.md), [API](docs/AUTOMATION_API.md), [STORAGE](docs/ACTIVITY_STORAGE.md), [MONGODB](docs/MONGODB_ATLAS.md).
+
+- [Chạy scanner YouTube độc lập với kịch bản](docs/SCANNER.md)
