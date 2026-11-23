@@ -65,12 +65,30 @@ function scenarioProfile(scenario, fallback) {
 
 function createScenarioStore(scenariosDir) {
   function file(name) {
-    if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(name)) throw new Error('Invalid scenario filename');
+    if (typeof name !== 'string' || !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(name)) throw new Error('Invalid scenario filename');
     return path.join(scenariosDir, `${name}.json`);
   }
 
   return {
     file,
+    rename(source, destination, updateReferences) {
+      const oldFile = file(source), newFile = file(destination);
+      if (source === destination) throw new Error('Nhập tên file khác tên hiện tại.');
+      try {
+        fs.linkSync(oldFile, newFile);
+      } catch (error) {
+        if (error.code === 'EEXIST') throw Object.assign(new Error('Tên file kịch bản đã tồn tại.'), { status: 409 });
+        throw error;
+      }
+      // Keep both names available until the schedules have been saved.
+      try {
+        updateReferences(source, destination);
+      } catch (error) {
+        fs.unlinkSync(newFile);
+        throw error;
+      }
+      fs.unlinkSync(oldFile);
+    },
     remove: name => fs.unlinkSync(file(name)),
     prepareStep: (step, uploadPath = '', runtime = {}) => {
       // Runtime file references must keep the downloaded clip even if a legacy run upload override is present.

@@ -292,3 +292,7 @@ Control Server nhận tiến độ của lượt chạy local và các lịch lo
 ## Chrome profile của kịch bản
 
 Chọn **Chrome profile của kịch bản** trong trình chỉnh sửa rồi bấm **Lưu**. File JSON lưu tên thư mục Chrome ở trường `"profile"`, ví dụ `"profile": "Profile 2"`. Khi chạy hoặc tạo lịch từ dashboard local, agent ưu tiên profile đã lưu. Chọn **Dùng profile đang chọn trên dashboard** để bỏ thiết lập riêng. Nếu profile đã lưu không có trên máy, dashboard báo lỗi và chờ bạn chọn lại. Mỗi lịch giữ profile tại thời điểm tạo. Các lệnh CLI, API v1 và lượt chạy từ Control Server tiếp tục dùng profile chỉ định cho lượt chạy.
+
+## Đổi tên file kịch bản
+
+Mở kịch bản đã lưu, nhập tên mới vào ô **Tên file mới** rồi bấm **Đổi tên file**. Nhập tên không có đuôi `.json`, chỉ dùng chữ thường, số, dấu gạch ngang hoặc gạch dưới. Tên hiển thị chỉnh riêng trong ô **Tên hiển thị**. Agent chuyển các lịch local đang chờ sang tên mới và yêu cầu dừng lượt chạy đang dùng file trước khi đổi tên. Nếu kịch bản được dùng qua Control Server, cập nhật quyền và lịch từ xa theo tên mới.

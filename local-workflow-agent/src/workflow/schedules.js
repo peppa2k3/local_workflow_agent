@@ -29,6 +29,12 @@ function createSchedules({ dataDir, workflows, scenarios, now = Date.now }) {
     persist([...tasks, task]);
     return task;
   }
+  function renameScenario(source, destination) {
+    const next = tasks.map(task => task.scenario === source && ['scheduled', 'confirming'].includes(task.state)
+      ? { ...task, scenario: destination }
+      : task);
+    if (next.some((task, index) => task !== tasks[index])) persist(next);
+  }
   function reschedule(id, scheduledAt) {
     validateTime(scheduledAt);
     const task = tasks.find(item => item.id === id);
@@ -66,6 +72,6 @@ function createSchedules({ dataDir, workflows, scenarios, now = Date.now }) {
       reserved.add(task.profile);
     }
   }
-  return { create, reschedule, decide, tick, list: () => tasks };
+  return { create, renameScenario, reschedule, decide, tick, list: () => tasks };
 }
 module.exports = { createSchedules };

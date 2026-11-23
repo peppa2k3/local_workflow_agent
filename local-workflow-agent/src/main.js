@@ -163,7 +163,7 @@ const server = http.createServer(async (request, response) => {
         return json(run ? 200 : 404, run || { error: 'Run not found' });
       }
       if (profileDiscovery) {
-        return json(200, { ...(dashboardAuthorized(request) && { schedules: schedules.list() }), defaultProfile: profile, automationEnabled: automation.enabled, storage: activity.syncStatus(), capabilities: ['remote-control-v1', 'shared-content-v1', 'activity-history-v1', 'download-cache-v1', 'automation-api-v1', 'variables-v1', 'video-download-v1', 'video-quality-best-v1', 'download-references-v1', 'scenario-management-v1'], performance, profiles: profiles().map(item => ({ ...item, ...workflows.status(item.directory) })) });
+        return json(200, { ...(dashboardAuthorized(request) && { schedules: schedules.list() }), defaultProfile: profile, automationEnabled: automation.enabled, storage: activity.syncStatus(), capabilities: ['remote-control-v1', 'shared-content-v1', 'activity-history-v1', 'download-cache-v1', 'automation-api-v1', 'variables-v1', 'video-download-v1', 'video-quality-best-v1', 'download-references-v1', 'scenario-management-v1', 'scenario-rename-v1'], performance, profiles: profiles().map(item => ({ ...item, ...workflows.status(item.directory) })) });
       }
       if (request.method === 'POST' && route === '/api/profiles/open') {
         const body = await readBody(request);
@@ -199,6 +199,14 @@ const server = http.createServer(async (request, response) => {
         return json(200, s.picker);
       }
       if (request.method === 'GET' && route === '/api/scenarios') return json(200, { names: scenarios.list() });
+      const renameMatch = route.match(/^\/api\/scenarios\/([^/]+)\/rename$/);
+      if (renameMatch && request.method === 'POST') {
+        const source = renameMatch[1];
+        const { name } = await readBody(request);
+        if (workflows.usesScenario(source)) throw new Error('Dừng lượt chạy dùng kịch bản này trước khi đổi tên.');
+        scenarios.rename(source, name, schedules.renameScenario);
+        return json(200, { name });
+      }
       const cloneMatch = route.match(/^\/api\/scenarios\/([^/]+)\/clone$/);
       if (cloneMatch && request.method === 'POST') {
         const body = await readBody(request);

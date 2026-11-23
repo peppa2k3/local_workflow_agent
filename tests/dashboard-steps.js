@@ -12,13 +12,17 @@ const { chromium } = require('playwright');
       { action: 'click', label: 'Chọn video', selector: '#video' },
       { action: 'wait', label: 'Đợi tải', ms: 1000 }
     ] };
-    let saved;
+    let saved, currentName = 'compact';
     await page.route('http://dashboard.test/**', route => {
       const request = route.request(), endpoint = new URL(request.url()).pathname;
       if (endpoint === '/') return route.fulfill({ contentType: 'text/html', body: fs.readFileSync(path.join(__dirname, '../local-workflow-agent/dashboard/index.html'), 'utf8') });
-      if (endpoint === '/api/profiles') return route.fulfill({ json: { defaultProfile: 'Default', capabilities: ['variables-v1', 'scenario-management-v1'], profiles: [{ directory: 'Default', name: 'Fixture', extensionConnected: true, running: false }] } });
-      if (endpoint === '/api/scenarios') return route.fulfill({ json: { names: ['compact'] } });
-      if (endpoint === '/api/scenarios/compact') {
+      if (endpoint === '/api/profiles') return route.fulfill({ json: { defaultProfile: 'Default', capabilities: ['variables-v1', 'scenario-management-v1', 'scenario-rename-v1'], profiles: [{ directory: 'Default', name: 'Fixture', extensionConnected: true, running: false }] } });
+      if (endpoint === '/api/scenarios') return route.fulfill({ json: { names: [currentName] } });
+      if (endpoint === '/api/scenarios/compact/rename') {
+        currentName = request.postDataJSON().name;
+        return route.fulfill({ json: { name: currentName } });
+      }
+      if (endpoint === '/api/scenarios/' + currentName) {
         if (request.method() === 'PUT') { saved = request.postDataJSON(); return route.fulfill({ json: { ok: true } }); }
         return route.fulfill({ json: scenario });
       }
@@ -79,6 +83,12 @@ const { chromium } = require('playwright');
     await page.setViewportSize({ width: 390, height: 800 });
     await cards.nth(2).getByRole('button', { name: 'Thu chi tiết bước 3' }).click();
     await page.screenshot({ path: path.join(screenshotDir, 'dashboard-steps-mobile.png'), fullPage: true });
+    await page.locator('#scenarioName').fill('Tên hiển thị đang chỉnh sửa');
+    await page.locator('#fileName').fill('compact-renamed');
+    await page.locator('#renameBtn').click();
+    await page.waitForFunction(() => document.getElementById('scenarioSelect').value === 'compact-renamed');
+    assert.equal(await page.locator('#scenarioName').inputValue(), 'Tên hiển thị đang chỉnh sửa');
+    assert.equal(await page.locator('#renameBtn').isDisabled(), true);
     console.log('Dashboard steps: compact rows, accessible expand/collapse, move/edit/delete, JSON isolation and mobile layout passed');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

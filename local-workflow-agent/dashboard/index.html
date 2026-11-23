@@ -127,6 +127,7 @@
       <button class="btn danger" id="deleteBtn">Xóa kịch bản</button>
       <label>Tên file mới<input id="fileName" placeholder="vi-du: facebook-reels" spellcheck="false"></label>
       <button class="btn ghost" id="newBtn">Tạo mới</button>
+      <button class="btn ghost" id="renameBtn" disabled>Đổi tên file</button>
       <label>File upload cho lần chạy<span class="file-path-control"><input id="uploadPath" placeholder="C:\\...\\anh.jpg (tùy chọn)" spellcheck="false"><button class="btn ghost" id="chooseRunFile" type="button">Chọn file…</button></span></label>
       <span class="spacer"></span>
       <button class="btn success" id="saveBtn">Lưu</button>
@@ -255,7 +256,7 @@
     let filePicking = false, statusPending = false, editorBusy = false;
     let knownProfiles = [];
     const executionProfile = () => scenario.profile || selectedProfile;
-    let agentCompatible = false, videoCompatible = false, referencesCompatible = false, managementCompatible = false;
+    let agentCompatible = false, videoCompatible = false, referencesCompatible = false, managementCompatible = false, renameCompatible = false;
     const runtimeVariables = ['download_title', 'download_file_name', 'download_file_path', 'download_id'];
     const usesDownloadReferences = () => /\{\{\s*download_(title|file_name|file_path|id)\s*\}\}/.test(JSON.stringify(scenario));
 
@@ -267,7 +268,9 @@
       for (const id of ['loadBtn', 'newBtn', 'saveBtn', 'cloneBtn', 'addBtn', 'addVariableBtn', 'scenarioSelect']) setProperty($(id), 'disabled', editorBusy);
       setProperty($('schedule-create'), 'disabled', editorBusy || !profileState);
       setProperty($('runBtn'), 'disabled', editorBusy || !agentCompatible || (!profileState?.extensionConnected && scenario.steps.some(step => !['wait', 'openFolder', 'downloadVideo'].includes(step.action))) || !profileState || profileState.running || (scenario.steps.some(step => step.action === 'downloadVideo') && !videoCompatible) || (usesDownloadReferences() && !referencesCompatible));
-      setProperty($('deleteBtn'), 'disabled', editorBusy || !managementCompatible || !Array.from($('scenarioSelect').options).some(option => option.value === fileName));
+      const saved = Array.from($('scenarioSelect').options).some(option => option.value === fileName);
+      setProperty($('deleteBtn'), 'disabled', editorBusy || !managementCompatible || !saved);
+      setProperty($('renameBtn'), 'disabled', editorBusy || !renameCompatible || !saved || $('fileName').value.trim() === fileName);
       setProperty($('steps'), 'inert', editorBusy);
       setProperty($('variables'), 'inert', editorBusy);
       setProperty($('scenarioName'), 'disabled', editorBusy);
@@ -599,6 +602,16 @@
       if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(name)) throw new Error('Nhập tên file hợp lệ trước khi tạo');
       fileName = name; $('scenarioSelect').value = ''; scenario = { name, steps: [{ action: 'openUrl', ...defaults.openUrl }] }; variableDrafts = []; renderVariables(); render(); notice('Kịch bản mới chưa lưu.');
     }));
+    $('fileName').addEventListener('input', updateButtons);
+    $('renameBtn').onclick = () => handle(() => editTask(async () => {
+      const name = $('fileName').value.trim();
+      if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(name)) throw new Error('Tên file chỉ dùng chữ thường, số, dấu - hoặc _');
+      await api(`/api/scenarios/${encodeURIComponent(fileName)}/rename`, 'POST', { name });
+      fileName = name; $('fileName').value = name;
+      await refreshNames();
+      notice(`Đã đổi tên file thành ${name}.json`);
+      refreshStatus();
+    }));
     $('deleteBtn').onclick = () => handle(() => editTask(async () => {
       const target = fileName;
       if (!window.confirm(`Xóa kịch bản "${target}"? File JSON này sẽ bị xóa.`)) return;
@@ -736,6 +749,7 @@
         anyWorkflowRunning = data.profiles.some(item => item.running);
         setText('automationStatus', `CLI/API ${data.automationEnabled ? 'đã bật' : 'chưa bật (đặt LOCAL_AGENT_API_TOKEN rồi khởi động lại agent)'}. Chạy node local-agent.js --help; xem docs/SETUP.md. Biến truyền qua API chỉ áp dụng cho lượt chạy đó.`);
         referencesCompatible = data.capabilities?.includes('download-references-v1') === true;
+        renameCompatible = data.capabilities?.includes('scenario-rename-v1') === true;
         managementCompatible = data.capabilities?.includes('scenario-management-v1') === true;
         videoCompatible = data.capabilities?.includes('video-quality-best-v1') === true;
         agentCompatible = data.capabilities?.includes('variables-v1') === true;
