@@ -282,6 +282,22 @@ const { createScenarioStore } = require('../local-workflow-agent/src/workflow/sc
     assert.equal(savedScenario.steps[0].completion.state, 'hidden');
     assert.equal(savedScenario.steps[0].settleMs, 0);
     assert.equal(savedScenario.steps[0].locator, '#go');
+    const scenarioProfile = dashboard.getByLabel('Chrome profile của kịch bản', { exact: true });
+    await scenarioProfile.selectOption('Profile 1');
+    await Promise.all([
+      dashboard.waitForResponse(response => new URL(response.url()).pathname === '/api/run'),
+      dashboard.locator('#runBtn').click()
+    ]);
+    assert.equal(runRequest.profile, 'Profile 1');
+    assert.equal(savedScenario.profile, 'Profile 1');
+    assert.equal(await dashboard.locator('#profileSelect').inputValue(), 'Profile 2');
+    await scenarioProfile.selectOption('');
+    await Promise.all([
+      dashboard.waitForResponse(response => new URL(response.url()).pathname === '/api/run'),
+      dashboard.locator('#runBtn').click()
+    ]);
+    assert.equal(runRequest.profile, 'Profile 2');
+    assert(!Object.hasOwn(savedScenario, 'profile'));
     console.log('Dashboard profile selection and completion condition persistence: OK');
     await dashboard.locator('#scenarioSelect').selectOption('typing');
     await dashboard.waitForFunction(() => document.getElementById('scenarioName').value === 'Typing test' && !document.getElementById('runBtn').disabled);

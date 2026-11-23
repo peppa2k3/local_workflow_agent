@@ -2,6 +2,8 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { atomicJson, readJson } = require('../../shared/remote-protocol');
 
+const { scenarioProfile } = require('./scenario-store');
+
 function createSchedules({ dataDir, workflows, scenarios, now = Date.now }) {
   const file = path.join(dataDir, 'schedules.json');
   let tasks = readJson(file, []);
@@ -17,9 +19,11 @@ function createSchedules({ dataDir, workflows, scenarios, now = Date.now }) {
         scheduledAt < Math.floor(now() / 60000) * 60000) throw Error('Chọn phút hiện tại hoặc tương lai.');
   }
   function create({ profile, scenario, scheduledAt, uploadPath = '' }) {
+    const saved = scenarios.load(scenario);
+    profile = scenarioProfile(saved, profile);
     if (!profile || typeof uploadPath !== 'string') throw Error('Chọn profile và đường dẫn hợp lệ.');
     workflows.session(profile);
-    scenarios.prepare(scenarios.load(scenario), uploadPath);
+    scenarios.prepare(saved, uploadPath);
     validateTime(scheduledAt);
     const task = { id: randomUUID(), profile, scenario, uploadPath, scheduledAt, state: 'scheduled' };
     persist([...tasks, task]);

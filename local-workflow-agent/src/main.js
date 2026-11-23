@@ -6,7 +6,7 @@ const { spawn } = require('child_process');
 const { monitorEventLoopDelay } = require('perf_hooks');
 const { randomBytes, timingSafeEqual } = require('crypto');
 const { port, dataDir, scenariosDir, dashboardPath, chromePath, profile, userDataDir } = require('./config');
-const { createScenarioStore } = require('./workflow/scenario-store');
+const { createScenarioStore, scenarioProfile } = require('./workflow/scenario-store');
 const { chooseFile } = require('./integrations/chrome/file-picker');
 const { createProfileCache } = require('./integrations/chrome/profiles');
 const { inspectVideo, downloadVideo } = require('./integrations/video/video-download');
@@ -138,7 +138,7 @@ const server = http.createServer(async (request, response) => {
       if (route.startsWith('/api/schedules') && request.method === 'POST') {
         if (!dashboardAuthorized(request)) return json(403, { error: 'Local dashboard approval required' });
         const body = await readBody(request);
-        if (route === '/api/schedules') return json(201, schedules.create(body));
+        if (route === '/api/schedules') return json(201, schedules.create({ ...body, profile: body.profile || profile }));
         if (route === '/api/schedules/time') {
           schedules.reschedule(body.id, body.scheduledAt);
           return json(200, { ok: true });
@@ -221,7 +221,8 @@ const server = http.createServer(async (request, response) => {
       }
       if (request.method === 'POST' && route === '/api/run') {
         const body = await readBody(request);
-        const run = workflows.start(body.profile || profile, scenarios.load(body.name), body.uploadPath || '', body.name, body.variables);
+        const scenario = scenarios.load(body.name);
+        const run = workflows.start(scenarioProfile(scenario, body.profile || profile), scenario, body.uploadPath || '', body.name, body.variables);
         return json(200, { ok: true, ...run });
       }
       if (request.method === 'POST' && route === '/api/stop') {

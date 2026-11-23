@@ -101,6 +101,20 @@ const { spawn } = require('node:child_process');
     await api('/api/run', { name: 'typing', profile: 'Profile 1' }, 'POST', 400);
     await api('/api/scenarios/typing', undefined, 'DELETE');
     assert(!(await api('/api/scenarios')).names.includes('typing'));
+    await api('/api/stop', { profile: 'Profile 2' });
+    const pinned = { profile: 'Profile 2', steps: [{ action: 'openUrl', url: 'https://example.test/' }] };
+    await api('/api/scenarios/pinned', { ...pinned, profile: '../invalid' }, 'PUT', 400);
+    await api('/api/scenarios/pinned', pinned, 'PUT');
+    assert.equal((await api('/api/run', { name: 'pinned', profile: 'Profile 1' })).profile, 'Profile 2');
+    assert.equal((await api('/next', clients[1])).step.action, 'openUrl');
+    const scheduled = await fetch(base + '/api/schedules', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-local-agent-session': localSession },
+      body: JSON.stringify({ scenario: 'pinned', profile: 'Profile 1', scheduledAt: Date.now() + 60000 })
+    });
+    assert.equal(scheduled.status, 201);
+    assert.equal((await scheduled.json()).profile, 'Profile 2');
+    await api('/api/scenarios/missing-profile', { ...pinned, profile: 'Profile 99' }, 'PUT');
+    await api('/api/run', { name: 'missing-profile', profile: 'Profile 1' }, 'POST', 400);
     console.log('Agent HTTP profile discovery, registration, dispatch and scoped stop: OK');
   } finally {
     if (child && child.exitCode === null) {

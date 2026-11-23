@@ -287,3 +287,7 @@ Agent lưu lịch local trong `data/schedules.json`. Control server lưu lịch 
 Popup hiển thị trên dashboard đã đặt lịch và trên màn hình Windows nếu agent chạy trong phiên desktop. Chọn **Yes** để chạy, **No** để hủy. Sau 30 giây hệ thống mặc định chạy dù dashboard đã đóng. Lượt remote giữ nguyên quyền profile/kịch bản và biến đã cấu hình trên máy local.
 
 Control Server nhận tiến độ của lượt chạy local và các lịch local đang chờ hoặc chờ xác nhận, theo quyền profile và kịch bản đã cấp trong trang Remote. Tài khoản ghép nối có thể dừng lượt chạy, đổi giờ, hủy hoặc xác nhận lịch từ xa khi thiết bị online. Các thao tác áp dụng tại agent sau lần polling tiếp theo. Control Server hiển thị số tác vụ vượt giới hạn dữ liệu của mỗi lần đồng bộ nếu có.
+
+## Chrome profile của kịch bản
+
+Chọn **Chrome profile của kịch bản** trong trình chỉnh sửa rồi bấm **Lưu**. File JSON lưu tên thư mục Chrome ở trường `"profile"`, ví dụ `"profile": "Profile 2"`. Khi chạy hoặc tạo lịch từ dashboard local, agent ưu tiên profile đã lưu. Chọn **Dùng profile đang chọn trên dashboard** để bỏ thiết lập riêng. Nếu profile đã lưu không có trên máy, dashboard báo lỗi và chờ bạn chọn lại. Mỗi lịch giữ profile tại thời điểm tạo. Các lệnh CLI, API v1 và lượt chạy từ Control Server tiếp tục dùng profile chỉ định cho lượt chạy.

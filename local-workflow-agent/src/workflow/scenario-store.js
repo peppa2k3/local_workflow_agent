@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { validProfile } = require('../integrations/chrome/profiles');
 const { validateVideo } = require('../integrations/video/video-download');
 const { resolveVariables, hasRuntime, resolveRuntime } = require('./variables');
 const { validateUploadMetadata } = require('../storage/activity-store');
@@ -53,6 +54,13 @@ function validateStep(step, uploadPath = '') {
   return step;
 }
 
+function scenarioProfile(scenario, fallback) {
+  const profile = scenario.profile;
+  if (profile === undefined || profile === '') return fallback;
+  if (!validProfile(profile)) throw new Error('Profile của kịch bản phải là tên thư mục Chrome hợp lệ.');
+  return profile;
+}
+
 function createScenarioStore(scenariosDir) {
   function file(name) {
     if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(name)) throw new Error('Invalid scenario filename');
@@ -72,6 +80,7 @@ function createScenarioStore(scenariosDir) {
     list: () => fs.readdirSync(scenariosDir).filter(name => name.endsWith('.json')).map(name => name.slice(0, -5)),
     load: name => JSON.parse(fs.readFileSync(file(name), 'utf8')),
     save: (name, scenario) => {
+      scenarioProfile(scenario);
       if (!Array.isArray(scenario.steps) || !scenario.steps.length) throw new Error('Add at least one step');
       fs.writeFileSync(file(name), JSON.stringify(scenario, null, 2) + '\n');
     },
@@ -102,4 +111,4 @@ function createScenarioStore(scenariosDir) {
   };
 }
 
-module.exports = { createScenarioStore };
+module.exports = { scenarioProfile, createScenarioStore };
