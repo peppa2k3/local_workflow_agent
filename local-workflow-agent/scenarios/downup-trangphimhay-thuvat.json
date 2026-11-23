@@ -2,8 +2,8 @@
   "name": "Tải clip → upload Reels và điền tên phim (bản sao)",
   "variables": {
     "video_url": "clip:[Trọn bộ] Chiến Thần Y Tiên Xuống Núi Cưới Nữ Tổng Tài, Lộ Thân Thế Quét Sạch Kẻ Thù Mùa 1 #phimhay.mp4",
-    "thu_muc_tai": "D:\\Videos\\giangloi",
-    "reels_url": "https://www.facebook.com/profile.php?id=61551343781361&sk=reels_tab",
+    "thu_muc_tai": "D:\\Videos\\trangphimhay",
+    "reels_url": "https://www.facebook.com/profile.php?id=61560176683071&sk=reels_tab",
     "ten_phim": "{{download_title}}",
     "ten_file": "{{download_file_name}}"
   },
@@ -78,6 +78,10 @@
       "locator": "Đăng",
       "timeoutMs": 5000,
       "label": "Đăng clip"
+    },
+    {
+      "action": "closeTab",
+      "label": "Đóng tab"
     }
   ]
 }

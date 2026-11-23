@@ -1,7 +1,7 @@
 {
   "name": "Tải clip → upload Reels và điền tên phim (bản sao) (bản sao)",
   "variables": {
-    "video_url": "https://youtu.be/Qg_yHCWCwpA?si=MjctI6KaurL2oVUZ",
+    "video_url": "https://www.youtube.com/watch?v=H6cmf-VCbag&pp=ygUSeHV5w6puIGtow7RuZyB24buB",
     "thu_muc_tai": "D:\\Videos\\tutrinh",
     "reels_url": "https://www.facebook.com/profile.php?id=61581547334850&sk=reels_tab&locale=vi_VN",
     "ten_phim": "{{download_title}}",
@@ -83,7 +83,7 @@
     },
     {
       "action": "wait",
-      "ms": 5000,
+      "ms": 120000,
       "label": "wait 5s"
     },
     {

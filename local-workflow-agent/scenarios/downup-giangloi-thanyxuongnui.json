@@ -79,5 +79,6 @@
       "timeoutMs": 5000,
       "label": "Đăng clip"
     }
-  ]
+  ],
+  "profile": "Profile 1"
 }
