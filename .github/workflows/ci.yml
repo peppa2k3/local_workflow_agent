@@ -19,6 +19,14 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
       - run: npm ci
+      - name: Install scanner test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg python3-venv
+          python3 -m venv "$RUNNER_TEMP/scanner-tools"
+          "$RUNNER_TEMP/scanner-tools/bin/pip" install yt-dlp==2026.8.19
+          echo "$RUNNER_TEMP/scanner-tools/bin" >> "$GITHUB_PATH"
+          echo "FFMPEG_PATH=$(command -v ffmpeg)" >> "$GITHUB_ENV"
       - run: npm test
       - name: Validate VPS source deployment Compose
         env:
