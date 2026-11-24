@@ -13,3 +13,22 @@ button.danger:hover{background:#bd3947;border-color:#ed6974}
 #keywords{width:100%;resize:vertical;padding:12px;background:#0b1526;color:inherit;border:1px solid #506789;border-radius:8px;font:15px/1.6 ui-monospace,monospace}
 #config fieldset{border:1px solid #30465f;border-radius:8px;margin:0 0 16px}
 #rows .run details{margin-bottom:14px}
+
+.scanner-filters{display:grid;grid-template-columns:2fr 1fr minmax(8rem,.65fr);gap:12px}
+.scanner label,.scanner legend{color:#c1e8fd}
+.scanner #rows .run{padding:10px 0;overflow-wrap:anywhere}
+.scanner #rows .run h3{margin:5px 0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.scanner #rows .run p{margin:3px 0;font-size:.875rem}
+.scanner #rows .run details{margin:4px 0;color:#a5d7ff}
+.scanner #rows summary{cursor:pointer;width:fit-content}
+.scanner-actions,.scanner-pages{margin-top:12px}
+.scanner-actions button{min-height:36px;padding:5px 10px}
+.scanner :is(#export,#prevPage,#nextPage,.scanner-actions button){background:#254b85;border-color:#6498dc}
+.scanner :is(#export,#prevPage,#nextPage,.scanner-actions button):hover{background:#3265a8}
+.scanner #keywordForm button{background:#5c3b8a;border-color:#aa81dc}
+.scanner #toggle.danger{background:#a52f3b;border-color:#d34b59}
+.scanner .scanner-status-synced{background:#153e37;color:#89f4d7}
+.scanner .scanner-status-pending{background:#263f73;color:#c0dbff}
+.scanner .scanner-status-reject{background:#592a39;color:#ffb8cb}
+.scanner :is(.scanner-status-unknown,.scanner-status-candidate){background:#543f23;color:#ffdb97}
+@media(max-width:600px){.scanner-filters{grid-template-columns:1fr 1fr}.scanner-filters label:first-child{grid-column:1/-1}.scanner-filters label{margin:4px 0}}

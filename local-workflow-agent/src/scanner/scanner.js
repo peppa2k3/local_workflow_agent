@@ -157,7 +157,7 @@ function createScanner({ directory, submit, onChange = () => {}, inspect = media
       }
     } finally { syncing = false; }
   }
-  const rows = () => db.prepare("SELECT status,data FROM clips WHERE data IS NOT NULL ORDER BY rowid DESC LIMIT 100").all().map(r=>({status:r.status,...JSON.parse(r.data)}));
+  const rows = () => db.prepare("SELECT status,data FROM clips WHERE data IS NOT NULL ORDER BY json_extract(data,'$.measured_at') DESC, rowid DESC LIMIT 100").all().map(r=>({status:r.status,...JSON.parse(r.data)}));
   function status() {
     let cfg, groups = [], configurationError;
     try { cfg = config(); groups = topics(); } catch (e) { configurationError = e.message; }
