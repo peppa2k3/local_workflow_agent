@@ -318,3 +318,5 @@ Mở `/scanner` trên dashboard local để lưu các ngưỡng lọc vào `conf
 Kết quả đạt điều kiện chờ trong hàng đợi local và tự gửi đến control server đã ghép nối. Xem trạng thái gửi và từng điều kiện ngay dưới biểu mẫu. Trong **Kho video** (`/library`) trên control server, nhấn tag máy gửi như `#Máy_01` để lọc kết quả. Khi nhiều máy gửi cùng video, kho giữ một bản ghi với tag của các máy gửi.
 
 Danh sách local hiển thị tối đa 100 kết quả gần nhất theo thời điểm đo, từ mới đến cũ. Tìm theo tiêu đề, chủ đề hoặc ID, lọc theo trạng thái và chọn 5 hoặc 10 kết quả mỗi trang. Mở từng dòng để xem điều kiện và thao tác với video.
+
+Mở **Lọc theo từng điều kiện** để kết hợp trạng thái của tuổi video, âm thanh, thời lượng, ID, từ khóa, độ phân giải, phụ đề và lượt xem. Kết quả phải khớp tất cả điều kiện đang chọn.

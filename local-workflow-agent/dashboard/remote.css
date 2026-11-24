@@ -10,11 +10,27 @@ button.primary:hover{background:#0a9063;border-color:#43c492}
 button.danger{background:#a52f3b;border-color:#d34b59;color:#fff;font-weight:750}
 button.danger:hover{background:#bd3947;border-color:#ed6974}
 
-#keywords{width:100%;resize:vertical;padding:12px;background:#0b1526;color:inherit;border:1px solid #506789;border-radius:8px;font:15px/1.6 ui-monospace,monospace}
-#config fieldset{border:1px solid #30465f;border-radius:8px;margin:0 0 16px}
+#keywords{width:100%;resize:vertical;padding:8px 10px;background:#0b1526;color:inherit;border:1px solid #506789;border-radius:8px;font:15px/1.6 ui-monospace,monospace}
+.scanner-editor{display:grid;grid-template-columns:minmax(0,27rem) minmax(0,28rem);gap:12px;align-items:start}
+.scanner .panel{padding:16px;margin-bottom:12px;min-width:0}
+.scanner h2{margin-bottom:8px}
+.scanner label{margin:0;gap:4px;font-size:.875rem}
+.scanner :is(input:not([type=checkbox]),select){padding:6px 8px;min-height:36px}
+.scanner-thresholds,.scanner-check-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr));gap:8px 12px}
+.scanner-thresholds input,.scanner #subtitleLanguages{max-width:13rem}
+.scanner #config>label,.scanner #config fieldset,.scanner #keywordForm button{margin:10px 0 0}
+.scanner #config fieldset{border:1px solid #30465f;border-radius:8px;padding:5px 8px 8px;display:flex;gap:8px 16px;flex-wrap:wrap;margin-bottom:10px}
+.scanner #config .check{display:flex;align-items:center}
+.scanner .panel p[role=status]{margin:6px 0 0}
+.scanner .panel p[role=status]:empty{display:none}
 #rows .run details{margin-bottom:14px}
 
-.scanner-filters{display:grid;grid-template-columns:2fr 1fr minmax(8rem,.65fr);gap:12px}
+.scanner-filters{display:flex;flex-wrap:wrap;gap:8px 12px;margin-top:8px}
+.scanner-filters label:first-child{width:min(100%,17rem)}
+.scanner-check-filters{max-width:46rem;margin:10px 0;border:1px solid #30465f;border-radius:8px;padding:8px 10px}
+.scanner-check-filters summary{color:#a5d7ff;cursor:pointer}
+.scanner-check-grid{margin:8px 0}
+.scanner #clearChecks{min-height:36px;padding:5px 10px}
 .scanner label,.scanner legend{color:#c1e8fd}
 .scanner #rows .run{padding:10px 0;overflow-wrap:anywhere}
 .scanner #rows .run h3{margin:5px 0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
@@ -31,4 +47,4 @@ button.danger:hover{background:#bd3947;border-color:#ed6974}
 .scanner .scanner-status-pending{background:#263f73;color:#c0dbff}
 .scanner .scanner-status-reject{background:#592a39;color:#ffb8cb}
 .scanner :is(.scanner-status-unknown,.scanner-status-candidate){background:#543f23;color:#ffdb97}
-@media(max-width:600px){.scanner-filters{grid-template-columns:1fr 1fr}.scanner-filters label:first-child{grid-column:1/-1}.scanner-filters label{margin:4px 0}}
+@media(max-width:660px){.scanner-editor{grid-template-columns:minmax(0,1fr)}}

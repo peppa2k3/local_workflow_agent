@@ -13,9 +13,18 @@ async function action(fn) {
 }
 const numericFields = ['minViews','minResolution','minDays','maxDays','minutes','requestsPerDay'];
 const kinds = ['subtitles','automatic_captions'];
-const labels = { pending:'Đang chờ gửi', synced:'Đã đồng bộ', reject:'Không đạt', unknown:'Chưa đủ dữ liệu', candidate:'Chờ xét lại' };
+const labels = { pass:'Đạt', pending:'Đang chờ gửi', synced:'Đã đồng bộ', reject:'Không đạt', unknown:'Chưa đủ dữ liệu', candidate:'Chờ xét lại' };
 const checkNames = { id:'ID video', keyword:'Từ khóa', views:'Lượt xem', age:'Tuổi video', duration:'Thời lượng',
   audio:'Âm thanh', resolution:'Độ phân giải', subtitles:'Phụ đề' };
+const checkFilters = Object.entries(checkNames).map(([key, name]) => {
+  const label = document.createElement('label');
+  const select = document.createElement('select');
+  select.append(new Option('Tất cả', ''), ...['pass','reject','unknown'].map(status => new Option(labels[status], status)));
+  select.onchange = resetPage;
+  label.append(name, select);
+  $('checkFilters').append(label);
+  return { key, select };
+});
 let currentConfig, results = [], page = 1;
 async function loadEditor() {
   const { config, keywords } = await api('settings');
@@ -70,8 +79,13 @@ function renderRows() {
   const query = $('resultQuery').value.trim().normalize('NFC').toLocaleLowerCase('vi');
   const size = Number($('pageSize').value);
   const openDetails = new Set(Array.from(document.querySelectorAll('#rows details[open]'), node => node.dataset.video));
+  const activeChecks = checkFilters.filter(({ select }) => select.value);
+  $('activeChecks').textContent = activeChecks.length;
+  $('activeChecks').hidden = !activeChecks.length;
+  $('clearChecks').disabled = !activeChecks.length;
   const matching = results.filter(r => [r.title, r.type_topic, r.video_id].some(value =>
-    value?.normalize('NFC').toLocaleLowerCase('vi').includes(query))).filter(r => mode === 'all' || r.status === mode || mode === 'pass' && ['pending','synced'].includes(r.status));
+    value?.normalize('NFC').toLocaleLowerCase('vi').includes(query))).filter(r => mode === 'all' || r.status === mode || mode === 'pass' && ['pending','synced'].includes(r.status))
+    .filter(r => activeChecks.every(({ key, select }) => r.checks[key]?.status === select.value));
   const pages = Math.max(1, Math.ceil(matching.length / size));
   page = Math.min(page, pages);
   $('pageInfo').textContent = 'Trang ' + page + '/' + pages + ' · ' + matching.length + ' kết quả';
@@ -90,7 +104,7 @@ function renderRows() {
     detail.append(summary);
     for (const [key, check] of Object.entries(row.checks)) {
       const line = document.createElement('p');
-      line.textContent = (checkNames[key] || key) + ' · ' + (labels[check.status] || 'Đạt') + ' · ' + check.reason;
+      line.textContent = (checkNames[key] || key) + ' · ' + (labels[check.status] || check.status) + ' · ' + check.reason;
       detail.append(line);
     }
     badge.className = 'badge scanner-status-' + row.status;
@@ -115,6 +129,10 @@ function renderRows() {
   if (!rows.length) $('rows').textContent = 'Chưa có kết quả cho lựa chọn này.';
 }
 function resetPage() { page = 1; renderRows(); }
+$('clearChecks').onclick = () => {
+  for (const { select } of checkFilters) select.value = '';
+  resetPage();
+};
 $('filter').onchange = resetPage;
 $('pageSize').onchange = resetPage;
 $('resultQuery').oninput = resetPage;
