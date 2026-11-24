@@ -131,6 +131,11 @@ const server = http.createServer(async (request, response) => {
           return json(200, { ok: true });
         }
       }
+      if (request.method === 'POST' && route === '/api/scanner/results') {
+        const { ids, operation } = await readBody(request);
+        const changed = scanner.manageResults(ids, operation);
+        return json(200, { changed, rows: scanner.status().rows });
+      }
       if (route === '/api/scanner/export' && request.method === 'GET') return json(200, scanner.exportVideos());
       if (route === '/api/scanner/status' && request.method === 'GET') return json(200, scanner.status());
       if (request.method === 'POST' && route === '/api/scanner/toggle') {

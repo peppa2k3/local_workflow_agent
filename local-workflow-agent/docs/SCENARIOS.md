@@ -322,3 +322,7 @@ Danh sách local hiển thị tối đa 100 kết quả gần nhất theo thời
 Mở **Lọc theo từng điều kiện** để kết hợp trạng thái của tuổi video, âm thanh, thời lượng, ID, từ khóa, độ phân giải, phụ đề và lượt xem. Kết quả phải khớp tất cả điều kiện đang chọn.
 
 Trong **Điều kiện lọc**, đặt khoảng thời lượng theo giây và nhập cả chiều rộng lẫn chiều cao tối thiểu nếu cần. Hai ô kích thước để trống thì scanner dùng ngưỡng cạnh ngắn.
+
+Trong **Chi tiết và chỉnh sửa**, chọn đánh giá thủ công hoặc quay về kết quả tự động. Dùng ô chọn từng dòng hoặc **Chọn cả trang** để áp dụng thao tác hàng loạt. Các mục đã chọn được giữ khi chuyển trang.
+
+Đánh giá thủ công dùng để phân loại kết quả local. Đánh dấu không đạt tạm giữ video đang chờ gửi. Chỉ video đạt đầy đủ kiểm tra tự động mới đủ điều kiện gửi. Xóa kết quả dọn bản ghi local và giữ ID chống quét lại. Bản ghi đã nhận vẫn xem được trong kho của Control Server.

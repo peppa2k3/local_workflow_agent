@@ -30,5 +30,13 @@
 <div id="checkFilters" class="scanner-check-grid"></div>
 <button id="clearChecks" type="button" disabled>Xóa lọc điều kiện</button>
 </details>
-<p id="feedback" role="status"></p><div id="rows"></div>
+<p id="feedback" role="status"></p>
+<div class="row scanner-selection">
+<label><input id="selectPage" type="checkbox" disabled> Chọn cả trang</label>
+<span id="selectionCount" role="status">Đã chọn 0</span>
+<label>Thao tác với mục đã chọn<select id="bulkOperation"><option value="">Chọn thao tác</option></select></label>
+<button id="applyBulk" type="button" disabled>Áp dụng</button>
+<button id="clearSelection" type="button" disabled>Bỏ chọn</button>
+</div>
+<div id="rows"></div>
 <nav class="row scanner-pages" aria-label="Phân trang kết quả"><button id="prevPage" disabled>Trang trước</button><span id="pageInfo" role="status"></span><button id="nextPage" disabled>Trang sau</button></nav></section></main></body></html>

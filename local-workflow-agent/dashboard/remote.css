@@ -48,3 +48,11 @@ button.danger:hover{background:#bd3947;border-color:#ed6974}
 .scanner .scanner-status-reject{background:#592a39;color:#ffb8cb}
 .scanner :is(.scanner-status-unknown,.scanner-status-candidate){background:#543f23;color:#ffdb97}
 @media(max-width:660px){.scanner-editor{grid-template-columns:minmax(0,1fr)}}
+
+.scanner-selection{margin:10px 0;align-items:end}
+.scanner-selection label:first-child{display:flex;align-items:center;gap:6px}
+.scanner-selection #selectionCount{align-self:center}
+.scanner #rows .run{display:grid;grid-template-columns:18px minmax(0,1fr);gap:10px}
+.scanner-row-select{margin:3px 0 0}
+.scanner-review{margin-left:6px}
+.scanner-review-editor{align-items:end}

@@ -37,11 +37,14 @@ function createScanner({ directory, submit, onChange = () => {}, inspect = media
   }
   const db = new DatabaseSync(path.join(directory, 'scanner.sqlite'));
   db.exec("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; CREATE TABLE IF NOT EXISTS state(k TEXT PRIMARY KEY,v TEXT); CREATE TABLE IF NOT EXISTS clips(id TEXT PRIMARY KEY,status TEXT NOT NULL,data TEXT,attempt INTEGER DEFAULT 0,due INTEGER DEFAULT 0);");
+  if (!db.prepare("PRAGMA table_info(clips)").all().some(column => column.name === 'review')) {
+    db.exec("ALTER TABLE clips ADD COLUMN review TEXT");
+  }
   const get = k => JSON.parse(db.prepare('SELECT v FROM state WHERE k=?').get(k)?.v || 'null');
   const set = (k,v) => db.prepare('INSERT OR REPLACE INTO state VALUES(?,?)').run(k,JSON.stringify(v));
   const config = () => settings(JSON.parse(fs.readFileSync(configFile,'utf8').replace(/^\uFEFF/,'')));
   const topics = () => topicsFrom(fs.readFileSync(keywordFile,'utf8'));
-  let scanning = false, syncing = false, timer, error = '', syncError = '';
+  let scanning = false, syncing = false, submitting, timer, error = '', syncError = '';
   const abort = new AbortController();
   function transaction(fn) {
     db.exec('BEGIN IMMEDIATE');
@@ -137,7 +140,7 @@ function createScanner({ directory, submit, onChange = () => {}, inspect = media
           const data = result.payload;
           if (result.verdict === 'pass') data.submission_id = randomUUID();
           // Metadata and outbox status share a single atomic SQLite row update.
-          db.prepare('UPDATE clips SET data=?,status=?,due=? WHERE id=?').run(JSON.stringify(data),
+          db.prepare("UPDATE clips SET data=?,status=?,due=? WHERE id=? AND status<>'deleted'").run(JSON.stringify(data),
             result.verdict === 'pass' ? 'pending' : result.verdict,result.verdict === 'unknown' ? Date.now() + 86400000 : 0,id);
         }
       }
@@ -154,8 +157,9 @@ function createScanner({ directory, submit, onChange = () => {}, inspect = media
     if (syncing || abort.signal.aborted) return;
     syncing = true;
     try {
-      const row = db.prepare("SELECT * FROM clips WHERE status='pending' AND due<=? ORDER BY due LIMIT 1").get(Date.now());
+      const row = db.prepare("SELECT * FROM clips WHERE status='pending' AND review IS NOT 'reject' AND due<=? ORDER BY due LIMIT 1").get(Date.now());
       if (!row) return;
+      submitting = row.id;
       try {
         const reply = await submit(JSON.parse(row.data));
         if (!['accepted','replayed','duplicate'].includes(reply?.status)) throw Error('Control Server chưa xác nhận.');
@@ -166,9 +170,9 @@ function createScanner({ directory, submit, onChange = () => {}, inspect = media
         syncError = e.message;
         db.prepare('UPDATE clips SET attempt=attempt+1,due=? WHERE id=?').run(Date.now()+Math.min(3600000,5000*2**Math.min(10,row.attempt)),row.id);
       }
-    } finally { syncing = false; }
+    } finally { submitting = undefined; syncing = false; }
   }
-  const rows = () => db.prepare("SELECT status,data FROM clips WHERE data IS NOT NULL ORDER BY json_extract(data,'$.measured_at') DESC, rowid DESC LIMIT 100").all().map(r=>({status:r.status,...JSON.parse(r.data)}));
+  const rows = () => db.prepare("SELECT status,review,data FROM clips WHERE data IS NOT NULL ORDER BY json_extract(data,'$.measured_at') DESC, rowid DESC LIMIT 100").all().map(r=>({status:r.status,review:r.review,...JSON.parse(r.data)}));
   function status() {
     let cfg, groups = [], configurationError;
     try { cfg = config(); groups = topics(); } catch (e) { configurationError = e.message; }
@@ -197,10 +201,30 @@ function createScanner({ directory, submit, onChange = () => {}, inspect = media
       fs.renameSync(temp, file);
     } finally { fs.rmSync(temp, { force: true }); }
   }
-  function exportVideos() {
-    return db.prepare("SELECT data FROM clips WHERE status IN ('pending','synced') ORDER BY rowid").all().map(row => JSON.parse(row.data));
+  function manageResults(ids, operation) {
+    if (!Array.isArray(ids) || !ids.length || ids.length > 100 ||
+        !ids.every(id => typeof id === 'string' && youtubeId(id) === id) ||
+        !['pass','reject','auto','delete'].includes(operation)) throw Error('Thao tác kết quả không hợp lệ');
+    const unique = [...new Set(ids)];
+    if (unique.includes(submitting)) {
+      throw Object.assign(Error('Một video đang gửi. Hãy thử lại sau khi gửi xong.'), { status: 409 });
+    }
+    return transaction(() => {
+      const update = operation === 'delete'
+        ? db.prepare("UPDATE clips SET status='deleted',data=NULL,review=NULL,attempt=0,due=0 WHERE data IS NOT NULL AND id=?")
+        : db.prepare("UPDATE clips SET review=? WHERE data IS NOT NULL AND id=?");
+      let changed = 0;
+      for (const id of unique) {
+        const result = operation === 'delete' ? update.run(id) : update.run(operation === 'auto' ? null : operation, id);
+        changed += Number(result.changes);
+      }
+      return changed;
+    });
   }
-  return { activity: () => ({enabled:Boolean(get('enabled')), scanning}), status, editor, saveSettings, exportVideos, scan, flush, audit, toggle(enabled) {
+  function exportVideos() {
+    return db.prepare("SELECT data FROM clips WHERE status IN ('pending','synced') AND review IS NOT 'reject' ORDER BY rowid").all().map(row => JSON.parse(row.data));
+  }
+  return { activity: () => ({enabled:Boolean(get('enabled')), scanning}), status, editor, saveSettings, manageResults, exportVideos, scan, flush, audit, toggle(enabled) {
     if (typeof enabled !== 'boolean') throw Error('enabled phải là boolean');
     set('enabled',enabled); if (enabled) set('next',0); onChange();
   }, start() {
@@ -209,7 +233,7 @@ function createScanner({ directory, submit, onChange = () => {}, inspect = media
       void flush();
     }, 3000); timer.unref();
   }, async download(id) {
-    const row = db.prepare("SELECT data FROM clips WHERE id=? AND status='synced'").get(id);
+    const row = db.prepare("SELECT data FROM clips WHERE id=? AND status='synced' AND review IS NOT 'reject'").get(id);
     if (!row) throw Error('Clip chưa được xác nhận đồng bộ.');
     return media.download(JSON.parse(row.data),path.join(directory,'videos'),AbortSignal.any([abort.signal,AbortSignal.timeout(1800000)]));
   }, async close() {

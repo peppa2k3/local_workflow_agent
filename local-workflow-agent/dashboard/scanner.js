@@ -25,7 +25,45 @@ const checkFilters = Object.entries(checkNames).map(([key, name]) => {
   $('checkFilters').append(label);
   return { key, select };
 });
-let currentConfig, results = [], page = 1;
+let currentConfig, results = [], page = 1, visibleIds = [], revision = 0, editing = false;
+const selected = new Set();
+const reviewOptions = [['pass','Đánh dấu đạt'], ['reject','Đánh dấu không đạt'], ['auto','Dùng kết quả tự động']];
+$('bulkOperation').append(...[...reviewOptions, ['delete','Xóa kết quả local']].map(([value, text]) => new Option(text, value)));
+
+function updateSelection() {
+  const count = visibleIds.filter(id => selected.has(id)).length;
+  $('selectPage').checked = visibleIds.length > 0 && count === visibleIds.length;
+  $('selectPage').indeterminate = count > 0 && count < visibleIds.length;
+  $('selectPage').disabled = !visibleIds.length;
+  $('selectionCount').textContent = 'Đã chọn ' + selected.size;
+  $('applyBulk').disabled = editing || !selected.size || !$('bulkOperation').value;
+  $('clearSelection').disabled = !selected.size;
+}
+function updateResults(rows) {
+  const next = JSON.stringify(rows);
+  if (signature === next) return;
+  signature = next;
+  results = rows;
+  const ids = new Set(rows.map(row => row.video_id));
+  for (const id of selected) if (!ids.has(id)) selected.delete(id);
+  renderRows();
+}
+async function manageResults(ids, operation) {
+  if (editing || !ids.length) return;
+  if (operation === 'delete' && !window.confirm('Xóa ' + ids.length + ' kết quả khỏi Scanner local?')) return;
+  editing = true;
+  updateSelection();
+  try {
+    const { changed, rows } = await api('results', { ids, operation });
+    revision++;
+    for (const id of ids) selected.delete(id);
+    updateResults(rows);
+    for (const checkbox of document.querySelectorAll('#rows .scanner-row-select')) {
+      checkbox.checked = selected.has(checkbox.value);
+    }
+    $('feedback').textContent = operation === 'delete' ? 'Đã xóa ' + changed + ' kết quả local.' : 'Đã cập nhật ' + changed + ' kết quả.';
+  } finally { editing = false; updateSelection(); }
+}
 async function loadEditor() {
   const { config, keywords } = await api('settings');
   currentConfig = config;
@@ -64,6 +102,7 @@ async function refresh() {
   if (refreshing || document.hidden) return;
   refreshing = true;
   try {
+    const requestedRevision = revision;
     const s = await api('status');
     enabled = s.enabled;
     $('toggle').disabled = false;
@@ -71,12 +110,7 @@ async function refresh() {
     $('toggle').textContent = enabled ? 'Tắt quét' : 'Bật quét';
     $('state').textContent = [s.scanning ? 'Đang quét' : enabled ? 'Đang chờ quét' : 'Đã tắt', s.error, s.syncError,
       'Yêu cầu API đã dùng: ' + (s.quota?.used || 0) + '/' + (s.config?.requestsPerDay ?? '?')].filter(Boolean).join(' · ');
-    const next = JSON.stringify(s.rows);
-    if (signature !== next) {
-      results = s.rows;
-      signature = next;
-      renderRows();
-    }
+    if (requestedRevision === revision) updateResults(s.rows);
   } finally { refreshing = false; }
 }
 function renderRows() {
@@ -89,7 +123,11 @@ function renderRows() {
   $('activeChecks').hidden = !activeChecks.length;
   $('clearChecks').disabled = !activeChecks.length;
   const matching = results.filter(r => [r.title, r.type_topic, r.video_id].some(value =>
-    value?.normalize('NFC').toLocaleLowerCase('vi').includes(query))).filter(r => mode === 'all' || r.status === mode || mode === 'pass' && ['pending','synced'].includes(r.status))
+    value?.normalize('NFC').toLocaleLowerCase('vi').includes(query))).filter(r => {
+      const verdict = r.review || (['pending','synced'].includes(r.status) ? 'pass' : r.status);
+      if (['pending','synced'].includes(mode)) return r.status === mode && (mode === 'synced' || r.review !== 'reject');
+      return mode === 'all' || verdict === mode;
+    })
     .filter(r => activeChecks.every(({ key, select }) => r.checks[key]?.status === select.value));
   const pages = Math.max(1, Math.ceil(matching.length / size));
   page = Math.min(page, pages);
@@ -97,13 +135,14 @@ function renderRows() {
   $('prevPage').disabled = page === 1;
   $('nextPage').disabled = page === pages;
   const rows = matching.slice((page - 1) * size, page * size);
+  visibleIds = rows.map(row => row.video_id);
   $('rows').replaceChildren(...rows.map(row => {
     const article = document.createElement('article'), title = document.createElement('h3'), detail = document.createElement('details');
     article.className = 'run';
     title.textContent = row.title || row.video_id;
     title.title = title.textContent;
     const summary = document.createElement('summary'), badge = document.createElement('span');
-    summary.textContent = 'Xem từng điều kiện';
+    summary.textContent = 'Chi tiết và chỉnh sửa';
     detail.dataset.video = row.video_id;
     detail.open = openDetails.has(row.video_id);
     detail.append(summary);
@@ -118,7 +157,26 @@ function renderRows() {
     metadata.className = 'muted';
     metadata.textContent = [row.type_topic, row.view_count != null && row.view_count.toLocaleString('vi-VN') + ' lượt xem',
       new Date(row.measured_at).toLocaleString('vi-VN')].filter(Boolean).join(' · ');
-    article.append(badge, title, metadata, detail);
+    const select = document.createElement('input'), content = document.createElement('div');
+    select.type = 'checkbox';
+    select.className = 'scanner-row-select';
+    select.value = row.video_id;
+    select.checked = selected.has(row.video_id);
+    select.setAttribute('aria-label', 'Chọn ' + title.textContent);
+    select.onchange = () => {
+      if (select.checked) selected.add(row.video_id); else selected.delete(row.video_id);
+      updateSelection();
+    };
+    if (row.status === 'pending' && row.review === 'reject') badge.textContent = 'Tạm giữ gửi';
+    content.append(badge);
+    if (row.review) {
+      const review = document.createElement('span');
+      review.className = 'badge scanner-review scanner-status-' + (row.review === 'pass' ? 'synced' : 'reject');
+      review.textContent = 'Thủ công · ' + labels[row.review];
+      content.append(review);
+    }
+    content.append(title, metadata, detail);
+    article.append(select, content);
     const actions = document.createElement('div');
     actions.className = 'row scanner-actions';
     detail.append(actions);
@@ -128,16 +186,45 @@ function renderRows() {
     }
     button('Copy URL', () => navigator.clipboard.writeText(row.video_url));
     button('Copy JSON', () => navigator.clipboard.writeText(JSON.stringify(row,null,2)));
-    if (row.status === 'synced') button('Tải clip', async () => { $('feedback').textContent = (await api('download',{video_id:row.video_id})).file; });
+    if (row.status === 'synced' && row.review !== 'reject') button('Tải clip', async () => { $('feedback').textContent = (await api('download',{video_id:row.video_id})).file; });
+    const editor = document.createElement('div'), label = document.createElement('label'), review = document.createElement('select');
+    editor.className = 'row scanner-actions scanner-review-editor';
+    review.append(...reviewOptions.map(([value, text]) => new Option(text, value)));
+    review.value = row.review || 'auto';
+    label.append('Đánh giá thủ công', review);
+    editor.append(label);
+    detail.append(editor);
+    const hint = document.createElement('small');
+    hint.textContent = 'Chỉ video đạt kiểm tra tự động mới được gửi. Đánh dấu không đạt sẽ tạm giữ video đang chờ gửi.';
+    detail.append(hint);
+    buttonFor('Lưu đánh giá', () => manageResults([row.video_id], review.value));
+    buttonFor('Xóa kết quả', () => manageResults([row.video_id], 'delete'), 'danger');
+    function buttonFor(text, fn, style = '') {
+      const control = document.createElement('button');
+      control.textContent = text;
+      control.className = style;
+      control.onclick = () => action(fn);
+      editor.append(control);
+    }
     return article;
   }));
   if (!rows.length) $('rows').textContent = 'Chưa có kết quả cho lựa chọn này.';
+  updateSelection();
 }
 function resetPage() { page = 1; renderRows(); }
 $('clearChecks').onclick = () => {
   for (const { select } of checkFilters) select.value = '';
   resetPage();
 };
+$('selectPage').onchange = () => {
+  for (const id of visibleIds) {
+    if ($('selectPage').checked) selected.add(id); else selected.delete(id);
+  }
+  renderRows();
+};
+$('clearSelection').onclick = () => { selected.clear(); renderRows(); };
+$('bulkOperation').onchange = updateSelection;
+$('applyBulk').onclick = () => action(() => manageResults([...selected], $('bulkOperation').value));
 $('filter').onchange = resetPage;
 $('pageSize').onchange = resetPage;
 $('resultQuery').oninput = resetPage;
