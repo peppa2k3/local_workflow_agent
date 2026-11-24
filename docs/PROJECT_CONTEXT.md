@@ -1,6 +1,6 @@
 # Quy tắc bảo trì hiện hành
 
-- Ba app độc lập: local engine, Chrome extension, control server HTTP. Chi tiết/lệnh: [README](README.md).
+- Ba app độc lập: local engine, Chrome extension, control server HTTP. Chi tiết/lệnh: [README](../README.md).
 - Engine local điều phối duy nhất; VPS nhận/gửi metadata và lệnh qua outbound HTTP polling. Không dùng Socket.IO Corebase, không public cổng 34719.
 - Giữ launcher gốc, URL dashboard, JSON scenario và CSS `selector` cũ.
 - Standalone dùng config/scenarios/tools/data trong app. Checkout cũ fallback dữ liệu gốc; không move runtime khi agent chạy, không đổi machine ID tùy tiện.

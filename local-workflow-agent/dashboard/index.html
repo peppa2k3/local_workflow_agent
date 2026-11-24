@@ -143,7 +143,7 @@
         <button class="btn success" id="schedule-yes">Yes · Chạy</button> <button class="btn danger" id="schedule-no">No · Hủy</button></dialog>
     </section>
     <p>Cài extension trong từng profile, mở Extension options và chọn đúng thư mục profile. Mỗi profile có thể chạy một kịch bản riêng.</p>
-    <p id="automationStatus">CLI/API: node local-agent.js --help. Hướng dẫn cấu hình token trong docs/SETUP.md.</p>
+    <p id="automationStatus">CLI/API: node local-agent.js --help. Hướng dẫn cấu hình token trong guides-local.md ở gốc repo.</p>
     <div id="profilesSummary" class="profiles-summary" aria-live="polite"></div>
     <nav class="variables" aria-label="Biến kịch bản">
       <p>Kết quả tải: {{download_title}} = tiêu đề / tên phim; {{download_file_name}} = tên file; {{download_file_path}} = đường dẫn clip; {{download_id}} = ID. Dùng trong các bước sau downloadVideo.</p>
@@ -755,7 +755,7 @@
         renderSchedules(data.schedules || []);
         statusFailures = 0;
         anyWorkflowRunning = data.profiles.some(item => item.running);
-        setText('automationStatus', `CLI/API ${data.automationEnabled ? 'đã bật' : 'chưa bật (đặt LOCAL_AGENT_API_TOKEN rồi khởi động lại agent)'}. Chạy node local-agent.js --help; xem docs/SETUP.md. Biến truyền qua API chỉ áp dụng cho lượt chạy đó.`);
+        setText('automationStatus', `CLI/API ${data.automationEnabled ? 'đã bật' : 'chưa bật (đặt LOCAL_AGENT_API_TOKEN rồi khởi động lại agent)'}. Chạy node local-agent.js --help; xem guides-local.md ở gốc repo. Biến truyền qua API chỉ áp dụng cho lượt chạy đó.`);
         referencesCompatible = data.capabilities?.includes('download-references-v1') === true;
         renameCompatible = data.capabilities?.includes('scenario-rename-v1') === true;
         managementCompatible = data.capabilities?.includes('scenario-management-v1') === true;

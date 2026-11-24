@@ -20,7 +20,7 @@ Remote control: use `node index.js --daemon` for an always-on local agent,
 and `/remote` to grant saved scenario/profile/variable permissions and approve a
 VPS account. The VPS web UI runs/stops only those granted saved scenarios through
 the existing workflow engine, with durable command IDs and per-step history. See
-[remote setup and deployment](../../docs/README.md). Remote run defaults to a
+[remote setup and deployment](../../guides-server.md). Remote run defaults to a
 one-hour timeout; queue start deadlines are five minutes. Browser actions still
 need the corresponding Chrome profile and extension online.
 
@@ -177,7 +177,7 @@ Status trả `download` gồm title, id, name, filePath, bytes, width, height, f
 
 Với DASH hoặc HLS do yt-dlp tải trực tiếp, agent mặc định tải 4 đoạn song song cho mỗi lượt. Có thể chỉnh `YTDLP_CONCURRENT_FRAGMENTS` từ 1 đến 8 trong `.env` của agent rồi khởi động lại. Nếu yt-dlp vẫn báo thiếu đoạn sau khi thử lại, bước tải thất bại và không xuất file. Tùy chọn tốc độ không đổi cache, độ phân giải hoặc ngôn ngữ.
 
-Dùng mẫu `scenarios/video-download.json`, sửa `video_url` và `thu_muc_tai`. Cài bằng `npm run setup:video`, xem [SETUP](SETUP.md). Không đọc cookies/profile Chrome. Website yêu cầu đăng nhập/chống bot có thể từ chối và lỗi được hiển thị.
+Dùng mẫu `scenarios/video-download.json`, sửa `video_url` và `thu_muc_tai`. Cài bằng `npm run setup:video`, xem [SETUP](../../guides-local.md). Không đọc cookies/profile Chrome. Website yêu cầu đăng nhập/chống bot có thể từ chối và lỗi được hiển thị.
 
 Tùy chọn metadata, output template và after_move: https://github.com/yt-dlp/yt-dlp#readme
 

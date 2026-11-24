@@ -1,40 +1,23 @@
 # Local Workflow Agent
 
-Ứng dụng Windows chạy scenario, dashboard/API loopback, tải video, lưu lịch sử và kết nối outbound tới control server. Chỉ cần copy **thư mục này** sang máy local; không cần source server, shared bên ngoài hoặc Playwright.
+Agent Windows chạy từng bước của scenario JSON theo profile, đợi kết quả của bước hiện tại trước khi chuyển tiếp. Các profile có thể chạy song song. Dashboard và API lắng nghe tại `127.0.0.1:34719`. [Cài đặt và chạy thử](../guides-local.md)
 
-```powershell
-cd local-workflow-agent
-npm ci --omit=dev
-if (!(Test-Path .env)) { Copy-Item .env.example .env }
-npm run setup:video
-npm start
-```
-
-Dashboard: `http://127.0.0.1:34719`. Sửa URL/thư mục scenario mẫu trước khi chạy. Cài extension riêng vào từng Chrome profile nếu có bước website; tải thuần local không cần extension.
-
-| Thư mục | Công dụng |
+| Màn hình | Dùng để |
 | --- | --- |
-| `src/workflow/` | Validate, biến, điều phối theo profile, media guard. |
-| `src/http/` | API automation và quản lý nội dung. |
-| `src/storage/` | Lịch sử, catalog, cache, outbox. |
-| `src/integrations/` | Chrome, video, MongoDB và remote HTTP. |
-| `dashboard/` | UI scenario, content và cấp quyền remote. |
-| `shared/` | Protocol HTTP đi kèm app, không import app khác. |
-| `scenarios/` | JSON, có mẫu tải video và mở trang. |
-| `scripts/` | Setup/check/startup/migrate layout cũ. |
-| `docs/` | Setup, API, scenario, storage. |
-| `.env`, `tools/`, `data/` | Cấu hình máy, executable, runtime; không commit. |
+| [Dashboard](http://127.0.0.1:34719) | Tạo, sửa, nhân bản và chạy scenario, chọn phần tử trên trang, theo dõi bước đang chạy hoặc dừng theo profile. |
+| [Content](http://127.0.0.1:34719/content) | Tra lịch sử tải/upload, quản lý page và publication, kiểm tra kết nối Atlas. |
+| [Scan YouTube](http://127.0.0.1:34719/scanner) | Chọn điều kiện lọc trong `config.json`, nhóm từ khóa trong `keywords.txt`, bật quét và xem kết quả. Trang hiển thị thư mục cấu hình thực tế. Clip đạt được xếp hàng gửi tới server đã ghép. |
+| [Remote](http://127.0.0.1:34719/remote) | Ghép thiết bị và cấp quyền theo profile, scenario và biến. Agent chủ động polling HTTPS. |
 
-Remote: mở `/remote`, kết nối URL control server, ghép cặp và cấp allowlist profile/scenario/biến. Agent chủ động polling outbound; không public cổng 34719. Đây là HTTP của repo, không phải Socket.IO Corebase.
+## Cấu trúc và dữ liệu
 
-CLI: `node index.js --help`. Chạy nền: `npm run start:daemon`. Kiểm tra Atlas: `npm run check:mongo`. Scheduled Task tùy chọn: `npm run install:startup`; không tự cài khi setup app.
+`index.js` khởi động app độc lập. `scenarios/` chứa kịch bản, `dashboard/` chứa UI, `src/` chứa engine, API, storage và tích hợp Chrome/video/remote. Công cụ video nằm trong `tools/`. Dữ liệu, nhật ký và danh tính máy nằm trong thư mục runtime. Extension MV3 ở `chrome-reels-extension/` tại gốc repo thực hiện các bước web trong profile đã kết nối.
 
-## Dữ liệu installation cũ
+Checkout cũ tiếp tục nhận launcher `node local-agent.js`, scenario, công cụ và dữ liệu ở gốc. Để gom installation cũ vào app, dừng agent rồi chạy `npm run migrate:legacy` trong thư mục này. Giữ identity và credential riêng cho từng máy.
 
-Launcher `node local-agent.js` ở gốc vẫn hoạt động. Checkout cũ tiếp tục đọc `.env`, `scenarios/`, `tools/`, `data/agent/` ở gốc nếu có, để giữ machine ID/lịch sử. `.env` trong app được ưu tiên. Environment/override đường dẫn vẫn có hiệu lực.
+## Tra cứu kỹ thuật
 
-Muốn gom dữ liệu cũ vào app: dừng agent rồi chạy `npm run migrate:legacy`. Script kiểm tra xung đột trước khi move và từ chối khi cổng agent còn hoạt động. Không copy machine ID/credential sang máy mới.
-
-Hướng dẫn: [SETUP](docs/SETUP.md), [SCENARIOS](docs/SCENARIOS.md), [API](docs/AUTOMATION_API.md), [STORAGE](docs/ACTIVITY_STORAGE.md), [MONGODB](docs/MONGODB_ATLAS.md).
-
-- [Chạy scanner YouTube độc lập với kịch bản](docs/SCANNER.md)
+- Cú pháp bước, biến, locator, lịch chạy và tương thích CSS selector. [Scenario JSON](docs/SCENARIOS.md)
+- Chạy từ terminal, truyền biến/file, theo dõi và hủy theo run ID. [CLI và HTTP API](docs/AUTOMATION_API.md)
+- Điều kiện nhận video, quota, retry và định dạng nhóm từ khóa. [Scanner](docs/SCANNER.md)
+- Lịch sử, cache và schema nội dung dùng chung. [Storage](docs/ACTIVITY_STORAGE.md) · [MongoDB Atlas](docs/MONGODB_ATLAS.md)
