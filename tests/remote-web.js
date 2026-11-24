@@ -177,6 +177,26 @@ const { chromium } = require('playwright');
     assert.equal(await titles.count(), 5);
     assert(await page.locator('#history-pagination').isHidden());
 
+    online = true;
+    await page.locator('.device').first().click();
+    await page.waitForFunction(() => document.getElementById('device-status').textContent === 'Online');
+    assert(await page.locator('#remove-device').isHidden());
+    online = false;
+    await page.locator('.device').first().click();
+    await page.locator('#remove-device').waitFor();
+    page.once('dialog', dialog => dialog.dismiss());
+    await page.locator('#remove-device').click();
+    assert(!posted.some(p => p.path === '/api/device-remove'));
+    await page.route('**/api/device-remove', async route => {
+      assert.equal(route.request().postDataJSON().id, id);
+      await page.route('**/api/devices', r => r.fulfill({ json: { devices: [] } }));
+      await route.fulfill({ json: { ok: true } });
+    });
+    page.once('dialog', dialog => dialog.accept());
+    await page.locator('#remove-device').click();
+    await page.locator('#empty').waitFor();
+    assert.equal(await page.locator('.device').count(), 0);
+
     // Local approval UI uses its session header and explicit claim, with fake state only.
     const state = { configured: false, url: 'https://control.test', policy: { profiles: [], scenarios: [], variables: {} }, pending: { id, code: 'FIXTURECODE1', expires: Date.now() + 60000, email: 'user@example.test', claim: 'fixture-claim' },
       available: { profiles: [{ directory: 'Default', name: 'Fixture' }], scenarios: [{ name: 'sample', variables: ['caption'] }] } };

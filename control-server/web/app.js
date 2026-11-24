@@ -238,6 +238,7 @@
     $('profiles').textContent = (d.metadata.profiles || []).map(p => `${p.name}: ${p.extensionConnected ? 'extension đã kết nối' : 'extension offline'}${p.running ? ' · đang có tác vụ' : ''}`).join(' | ') || 'Máy chưa cấp quyền profile/kịch bản. Thiết lập tại trang Remote của máy local.';
     renderLocalTasks(d);
     $('revoke').disabled = d.revoked;
+    $('remove-device').hidden = d.online;
     const signature = JSON.stringify([d.id, d.metadata.profiles?.map(p => [p.directory, p.name]), d.metadata.scenarios]);
     if (signature !== formSignature) { options($('run-profile'), d.metadata.profiles || [], 'directory', 'name'); options($('run-scenario'), d.metadata.scenarios || [], 'name', 'name'); renderVariables(); formSignature = signature; }
     if (followClock && document.activeElement !== scheduleTime) setScheduleTime();
@@ -382,7 +383,13 @@
   async function refresh() {
     if (busy || !csrf || document.hidden) return; busy = true; clearTimeout(timer);
     let deviceId = selected;
-    try { devices = (await api('/api/devices')).devices; renderDevices(); renderDetail();
+    try {
+      devices = (await api('/api/devices')).devices;
+      if (selected && !devices.some(d => d.id === selected)) {
+        closeDownloadPrompt(); closeClipPicker?.();
+        selected = ''; formSignature = ''; runIntent = null; resetHistory();
+      }
+      renderDevices(); renderDetail();
       deviceId = selected;
       if (deviceId) {
         const { commands } = await api(`/api/commands?device=${encodeURIComponent(deviceId)}`);
@@ -421,6 +428,14 @@
     runIntent ||= { requestId: crypto.randomUUID(), ...payload };
     await api('/api/commands', runIntent); runIntent = null; message(scheduled ? 'Đã lưu lịch chạy.' : 'Đã gửi lệnh chạy. Máy local sẽ xác nhận và cập nhật tiến độ.'); await refresh();
   }); });
+  $('remove-device').addEventListener('click', () => submit($('remove-device'), async () => {
+    const device = devices.find(d => d.id === selected);
+    if (!device || device.online || !confirm(`Gỡ “${device.name}” khỏi danh sách? Máy sẽ cần ghép nối lại để kết nối.`)) return;
+    try {
+      await api('/api/device-remove', { id: device.id });
+      message('Đã gỡ thiết bị khỏi danh sách.');
+    } finally { await refresh(); }
+  }));
   $('revoke').addEventListener('click', () => submit($('revoke'), async () => {
     if (!confirm('Thu hồi quyền điều khiển máy này? Máy local sẽ dừng tác vụ remote khi nhận thông báo.')) return;
     await api('/api/device-revoke', { id: selected }); message('Đã thu hồi kết nối.'); await refresh();

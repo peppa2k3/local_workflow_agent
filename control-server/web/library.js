@@ -3,7 +3,7 @@ let csrf, devices = [], page = 0, generation = 0, debounce;
 async function api(route, data) {
   const response = await fetch(route,{method:data?'POST':'GET',headers:{'content-type':'application/json','x-csrf-token':csrf || ''},
     body:data ? JSON.stringify(data) : undefined});
-  if (response.status === 401) throw Error('Đăng nhập tại trang Điều khiển thiết bị để xem kho.');
+  if (response.status === 401) throw Error('Mở trang Thiết bị và đăng nhập để xem kho video.');
   const body = await response.json();
   if (!response.ok) throw Error(body.error);
   return body;

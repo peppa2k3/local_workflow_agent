@@ -1153,3 +1153,23 @@ footer {
     transition-duration: 0.01ms !important;
   }
 }
+
+.main-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--line);
+}
+.main-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 16px;
+  border-bottom: 3px solid transparent;
+  color: var(--muted);
+  font-weight: 600;
+  text-decoration: none;
+}
+.main-nav a:hover, .main-nav a:focus-visible { color: var(--text); }
+.main-nav a[aria-current="page"] { border-color: var(--accent); color: var(--accent); }

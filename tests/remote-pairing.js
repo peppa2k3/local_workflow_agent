@@ -34,7 +34,23 @@ const { createRemoteClient } = require('../local-workflow-agent/src/integrations
     // Lost approval response can be retried without generating another credential/device.
     await c.post(f.origin, '/device/pair-approve', { id: secret.id, claim: pending.claim }, secret.pollToken, { allowHttp: true });
     assert.equal((await a('/api/devices')).devices.length, 1);
-    await a('/api/device-revoke', { id: devices[0].id });
+    const pc = f.store.get('device', devices[0].id);
+    pc.lastSeen = Date.now();
+    f.store.put('device', pc, pc.owner);
+    await b('/api/device-remove', { id: pc.id }, 404);
+    await a('/api/device-remove', { id: pc.id }, 409);
+    await a('/api/device-revoke', { id: pc.id });
+    await a('/api/device-remove', { id: pc.id });
+    assert.equal((await a('/api/devices')).devices.length, 0);
+    const offline = { ...pc, id: require('node:crypto').randomUUID(), lastSeen: Date.now() - 60000 };
+    f.store.put('device', offline, offline.owner);
+    await a('/api/device-remove', { id: offline.id });
+    assert.equal((await a('/api/devices')).devices.length, 0);
+    for (const route of ['/', '/devices', '/library']) {
+      const response = await fetch(f.origin + route);
+      assert.equal(response.status, 200);
+      assert((await response.text()).includes(`href="${route === '/' ? '/devices' : route}" aria-current="page"`));
+    }
     await assert.rejects(c.post(f.origin, '/device/revoke', { id: secret.id }, secret.deviceToken, { allowHttp: true }), /revoked/);
     await a('/api/logout', {}); await a('/api/me', undefined, 401);
     console.log('remote pairing: mutual approval, retry, account isolation, CSRF, login and revoke passed');

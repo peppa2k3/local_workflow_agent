@@ -27,6 +27,7 @@ function createControlServer({ store, publicUrl, allowHttp = false, trustProxy =
     if (!rates.has(key)) { if (rates.size >= 10000) c.fail('Too many requests', 429); rates.set(key, { count: 0, until: now + period }); }
     if (++rates.get(key).count > limit) c.fail('Too many requests; retry later', 429);
   }
+  function isOnline(device) { return !device.revoked && Date.now() - device.lastSeen < 45000; }
   function bearer(req) { return /^Bearer ([A-Za-z0-9_-]{43})$/.exec(req.headers.authorization || '')?.[1] || ''; }
   function pending(req, data) {
     const pair = store.get('pair', c.uuid(data.id));
@@ -48,10 +49,10 @@ function createControlServer({ store, publicUrl, allowHttp = false, trustProxy =
       if (req.headers.host !== new URL(publicUrl).host) c.fail('Host not allowed', 403);
       const url = new URL(req.url, publicUrl), route = url.pathname;
       if (route === '/health' && req.method === 'GET') return json(200, { ok: true });
-      if (req.method === 'GET' && ['/', '/library', '/library.js', '/app.js', '/style.css'].includes(route)) {
-        const file = path.resolve(__dirname, '../web', route === '/' ? 'index.html' : route === '/library' ? 'library.html' : route.slice(1));
+      if (req.method === 'GET' && ['/', '/devices', '/library', '/library.js', '/app.js', '/style.css'].includes(route)) {
+        const file = path.resolve(__dirname, '../web', ['/', '/devices'].includes(route) ? 'index.html' : route === '/library' ? 'library.html' : route.slice(1));
         if (!fs.existsSync(file)) { res.writeHead(200, { ...headers, 'content-type': 'text/plain; charset=utf-8' }); return res.end('Control core ready. Web UI follows in feature 04.'); }
-        res.writeHead(200, { ...headers, 'content-type': ['/', '/library'].includes(route) ? 'text/html; charset=utf-8' : route.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/css; charset=utf-8' });
+        res.writeHead(200, { ...headers, 'content-type': ['/', '/devices', '/library'].includes(route) ? 'text/html; charset=utf-8' : route.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/css; charset=utf-8' });
         return res.end(fs.readFileSync(file));
       }
       if (req.method !== 'GET' && req.method !== 'POST') c.fail('Method not allowed', 405);
@@ -143,10 +144,15 @@ function createControlServer({ store, publicUrl, allowHttp = false, trustProxy =
         const target = d.metadata.scenarios?.find(s=>s.name===data.scenario)?.libraryTarget;
         return json(200,library.variables(v,target));
       }
-      if (route === '/api/devices' && req.method === 'GET') return json(200, { devices: store.list('device', user.id).map(({ tokenHash, ...d }) => ({ ...d, online: !d.revoked && Date.now() - d.lastSeen < 45000 })) });
-      if (route === '/api/device-revoke' && req.method === 'POST') {
+      if (route === '/api/devices' && req.method === 'GET') return json(200, { devices: store.list('device', user.id)
+        .filter(d => !d.removed).map(({ tokenHash, ...d }) => ({ ...d, online: isOnline(d) })) });
+      if (['/api/device-revoke', '/api/device-remove'].includes(route) && req.method === 'POST') {
         const d = store.get('device', c.uuid(data.id));
         if (!d || d.owner !== user.id) c.fail('Device not found', 404);
+        if (route === '/api/device-remove') {
+          if (isOnline(d)) c.fail('Thiết bị đang trực tuyến. Hãy ngắt kết nối trước khi gỡ.', 409);
+          d.removed = true;
+        }
         d.revoked = true; store.put('device', d, user.id); return json(200, { ok: true });
       }
       if (commandApi) return json(200, commandApi.account(route, req.method, user, data, url));
