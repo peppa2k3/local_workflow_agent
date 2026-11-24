@@ -9,7 +9,8 @@
     "check:mongo": "node scripts/check-mongodb.js",
     "setup:video": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-video.ps1",
     "install:startup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-remote-startup.ps1",
-    "migrate:legacy": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/migrate-legacy.ps1"
+    "migrate:legacy": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/migrate-legacy.ps1",
+    "build:dashboard": "npm --prefix dashboard run build"
   },
   "dependencies": {
     "mongodb": "^7.7.0"

@@ -1,42 +1,73 @@
 <!doctype html>
-<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="local-agent-session" content="__LOCAL_AGENT_DASHBOARD_TOKEN__"><title>Scan YouTube</title>
-<link rel="stylesheet" href="/remote.css"><script src="/scanner.js" defer></script></head><body class="scanner"><main class="shell">
-<nav class="site-nav" aria-label="Điều hướng chính"><div class="row site-links"><a href="/">Kịch bản</a><a href="/content">Quản lý nội dung</a><a href="/remote">Remote Control</a><a href="/scanner" aria-current="page">Scan YouTube</a></div></nav>
-<header><h1>Quét YouTube</h1><button id="toggle" class="primary" disabled>Bật quét</button></header>
-<p id="state" class="muted"></p>
-<div class="scanner-editor"><form id="config" class="panel"><h2>Điều kiện lọc</h2>
-<div class="scanner-thresholds">
-<label>Lượt xem tối thiểu<input id="minViews" type="number" min="0" max="9007199254740991" required></label>
-<label>Cạnh ngắn tối thiểu (px)<input id="minResolution" type="number" min="1" max="8192" required></label>
-<label>Rộng tối thiểu (px)<input id="minWidth" type="number" min="1" max="8192" placeholder="Tùy chọn"></label>
-<label>Cao tối thiểu (px)<input id="minHeight" type="number" min="1" max="8192" placeholder="Tùy chọn"></label>
-<label>Thời lượng từ (giây)<input id="minDurationSeconds" type="number" min="0" max="14399" required></label>
-<label>Thời lượng dưới (giây)<input id="maxDurationSeconds" type="number" min="1" max="14400" required></label>
-<label>Tuổi video từ (ngày)<input id="minDays" type="number" min="0" max="36500" required></label>
-<label>Tuổi video đến (ngày)<input id="maxDays" type="number" min="0" max="36500" required></label>
-<label>Chu kỳ quét (phút)<input id="minutes" type="number" min="1" max="1440" required></label>
-<label>Yêu cầu API mỗi ngày<input id="requestsPerDay" type="number" min="1" max="100" required></label>
-</div>
-<label>Ngôn ngữ phụ đề (cách nhau bằng dấu phẩy)<input id="subtitleLanguages" required placeholder="vi, en"></label>
-<fieldset><legend>Loại phụ đề</legend><label class="check"><input id="subtitles" type="checkbox">Thủ công</label><label class="check"><input id="automatic_captions" type="checkbox">Tự động</label></fieldset>
-<button class="primary" disabled>Lưu bộ lọc</button><p role="status" id="configNote"></p></form>
-<form id="keywordForm" class="panel"><h2>Nhóm từ khóa</h2><label>Nội dung keywords.txt <small>Mỗi nhóm bắt đầu bằng [ma-nhom]. Nhập một cụm từ trên mỗi dòng.</small><textarea id="keywords" rows="9" required spellcheck="false"></textarea></label>
-<button disabled>Lưu từ khóa</button><p role="status" id="keywordNote"></p></form></div>
-<section class="panel"><div class="row"><h2>Kết quả gần nhất</h2><button id="export">Xuất kho JSON</button></div>
-<div class="scanner-filters"><label>Tìm video<input id="resultQuery" type="search" placeholder="Tiêu đề, chủ đề hoặc ID"></label>
-<label>Trạng thái<select id="filter"><option value="all">Mọi kết quả</option><option value="pass">Đạt điều kiện</option><option value="pending">Đang chờ gửi</option><option value="synced">Đã đồng bộ</option><option value="reject">Không đạt</option><option value="unknown">Chưa đủ dữ liệu</option></select></label><label>Kết quả mỗi trang<select id="pageSize"><option value="5">5</option><option value="10">10</option></select></label></div>
-<details class="scanner-check-filters"><summary>Lọc theo từng điều kiện <span id="activeChecks" class="badge" hidden></span></summary>
-<div id="checkFilters" class="scanner-check-grid"></div>
-<button id="clearChecks" type="button" disabled>Xóa lọc điều kiện</button>
-</details>
-<p id="feedback" role="status"></p>
-<div class="row scanner-selection">
-<label><input id="selectPage" type="checkbox" disabled> Chọn cả trang</label>
-<span id="selectionCount" role="status">Đã chọn 0</span>
-<label>Thao tác với mục đã chọn<select id="bulkOperation"><option value="">Chọn thao tác</option></select></label>
-<button id="applyBulk" type="button" disabled>Áp dụng</button>
-<button id="clearSelection" type="button" disabled>Bỏ chọn</button>
-</div>
-<div id="rows"></div>
-<nav class="row scanner-pages" aria-label="Phân trang kết quả"><button id="prevPage" disabled>Trang trước</button><span id="pageInfo" role="status"></span><button id="nextPage" disabled>Trang sau</button></nav></section></main></body></html>
+<!-- Generated from dashboard/src by npm run build:dashboard -->
+<html lang="vi"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><meta name="local-agent-session" content="__LOCAL_AGENT_DASHBOARD_TOKEN__"/><title></title><link rel="stylesheet" href="/remote.css"/><style>:root {
+  --canvas: #0e151c;
+  --panel: #151f29;
+  --line: #344351;
+  --text: #edf3f5;
+  --dim: #adc0cc;
+  --accent: #78e1c6;
+  --gutter: clamp(14px, 3vw, 38px);
+}
+.workspace {
+  margin: 0;
+  min-height: 100vh;
+  font: 15px/1.5 "Segoe UI", system-ui, sans-serif;
+  color: var(--text);
+  background: var(--canvas);
+  color-scheme: dark;
+}
+.workspace *, .workspace *::before, .workspace *::after { box-sizing: border-box }
+.workspace .site-nav { margin:0; padding:0; background:#101a22; border-bottom:1px solid var(--line) }
+.nav-inner, .workspace main.shell, .workspace main.main {
+  width:100%; max-width:1240px; margin-inline:auto; padding-inline:var(--gutter);
+}
+.nav-inner { display:flex; flex-wrap:wrap; align-items:center; gap:12px 32px; padding-block:12px }
+.workspace .site-brand { display:inline-flex; align-items:center; gap:10px; font-size:17px; font-weight:700; color:var(--text); text-decoration:none }
+.site-brand i { width:24px; height:24px; border:6px double var(--accent); border-radius:7px; transform:rotate(-8deg) }
+.workspace .site-links { display:flex; flex-wrap:wrap; gap:4px }
+.workspace .site-links a { color:var(--dim); padding:7px 12px; border-radius:7px; text-decoration:none; font-size:14px; font-weight:600 }
+.workspace .site-links a:hover { color:white; background:#24333c }
+.workspace .site-links a[aria-current=page] { background:#193e39; color:#96f1d8 }
+.workspace main.shell,.workspace main.main { padding-block:clamp(16px,3vw,32px) 48px }
+.workspace .page-heading { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px 20px; margin:0 0 18px; padding:0 0 16px; border-bottom:1px solid var(--line) }
+.workspace .page-heading h1 { margin:0; font-size:clamp(25px,3vw,34px); line-height:1.2; letter-spacing:-.035em }
+.workspace .page-heading p { margin:5px 0 0; color:var(--dim) }
+.workspace :is(.panel,.editor,.toolbar,.connection,.metric,.variables,.progress) { background:var(--panel); border:1px solid var(--line); border-radius:12px; box-shadow:none }
+.workspace .dashboard-field { display:grid; align-content:start; gap:4px; min-width:0; font-size:13px; font-weight:600; color:var(--dim) }
+.workspace :is(input,select,textarea) { min-width:0; max-width:100%; font-family:inherit }
+.workspace :is(button,a,input,select,summary,textarea):focus-visible { outline:2px solid var(--accent); outline-offset:2px }
+.workspace main :is(input:not([type=checkbox]),select,textarea) { color:var(--text); background:#0c161f; border:1px solid #435563; border-radius:7px; font-size:14px }
+.workspace main button { font-family:inherit }
+.workspace .primary,.workspace .btn.success { background:#17664f; color:white; border-color:#37856e }
+.workspace .danger,.workspace .btn.danger { background:#65343f; color:#fff0f2; border-color:#97515f }
+.workspace.index .shell > .toolbar { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); padding:16px; gap:12px 24px }
+.tool-group,.run-actions { display:flex; align-items:end; flex-wrap:wrap; gap:6px }
+.tool-group label { flex:1 1 160px; min-width:0 }
+.workspace .tool-group :is(select,input) { width:100% }
+.run-actions { grid-column:1/-1; justify-content:flex-end; padding-top:10px; border-top:1px solid var(--line) }
+.workspace.index .editor { margin:16px 0 }
+.workspace.index .editor-head { align-items:end }
+.workspace.index .editor-head > div { flex:1 1 280px }
+.workspace.index .editor-head :is(input,select) { width:min(100%,280px) }
+.workspace.index .editor .two { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-block:12px }
+.workspace.scanner .scanner-editor { grid-template-columns: minmax(0,1.1fr) minmax(0,.9fr) }
+.workspace.scanner .scanner-thresholds { grid-template-columns:repeat(auto-fit,minmax(min(100%,9rem),1fr)) }
+.workspace.scanner .scanner-thresholds input { width:100% }
+.workspace .two > *, .workspace .tool-group > * { min-width:0 }
+.workspace.remote .two { align-items:start }
+.workspace.remote .panel label { margin-block:10px }
+.workspace.content .metric strong { color:var(--accent) }
+.workspace.content .main { min-height:0 }
+@media(max-width:720px) {
+  .nav-inner { gap:8px; padding-block:10px; align-items:start; flex-direction:column }
+  .workspace .site-links { width:100%; gap:2px }
+  .workspace .site-links a { padding:6px 8px; font-size:13px }
+  .workspace.index .shell > .toolbar,.workspace.scanner .scanner-editor,.workspace.index .editor .two { grid-template-columns:minmax(0,1fr) }
+  .workspace.index .editor-head { display:grid; grid-template-columns:minmax(0,1fr); align-items:start }
+  .workspace.index .editor-head :is(input,select) { width:100% }
+  .workspace .page-heading { margin-bottom:12px }
+  .workspace .run-actions { justify-content:flex-start }
+}
+.workspace.scanner :is(#config,#keywordForm) fieldset.editor-fields { display:grid; gap:10px; min-width:0; padding:0; margin:0 0 12px; border:0 }
+</style><script defer="" src="/scanner.js"></script></head><body class="workspace scanner"><nav class="site-nav" aria-label="Điều hướng chính"><div class="nav-inner"><a class="site-brand" href="/"><i aria-hidden="true"></i>Workflow Studio</a><div class="site-links"><a href="/">Kịch bản</a><a href="/content">Quản lý nội dung</a><a href="/remote">Remote Control</a><a href="/scanner" aria-current="page">Scan YouTube</a></div></div></nav><main class="shell"><header class="page-heading"><div><h1>Quét YouTube</h1></div><button id="toggle" class="primary" disabled="">Bật quét</button></header><p id="state" class="muted"></p><div id="scanner-settings"><div class="scanner-editor"><form id="config" class="panel"><h2>Điều kiện lọc</h2><fieldset class="editor-fields" disabled=""><div class="scanner-thresholds"><label class="dashboard-field">Lượt xem tối thiểu<input id="minViews" type="number" min="0" max="9007199254740991" required="" name="minViews" value=""/></label><label class="dashboard-field">Cạnh ngắn tối thiểu (px)<input id="minResolution" type="number" min="1" max="8192" required="" name="minResolution" value=""/></label><label class="dashboard-field">Rộng tối thiểu (px)<input id="minWidth" type="number" min="1" max="8192" placeholder="Tùy chọn" name="minWidth" value=""/></label><label class="dashboard-field">Cao tối thiểu (px)<input id="minHeight" type="number" min="1" max="8192" placeholder="Tùy chọn" name="minHeight" value=""/></label><label class="dashboard-field">Thời lượng từ (giây)<input id="minDurationSeconds" type="number" min="0" max="14399" required="" name="minDurationSeconds" value=""/></label><label class="dashboard-field">Thời lượng dưới (giây)<input id="maxDurationSeconds" type="number" min="1" max="14400" required="" name="maxDurationSeconds" value=""/></label><label class="dashboard-field">Tuổi video từ (ngày)<input id="minDays" type="number" min="0" max="36500" required="" name="minDays" value=""/></label><label class="dashboard-field">Tuổi video đến (ngày)<input id="maxDays" type="number" min="0" max="36500" required="" name="maxDays" value=""/></label><label class="dashboard-field">Chu kỳ quét (phút)<input id="minutes" type="number" min="1" max="1440" required="" name="minutes" value=""/></label><label class="dashboard-field">Yêu cầu API mỗi ngày<input id="requestsPerDay" type="number" min="1" max="100" required="" name="requestsPerDay" value=""/></label></div><label class="dashboard-field">Ngôn ngữ phụ đề (cách nhau bằng dấu phẩy)<input id="subtitleLanguages" required="" placeholder="vi, en" name="subtitleLanguages" value=""/></label><fieldset><legend>Loại phụ đề</legend><label class="check"><input type="checkbox" id="subtitles" name="subtitles"/>Thủ công</label><label class="check"><input type="checkbox" id="automatic_captions" name="automatic_captions"/>Tự động</label></fieldset></fieldset><button class="primary" disabled="">Lưu bộ lọc</button><p role="status" id="configNote"></p></form><form id="keywordForm" class="panel"><h2>Nhóm từ khóa</h2><fieldset class="editor-fields" disabled=""><label>Nội dung keywords.txt<!-- --> <small>Mỗi nhóm bắt đầu bằng [ma-nhom]. Nhập một cụm từ trên mỗi dòng.</small><textarea id="keywords" name="keywords" rows="9" required="" spellCheck="false"></textarea></label></fieldset><button class="primary" disabled="">Lưu từ khóa</button><p role="status" id="keywordNote"></p></form></div></div><section class="panel"><div class="row"><h2>Kết quả gần nhất</h2><button id="export">Xuất kho JSON</button></div><div class="scanner-filters"><label class="dashboard-field">Tìm video<input id="resultQuery" type="search" placeholder="Tiêu đề, chủ đề hoặc ID"/></label><label class="dashboard-field">Trạng thái<select id="filter"><option value="all">Mọi kết quả</option><option value="pass">Đạt điều kiện</option><option value="pending">Đang chờ gửi</option><option value="synced">Đã đồng bộ</option><option value="reject">Không đạt</option><option value="unknown">Chưa đủ dữ liệu</option></select></label><label class="dashboard-field">Kết quả mỗi trang<select id="pageSize"><option value="5">5</option><option value="10">10</option></select></label></div><details class="scanner-check-filters"><summary>Lọc theo từng điều kiện<!-- --> <span id="activeChecks" class="badge" hidden=""></span></summary><div id="checkFilters" class="scanner-check-grid"></div><button id="clearChecks" type="button" disabled="">Xóa lọc điều kiện</button></details><p id="feedback" role="status"></p><div class="row scanner-selection"><label><input id="selectPage" type="checkbox" disabled=""/> Chọn cả trang</label><span id="selectionCount" role="status">Đã chọn 0</span><label class="dashboard-field">Thao tác với mục đã chọn<select id="bulkOperation"><option value="">Chọn thao tác</option></select></label><button id="applyBulk" type="button" disabled="">Áp dụng</button><button id="clearSelection" type="button" disabled="">Bỏ chọn</button></div><div id="rows"></div><nav class="row scanner-pages" aria-label="Phân trang kết quả"><button id="prevPage" disabled="">Trang trước</button><span id="pageInfo" role="status"></span><button id="nextPage" disabled="">Trang sau</button></nav></section></main></body></html>

@@ -1,21 +1,73 @@
 <!doctype html>
-<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="local-agent-session" content="__LOCAL_AGENT_DASHBOARD_TOKEN__"><title>Kết nối remote · Local Agent</title><link rel="stylesheet" href="/remote.css"><script src="/remote.js" defer></script><style>
-.site-nav{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px clamp(16px,3vw,36px);background:#101928;border-bottom:1px solid #2c3c53;font-family:Segoe UI,Arial,sans-serif}
-.site-nav .site-brand{color:#eef4ff;font-size:16px;font-weight:700;text-decoration:none}
-.site-nav .site-links{display:flex;gap:6px;flex-wrap:wrap}
-.site-nav .site-links a{display:block;padding:10px 14px;border:1px solid transparent;border-radius:8px;color:#acbbd6;text-decoration:none;font-size:14px;line-height:1.4}
-.site-nav .site-links a:hover{background:#23354d;color:#fff}
-.site-nav .site-links a[aria-current=page]{background:#173b3c;border-color:#287266;color:#8be2d0}
-.site-nav a:focus-visible{outline:2px solid #8be2d0;outline-offset:3px}
-@media(max-width:550px){.site-nav{gap:10px}.site-nav .site-links{width:100%}.site-nav .site-links a{padding:10px;font-size:13px}}
-</style>
-<script src="/issues.js" defer></script>
-</head>
-<body>
-<nav class="site-nav" aria-label="Điều hướng chính"><a class="site-brand" href="/">Workflow Studio</a><div class="site-links"><a href="/">Kịch bản</a><a href="/content">Quản lý nội dung</a><a href="/remote" aria-current="page">Remote Control</a><a href="/scanner">Scan YouTube</a></div></nav><main class="shell"><header><div><span class="eyebrow">Local Agent / Thiết bị này</span><h1>Kết nối điều khiển từ xa</h1><small>Chỉ tài khoản bạn xác nhận mới có quyền chạy kịch bản được cấp phép.</small></div></header>
-<div id="message" role="status" class="notice" hidden></div>
-<div class="two"><section><div class="panel"><h2>Kết nối VPS</h2><div id="connection" class="muted">Đang đọc trạng thái…</div><form id="pair-form"><label>Địa chỉ web điều khiển<input name="url" type="url" placeholder="https://control.example.com" required></label><label>Tên máy hiển thị<input name="name" required maxlength="80" placeholder="Máy đăng Reels văn phòng"></label><button type="submit" class="primary">Tạo mã ghép nối</button></form>
-<div id="pending" hidden><p>Đăng nhập web VPS và nhập mã sau:</p><code id="code" class="code"></code><small id="expires"></small><p id="claim"></p><button id="approve" class="primary" hidden>Đồng ý cho tài khoản này kết nối</button></div><p><button id="disconnect" class="danger" hidden>Ngắt kết nối / hủy ghép nối</button></p></div>
-<div class="panel subtle"><h2>Máy local giữ quyền kiểm soát</h2><p class="muted">Chỉ cấp quyền cho profile và kịch bản cần dùng. Tài khoản ghép nối có thể xem và quản lý tác vụ local của các profile và kịch bản đã cấp quyền. Mặc định tài khoản remote không được thay giá trị biến. Không gửi file video, mật khẩu hay cấu hình MongoDB lên VPS.</p><small>Để chạy bước trên website, Chrome profile và extension phải hoạt động. Sau khi lưu quyền, VPS nhận thay đổi ở lần kết nối kế tiếp. Khi ngắt kết nối, các lượt chạy remote sẽ được dừng.</small></div></section>
-<section><form id="policy-form" class="panel"><h2>Quyền điều khiển trên máy này</h2><h3>Chrome profiles</h3><div id="profiles" class="choice-list"></div><h3>Kịch bản được phép chạy</h3><div id="scenarios" class="choice-list"></div><p><button class="primary" type="submit">Lưu quyền điều khiển</button></p><small>Thay đổi nội dung JSON local sẽ áp dụng cho lần chạy kế tiếp của kịch bản được cấp quyền.</small></form></section></div>
-<footer>Kết nối chủ động ra VPS · Không mở cổng 34719 ra Internet</footer></main></body></html>
+<!-- Generated from dashboard/src by npm run build:dashboard -->
+<html lang="vi"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><meta name="local-agent-session" content="__LOCAL_AGENT_DASHBOARD_TOKEN__"/><title></title><link rel="stylesheet" href="/remote.css"/><style>:root {
+  --canvas: #0e151c;
+  --panel: #151f29;
+  --line: #344351;
+  --text: #edf3f5;
+  --dim: #adc0cc;
+  --accent: #78e1c6;
+  --gutter: clamp(14px, 3vw, 38px);
+}
+.workspace {
+  margin: 0;
+  min-height: 100vh;
+  font: 15px/1.5 "Segoe UI", system-ui, sans-serif;
+  color: var(--text);
+  background: var(--canvas);
+  color-scheme: dark;
+}
+.workspace *, .workspace *::before, .workspace *::after { box-sizing: border-box }
+.workspace .site-nav { margin:0; padding:0; background:#101a22; border-bottom:1px solid var(--line) }
+.nav-inner, .workspace main.shell, .workspace main.main {
+  width:100%; max-width:1240px; margin-inline:auto; padding-inline:var(--gutter);
+}
+.nav-inner { display:flex; flex-wrap:wrap; align-items:center; gap:12px 32px; padding-block:12px }
+.workspace .site-brand { display:inline-flex; align-items:center; gap:10px; font-size:17px; font-weight:700; color:var(--text); text-decoration:none }
+.site-brand i { width:24px; height:24px; border:6px double var(--accent); border-radius:7px; transform:rotate(-8deg) }
+.workspace .site-links { display:flex; flex-wrap:wrap; gap:4px }
+.workspace .site-links a { color:var(--dim); padding:7px 12px; border-radius:7px; text-decoration:none; font-size:14px; font-weight:600 }
+.workspace .site-links a:hover { color:white; background:#24333c }
+.workspace .site-links a[aria-current=page] { background:#193e39; color:#96f1d8 }
+.workspace main.shell,.workspace main.main { padding-block:clamp(16px,3vw,32px) 48px }
+.workspace .page-heading { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px 20px; margin:0 0 18px; padding:0 0 16px; border-bottom:1px solid var(--line) }
+.workspace .page-heading h1 { margin:0; font-size:clamp(25px,3vw,34px); line-height:1.2; letter-spacing:-.035em }
+.workspace .page-heading p { margin:5px 0 0; color:var(--dim) }
+.workspace :is(.panel,.editor,.toolbar,.connection,.metric,.variables,.progress) { background:var(--panel); border:1px solid var(--line); border-radius:12px; box-shadow:none }
+.workspace .dashboard-field { display:grid; align-content:start; gap:4px; min-width:0; font-size:13px; font-weight:600; color:var(--dim) }
+.workspace :is(input,select,textarea) { min-width:0; max-width:100%; font-family:inherit }
+.workspace :is(button,a,input,select,summary,textarea):focus-visible { outline:2px solid var(--accent); outline-offset:2px }
+.workspace main :is(input:not([type=checkbox]),select,textarea) { color:var(--text); background:#0c161f; border:1px solid #435563; border-radius:7px; font-size:14px }
+.workspace main button { font-family:inherit }
+.workspace .primary,.workspace .btn.success { background:#17664f; color:white; border-color:#37856e }
+.workspace .danger,.workspace .btn.danger { background:#65343f; color:#fff0f2; border-color:#97515f }
+.workspace.index .shell > .toolbar { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); padding:16px; gap:12px 24px }
+.tool-group,.run-actions { display:flex; align-items:end; flex-wrap:wrap; gap:6px }
+.tool-group label { flex:1 1 160px; min-width:0 }
+.workspace .tool-group :is(select,input) { width:100% }
+.run-actions { grid-column:1/-1; justify-content:flex-end; padding-top:10px; border-top:1px solid var(--line) }
+.workspace.index .editor { margin:16px 0 }
+.workspace.index .editor-head { align-items:end }
+.workspace.index .editor-head > div { flex:1 1 280px }
+.workspace.index .editor-head :is(input,select) { width:min(100%,280px) }
+.workspace.index .editor .two { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-block:12px }
+.workspace.scanner .scanner-editor { grid-template-columns: minmax(0,1.1fr) minmax(0,.9fr) }
+.workspace.scanner .scanner-thresholds { grid-template-columns:repeat(auto-fit,minmax(min(100%,9rem),1fr)) }
+.workspace.scanner .scanner-thresholds input { width:100% }
+.workspace .two > *, .workspace .tool-group > * { min-width:0 }
+.workspace.remote .two { align-items:start }
+.workspace.remote .panel label { margin-block:10px }
+.workspace.content .metric strong { color:var(--accent) }
+.workspace.content .main { min-height:0 }
+@media(max-width:720px) {
+  .nav-inner { gap:8px; padding-block:10px; align-items:start; flex-direction:column }
+  .workspace .site-links { width:100%; gap:2px }
+  .workspace .site-links a { padding:6px 8px; font-size:13px }
+  .workspace.index .shell > .toolbar,.workspace.scanner .scanner-editor,.workspace.index .editor .two { grid-template-columns:minmax(0,1fr) }
+  .workspace.index .editor-head { display:grid; grid-template-columns:minmax(0,1fr); align-items:start }
+  .workspace.index .editor-head :is(input,select) { width:100% }
+  .workspace .page-heading { margin-bottom:12px }
+  .workspace .run-actions { justify-content:flex-start }
+}
+.workspace.scanner :is(#config,#keywordForm) fieldset.editor-fields { display:grid; gap:10px; min-width:0; padding:0; margin:0 0 12px; border:0 }
+</style><script defer="" src="/remote.js"></script><script defer="" src="/issues.js"></script></head><body class="workspace remote"><nav class="site-nav" aria-label="Điều hướng chính"><div class="nav-inner"><a class="site-brand" href="/"><i aria-hidden="true"></i>Workflow Studio</a><div class="site-links"><a href="/">Kịch bản</a><a href="/content">Quản lý nội dung</a><a href="/remote" aria-current="page">Remote Control</a><a href="/scanner">Scan YouTube</a></div></div></nav><main class="shell"><header class="page-heading"><div><h1>Điều khiển từ xa</h1><p>Ghép nối tài khoản và cấp quyền chạy kịch bản cho từng profile.</p></div></header><div id="message" role="status" class="notice" hidden=""></div><div class="two"><section><div class="panel"><h2>Kết nối VPS</h2><div id="connection" class="muted">Đang đọc trạng thái…</div><form id="pair-form"><label class="dashboard-field">Địa chỉ web điều khiển<input type="url" placeholder="https://control.example.com" required="" name="url"/></label><label class="dashboard-field">Tên máy hiển thị<input required="" maxLength="80" placeholder="Máy đăng Reels văn phòng" name="name"/></label><button type="submit" class="primary">Tạo mã ghép nối</button></form><div id="pending" hidden=""><p>Đăng nhập web VPS và nhập mã sau:</p><code id="code" class="code"></code><small id="expires"></small><p id="claim"></p><button id="approve" class="primary" hidden="">Đồng ý cho tài khoản này kết nối</button></div><p><button id="disconnect" class="danger" hidden="">Ngắt kết nối / hủy ghép nối</button></p></div><div class="panel subtle"><h2>Máy local giữ quyền kiểm soát</h2><p class="muted">Chỉ cấp quyền cho profile và kịch bản cần dùng. Tài khoản ghép nối có thể xem và quản lý tác vụ local của các profile và kịch bản đã cấp quyền. Mặc định tài khoản remote không được thay giá trị biến. Không gửi file video, mật khẩu hay cấu hình MongoDB lên VPS.</p><small>Để chạy bước trên website, Chrome profile và extension phải hoạt động. Sau khi lưu quyền, VPS nhận thay đổi ở lần kết nối kế tiếp. Khi ngắt kết nối, các lượt chạy remote sẽ được dừng.</small></div></section><section><form id="policy-form" class="panel"><h2>Quyền điều khiển trên máy này</h2><h3>Chrome profiles</h3><div id="profiles" class="choice-list"></div><h3>Kịch bản được phép chạy</h3><div id="scenarios" class="choice-list"></div><p><button class="primary" type="submit">Lưu quyền điều khiển</button></p><small>Thay đổi nội dung JSON local sẽ áp dụng cho lần chạy kế tiếp của kịch bản được cấp quyền.</small></form></section></div><footer>Kết nối chủ động ra VPS · Không mở cổng 34719 ra Internet</footer></main></body></html>

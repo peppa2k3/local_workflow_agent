@@ -21,3 +21,9 @@ Checkout cũ tiếp tục nhận launcher `node local-agent.js`, scenario, công
 - Chạy từ terminal, truyền biến/file, theo dõi và hủy theo run ID. [CLI và HTTP API](docs/AUTOMATION_API.md)
 - Điều kiện nhận video, quota, retry và định dạng nhóm từ khóa. [Scanner](docs/SCANNER.md)
 - Lịch sử, cache và schema nội dung dùng chung. [Storage](docs/ACTIVITY_STORAGE.md) · [MongoDB Atlas](docs/MONGODB_ATLAS.md)
+
+### Phát triển giao diện dashboard
+
+Bốn màn hình dùng chung điều hướng, tiêu đề, trường nhập và bộ style trong `dashboard/src`. Sửa component từng màn hình tại `dashboard/src/pages`. Vite build giao diện React thành HTML phục vụ trực tiếp bởi local agent. Biểu mẫu Scanner dùng React trong trình duyệt. Các bộ điều khiển hiện có xử lý workflow, nội dung, remote và danh sách kết quả.
+
+Từ thư mục `local-workflow-agent`, chạy `npm --prefix dashboard ci` để cài công cụ build, sau đó chạy `npm run build:dashboard` khi sửa nguồn. Commit cả nguồn và tài nguyên đã build trong `dashboard/`. Chạy agent như bình thường để xem thay đổi.

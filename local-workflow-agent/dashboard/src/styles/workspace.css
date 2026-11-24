@@ -1,0 +1,70 @@
+:root {
+  --canvas: #0e151c;
+  --panel: #151f29;
+  --line: #344351;
+  --text: #edf3f5;
+  --dim: #adc0cc;
+  --accent: #78e1c6;
+  --gutter: clamp(14px, 3vw, 38px);
+}
+.workspace {
+  margin: 0;
+  min-height: 100vh;
+  font: 15px/1.5 "Segoe UI", system-ui, sans-serif;
+  color: var(--text);
+  background: var(--canvas);
+  color-scheme: dark;
+}
+.workspace *, .workspace *::before, .workspace *::after { box-sizing: border-box }
+.workspace .site-nav { margin:0; padding:0; background:#101a22; border-bottom:1px solid var(--line) }
+.nav-inner, .workspace main.shell, .workspace main.main {
+  width:100%; max-width:1240px; margin-inline:auto; padding-inline:var(--gutter);
+}
+.nav-inner { display:flex; flex-wrap:wrap; align-items:center; gap:12px 32px; padding-block:12px }
+.workspace .site-brand { display:inline-flex; align-items:center; gap:10px; font-size:17px; font-weight:700; color:var(--text); text-decoration:none }
+.site-brand i { width:24px; height:24px; border:6px double var(--accent); border-radius:7px; transform:rotate(-8deg) }
+.workspace .site-links { display:flex; flex-wrap:wrap; gap:4px }
+.workspace .site-links a { color:var(--dim); padding:7px 12px; border-radius:7px; text-decoration:none; font-size:14px; font-weight:600 }
+.workspace .site-links a:hover { color:white; background:#24333c }
+.workspace .site-links a[aria-current=page] { background:#193e39; color:#96f1d8 }
+.workspace main.shell,.workspace main.main { padding-block:clamp(16px,3vw,32px) 48px }
+.workspace .page-heading { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px 20px; margin:0 0 18px; padding:0 0 16px; border-bottom:1px solid var(--line) }
+.workspace .page-heading h1 { margin:0; font-size:clamp(25px,3vw,34px); line-height:1.2; letter-spacing:-.035em }
+.workspace .page-heading p { margin:5px 0 0; color:var(--dim) }
+.workspace :is(.panel,.editor,.toolbar,.connection,.metric,.variables,.progress) { background:var(--panel); border:1px solid var(--line); border-radius:12px; box-shadow:none }
+.workspace .dashboard-field { display:grid; align-content:start; gap:4px; min-width:0; font-size:13px; font-weight:600; color:var(--dim) }
+.workspace :is(input,select,textarea) { min-width:0; max-width:100%; font-family:inherit }
+.workspace :is(button,a,input,select,summary,textarea):focus-visible { outline:2px solid var(--accent); outline-offset:2px }
+.workspace main :is(input:not([type=checkbox]),select,textarea) { color:var(--text); background:#0c161f; border:1px solid #435563; border-radius:7px; font-size:14px }
+.workspace main button { font-family:inherit }
+.workspace .primary,.workspace .btn.success { background:#17664f; color:white; border-color:#37856e }
+.workspace .danger,.workspace .btn.danger { background:#65343f; color:#fff0f2; border-color:#97515f }
+.workspace.index .shell > .toolbar { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); padding:16px; gap:12px 24px }
+.tool-group,.run-actions { display:flex; align-items:end; flex-wrap:wrap; gap:6px }
+.tool-group label { flex:1 1 160px; min-width:0 }
+.workspace .tool-group :is(select,input) { width:100% }
+.run-actions { grid-column:1/-1; justify-content:flex-end; padding-top:10px; border-top:1px solid var(--line) }
+.workspace.index .editor { margin:16px 0 }
+.workspace.index .editor-head { align-items:end }
+.workspace.index .editor-head > div { flex:1 1 280px }
+.workspace.index .editor-head :is(input,select) { width:min(100%,280px) }
+.workspace.index .editor .two { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-block:12px }
+.workspace.scanner .scanner-editor { grid-template-columns: minmax(0,1.1fr) minmax(0,.9fr) }
+.workspace.scanner .scanner-thresholds { grid-template-columns:repeat(auto-fit,minmax(min(100%,9rem),1fr)) }
+.workspace.scanner .scanner-thresholds input { width:100% }
+.workspace .two > *, .workspace .tool-group > * { min-width:0 }
+.workspace.remote .two { align-items:start }
+.workspace.remote .panel label { margin-block:10px }
+.workspace.content .metric strong { color:var(--accent) }
+.workspace.content .main { min-height:0 }
+@media(max-width:720px) {
+  .nav-inner { gap:8px; padding-block:10px; align-items:start; flex-direction:column }
+  .workspace .site-links { width:100%; gap:2px }
+  .workspace .site-links a { padding:6px 8px; font-size:13px }
+  .workspace.index .shell > .toolbar,.workspace.scanner .scanner-editor,.workspace.index .editor .two { grid-template-columns:minmax(0,1fr) }
+  .workspace.index .editor-head { display:grid; grid-template-columns:minmax(0,1fr); align-items:start }
+  .workspace.index .editor-head :is(input,select) { width:100% }
+  .workspace .page-heading { margin-bottom:12px }
+  .workspace .run-actions { justify-content:flex-start }
+}
+.workspace.scanner :is(#config,#keywordForm) fieldset.editor-fields { display:grid; gap:10px; min-width:0; padding:0; margin:0 0 12px; border:0 }
