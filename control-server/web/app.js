@@ -2,8 +2,13 @@
   const $ = id => document.getElementById(id);
   let csrf = '', selected = '', devices = [], busy = false, timer, formSignature = '', historySignature = '', runIntent = null;
   let clipSelections = {}, closeClipPicker;
+  const historyPageSize = 8, historyPages = new Map();
+  let historyCommands = [];
   const stateName = { scheduled: 'Đã lên lịch', confirming: 'Chờ xác nhận', approved: 'Đã xác nhận', pending: 'Chờ thực hiện', queued: 'Đang đợi', dispatched: 'Đã gửi tới máy', running: 'Đang chạy', succeeded: 'Thành công', failed: 'Thất bại', cancelled: 'Đã dừng',
     interrupted: 'Bị gián đoạn', unknown: 'Chưa rõ kết quả — kiểm tra máy local', expired: 'Hết hạn', rejected: 'Máy local từ chối' };
+  const historyTone = { succeeded: 'success', failed: 'failure', rejected: 'failure', running: 'active', dispatched: 'active',
+    queued: 'pending', pending: 'pending', scheduled: 'pending', confirming: 'pending', approved: 'pending',
+    interrupted: 'pending', expired: 'pending', unknown: 'pending' };
   const when = n => n ? new Date(n).toLocaleString('vi-VN') : 'Chưa nhận heartbeat';
   function el(tag, text, className) { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (className) n.className = className; return n; }
   function editScheduleTime(timestamp, save) {
@@ -118,7 +123,11 @@
     const value = await r.json();
     if (!r.ok) { if (r.status === 401) loginView(); throw Error(value.error || 'Yêu cầu thất bại'); } return value;
   }
-  function loginView() { closeClipPicker?.(); closeDownloadPrompt(); submittedDownload = null; csrf = ''; selected = ''; devices = []; formSignature = ''; historySignature = ''; runIntent = null; $('history').replaceChildren(); clearTimeout(timer); $('workspace').hidden = true; $('account').hidden = true; $('login').hidden = false; }
+  function loginView() {
+    closeClipPicker?.(); closeDownloadPrompt(); submittedDownload = null; csrf = ''; selected = ''; devices = []; formSignature = ''; runIntent = null;
+    historyPages.clear(); reportedResults.clear(); resetHistory();
+    clearTimeout(timer); $('workspace').hidden = true; $('account').hidden = true; $('login').hidden = false;
+  }
   function accountView(value) { csrf = value.csrf; $('email').textContent = value.email; $('account').hidden = false; $('login').hidden = true; $('workspace').hidden = false; }
   function options(target, items, valueKey, labelKey) { const old = target.value; target.replaceChildren(...items.map(item => { const n = el('option', item[labelKey]); n.value = item[valueKey]; return n; })); if (items.some(i => i[valueKey] === old)) target.value = old; }
   function clipPicker(scenario, target, choose) {
@@ -199,7 +208,14 @@
     $('devices').replaceChildren(...devices.map(d => {
       const n = el('button', undefined, 'device' + (d.id === selected ? ' selected' : ''));
       n.append(el('strong', d.name), el('span', d.revoked ? 'Đã thu hồi' : d.online ? 'Online' : 'Offline', 'badge ' + (d.online ? 'online' : 'offline')));
-      n.addEventListener('click', () => { if (selected !== d.id) closeDownloadPrompt(); selected = d.id; formSignature = ''; historySignature = ''; runIntent = null; void refresh(); }); return n;
+      n.addEventListener('click', () => {
+        if (selected !== d.id) {
+          closeDownloadPrompt(); selected = d.id; formSignature = ''; runIntent = null;
+          resetHistory('Đang tải lịch sử…'); renderDevices(); renderDetail();
+        }
+        void refresh();
+      });
+      return n;
     }));
     if (!devices.length) $('devices').append(el('p', 'Chưa ghép thiết bị nào.', 'muted'));
   }
@@ -270,18 +286,62 @@
     renderList('local-running', tasks.filter(task => task.state === 'running'), 'Chưa có lượt chạy local.');
     renderList('local-schedules', tasks.filter(task => task.state !== 'running'), 'Chưa có lịch local đang chờ.');
   }
-  function renderHistory(commands, deviceId) {
-    const signature = JSON.stringify(commands); if (historySignature === signature) return; historySignature = signature;
+  function resetHistory(message) {
+    historyCommands = []; historySignature = '';
+    $('history').replaceChildren(...(message ? [el('p', message, 'history-empty')] : []));
+    $('history-pagination').hidden = true;
+  }
+  function updateHistory(commands, deviceId) {
     const previousResults = reportedResults.get(deviceId);
-    // The first response is saved history. Only later results are new notifications.
-    reportedResults.set(deviceId, new Set(commands.filter(cmd => cmd.result?.message).map(cmd => cmd.id)));
-    const open = new Set([...$('history').querySelectorAll('details[open]')].map(n => n.dataset.id));
-    $('history').replaceChildren(...commands.map(cmd => {
-      const n = el('article', undefined, 'run'), row = el('div', undefined, 'row');
-      row.append(el('span', stateName[cmd.state] || cmd.state, 'badge'), el('small', when(cmd.created))); n.append(row);
-      n.append(el('h3', cmd.type === 'run' ? `${cmd.payload.scenario} · ${cmd.payload.profile}` : cmd.type === 'manageLocalTask' ? `Yêu cầu quản lý tác vụ local · ${cmd.payload.scenario}` : 'Yêu cầu dừng tác vụ'));
-      n.append(el('small', `ID: ${cmd.id}`));
-      if (cmd.payload.scheduledAt) n.append(el('p', 'Giờ đã đặt: ' + when(cmd.payload.scheduledAt)));
+    const withResults = commands.filter(cmd => cmd.result?.message);
+    reportedResults.set(deviceId, new Set(withResults.map(cmd => cmd.id)));
+    if (previousResults) for (const cmd of withResults) {
+      if (!previousResults.has(cmd.id)) popup(`${cmd.payload.scenario || cmd.type}: ${cmd.result.message}`, true);
+    }
+    historyCommands = [...commands].sort((a, b) => b.created - a.created);
+    renderHistory(deviceId);
+  }
+  function renderHistory(deviceId) {
+    const total = historyCommands.length;
+    const pages = Math.ceil(total / historyPageSize);
+    const page = Math.max(0, Math.min(historyPages.get(deviceId) ?? 0, pages - 1));
+    historyPages.set(deviceId, page);
+    const start = page * historyPageSize;
+    const visible = historyCommands.slice(start, start + historyPageSize);
+    const pageLabel = total ? `Trang ${page + 1}/${pages} · ${start + 1}–${start + visible.length}/${total} lệnh` : '';
+    if ($('history-page').textContent !== pageLabel) $('history-page').textContent = pageLabel;
+    $('history-pagination').hidden = pages <= 1;
+    $('history-prev').disabled = page === 0;
+    $('history-next').disabled = page >= pages - 1;
+
+    const signature = JSON.stringify(visible);
+    if (historySignature === signature) return;
+    historySignature = signature;
+    const open = new Set([...$('history').querySelectorAll('details[data-id][open]')].map(n => n.dataset.id));
+    $('history').replaceChildren(...visible.map(cmd => {
+      const tone = historyTone[cmd.state] || 'neutral';
+      const n = el('article', undefined, `run history-task history-task--${tone}`);
+      const heading = el('div', undefined, 'history-task-heading');
+      const title = el('div');
+      const action = cmd.type === 'manageLocalTask' ? 'Yêu cầu quản lý tác vụ local' : 'Yêu cầu dừng tác vụ';
+      title.append(el('h3', cmd.payload.scenario || action));
+      if (cmd.payload.profile) title.append(el('p', `Profile · ${cmd.payload.profile}`, 'history-profile'));
+      if (cmd.type !== 'run' && cmd.payload.scenario) title.append(el('small', action));
+      heading.append(title, el('span', stateName[cmd.state] || cmd.state, 'badge history-status'));
+      n.append(heading);
+
+      const result = cmd.result;
+      const times = el('dl', undefined, 'history-times');
+      for (const [label, timestamp] of [['Tạo lệnh', cmd.created], ['Giờ đã đặt', cmd.payload.scheduledAt],
+        ['Bắt đầu', result?.startedAt], ['Kết thúc', result?.endedAt]]) {
+        const date = new Date(timestamp);
+        if (!Number.isFinite(timestamp) || !Number.isFinite(date.getTime())) continue;
+        const field = el('div'), time = el('time', date.toLocaleString('vi-VN'));
+        time.dateTime = date.toISOString();
+        const value = el('dd'); value.append(time);
+        field.append(el('dt', label), value); times.append(field);
+      }
+      n.append(times);
       if (cmd.state === 'scheduled') {
         const cancel = el('button', 'Hủy lịch');
         cancel.onclick = () => submit(cancel, async () => {
@@ -293,46 +353,58 @@
           await refresh();
         })));
       }
-      const result = cmd.result;
-      if (result?.startedAt) n.append(el('p', `Bắt đầu: ${when(result.startedAt)}${result.endedAt ? ' · Kết thúc: ' + when(result.endedAt) : ''}`, 'muted'));
-      if (result?.total) { const progress = el('progress'); progress.max = result.total; progress.value = cmd.state === 'succeeded' ? result.total : result.index;
-        n.append(el('p', result.stoppedAtStep ? `Dừng tại bước ${result.stoppedAtStep}/${result.total}` : `Tiến độ: ${Math.min(result.index + 1, result.total)}/${result.total}`), progress); }
-      if (result?.message) {
-        n.append(el('p', result.message, 'muted'));
-        if (previousResults && !previousResults.has(cmd.id)) {
-          popup(`${cmd.payload.scenario || cmd.type}: ${result.message}`, true);
-        }
+      if (result?.total) {
+        const step = cmd.state === 'succeeded' ? result.total : Math.min(result.index + 1, result.total);
+        const label = result.stoppedAtStep ? `Dừng tại bước ${result.stoppedAtStep}/${result.total}` : `Tiến độ ${step}/${result.total}`;
+        const progress = el('progress'); progress.max = result.total; progress.value = cmd.state === 'succeeded' ? result.total : result.index;
+        progress.setAttribute('aria-label', label);
+        n.append(el('p', label, 'history-progress'), progress);
       }
-      if (result?.steps?.length) { const details = el('details'), list = el('ol'); details.dataset.id = cmd.id; details.open = open.has(cmd.id);
-        details.append(el('summary', 'Chi tiết từng bước')); list.append(...result.steps.map(s => el('li', `${s.label || s.action} — ${stateName[s.state] || s.state}`))); details.append(list); n.append(details); }
+      if (result?.message) n.append(el('p', result.message, 'history-result'));
+      const details = el('details', undefined, 'history-details');
+      details.dataset.id = cmd.id; details.open = open.has(cmd.id);
+      details.append(el('summary', result?.steps?.length ? 'Chi tiết từng bước' : 'Chi tiết lệnh'), el('small', `ID · ${cmd.id}`));
+      if (result?.steps?.length) {
+        const list = el('ol');
+        list.append(...result.steps.map(s => el('li', `${s.label || s.action} — ${stateName[s.state] || s.state}`)));
+        details.append(list);
+      }
+      n.append(details);
       if (cmd.type === 'run' && ['queued', 'dispatched', 'running', 'unknown'].includes(cmd.state)) {
         const stop = el('button', 'Dừng lượt này', 'danger'); stop.addEventListener('click', () => submit(stop, async () => {
-          await api('/api/commands', { requestId: crypto.randomUUID(), deviceId: selected, type: 'stop', runId: cmd.id }); message('Đã gửi lệnh dừng.'); await refresh();
+          await api('/api/commands', { requestId: crypto.randomUUID(), deviceId, type: 'stop', runId: cmd.id }); message('Đã gửi lệnh dừng.'); await refresh();
         })); n.append(stop);
       }
       return n;
     }));
-    if (!commands.length) $('history').append(el('p', 'Chưa có lệnh điều khiển.', 'muted'));
+    if (!total) $('history').append(el('p', 'Chưa có lệnh điều khiển.', 'history-empty'));
   }
   async function refresh() {
     if (busy || !csrf || document.hidden) return; busy = true; clearTimeout(timer);
+    let deviceId = selected;
     try { devices = (await api('/api/devices')).devices; renderDevices(); renderDetail();
-      const deviceId = selected;
+      deviceId = selected;
       if (deviceId) {
         const { commands } = await api(`/api/commands?device=${encodeURIComponent(deviceId)}`);
         if (selected === deviceId) {
           showDownloadConfirmation(commands, deviceId);
-          renderHistory(commands, deviceId);
+          updateHistory(commands, deviceId);
         }
       }
     } catch (e) { message(e.message, true); }
-    finally { busy = false; if (csrf) timer = setTimeout(refresh, 5000); }
+    finally { busy = false; if (csrf) timer = setTimeout(refresh, deviceId === selected ? 5000 : 0); }
   }
   async function submit(button, fn) { button.disabled = true; try { await fn(); } catch (e) { message(e.message, true); } finally { button.disabled = false; if (csrf && ['run', 'schedule-create', 'revoke'].includes(button.id)) renderDetail(); } }
   $('login-form').addEventListener('submit', event => { event.preventDefault(); void submit(event.submitter, async () => {
     const form = new FormData(event.target); accountView(await api('/api/login', Object.fromEntries(form))); event.target.reset(); message(''); await refresh();
   }); });
   $('logout').addEventListener('click', () => submit($('logout'), async () => { await api('/api/logout', {}); loginView(); message('Đã đăng xuất.'); }));
+  for (const [id, offset] of [['history-prev', -1], ['history-next', 1]]) {
+    $(id).addEventListener('click', () => {
+      historyPages.set(selected, historyPages.get(selected) + offset);
+      renderHistory(selected);
+    });
+  }
   $('pair-form').addEventListener('submit', event => { event.preventDefault(); void submit(event.submitter, async () => {
     const value = await api('/api/pair-claim', { code: new FormData(event.target).get('code') }); event.target.reset(); message(`Đã nhận mã của ${value.name}. Hãy xác nhận tài khoản trên máy local trước ${when(value.expires)}.`); await refresh();
   }); });

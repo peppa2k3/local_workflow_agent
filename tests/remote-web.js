@@ -31,6 +31,8 @@ const { chromium } = require('playwright');
     await navigation.close();
     page.on('pageerror', e => errors.push(e.message));
     const id = 'e43c8711-3731-4daa-9725-6721f78f1039';
+    const otherId = '227ba0f3-8a00-4f33-9958-73399556cf14';
+    const historyFixtures = new Map();
     const target = 'a'.repeat(64), uploadTarget = 'b'.repeat(64), clip = 'Clip tiếng Việt.mp4';
     let loggedIn = false, online = true, downloadConfirmation, scheduledRun;
     await page.route('https://control.test/**', async route => {
@@ -45,7 +47,8 @@ const { chromium } = require('playwright');
           { id: target, profile: 'Default', scenario: 'sample', state: 'scheduled', scheduledAt: Date.now() + 600000 }
         ] }, metadata: { network: { downloadMbps: 8.25, uploadMbps: 1.75 },
         profiles: [{ directory: 'Default', name: 'Test', extensionConnected: true }], scenarios: [{ name: 'sample', variables: ['caption'], steps: 2,
-          clipTargets: [{ id: target, index: 0, action: 'downloadVideo', variable: 'caption' }, { id: uploadTarget, index: 1, action: 'upload' }] }] } }] } });
+          clipTargets: [{ id: target, index: 0, action: 'downloadVideo', variable: 'caption' }, { id: uploadTarget, index: 1, action: 'upload' }] }] } },
+        ...(historyFixtures.has(otherId) ? [{ id: otherId, name: 'Máy còn lại', online, metadata: {} }] : [])] } });
       if (url.pathname === '/api/commands' && url.searchParams.has('request')) return route.fulfill({ json: { commands: [{ state: 'succeeded', result: { clips: { names: [clip], more: false } } }] } });
       if (url.pathname === '/api/schedule-decision') {
         scheduledRun = null;
@@ -54,6 +57,9 @@ const { chromium } = require('playwright');
       if (url.pathname === '/api/commands' && req.method() === 'POST' && req.postDataJSON().scheduledAt) {
         scheduledRun = req.postDataJSON();
         return route.fulfill({ json: { command: { id: scheduledRun.requestId } } });
+      }
+      if (url.pathname === '/api/commands' && req.method() === 'GET' && historyFixtures.has(url.searchParams.get('device'))) {
+        return route.fulfill({ json: { commands: historyFixtures.get(url.searchParams.get('device')) } });
       }
       if (url.pathname === '/api/commands' && scheduledRun) return route.fulfill({ json: { commands: [{
         id: scheduledRun.requestId, type: 'run', state: 'confirming', payload: scheduledRun,
@@ -120,6 +126,57 @@ const { chromium } = require('playwright');
     assert(scheduledRequest.scheduledAt > Date.now() + 13 * 60000);
     assert.equal(scheduledRequest.profile, 'Default');
     assert.equal(posted.find(p => p.path === '/api/schedule-decision').data.runId, scheduledRequest.requestId);
+
+    const now = Date.now();
+    const commands = Array.from({ length: 19 }, (_, i) => ({ id: `task-${i + 1}`, type: 'run',
+      created: now - i * 60000, state: i % 2 ? 'failed' : 'succeeded',
+      payload: { scenario: `Scenario ${i + 1}`, profile: `Profile ${i + 1}` },
+      result: { startedAt: now - i * 60000 + 1000, endedAt: now - i * 60000 + 2000 } }));
+    historyFixtures.set(id, [...commands].reverse());
+    historyFixtures.set(otherId, []);
+    await page.reload();
+    await page.locator('.device').first().click();
+    await page.getByText('Trang 1/3 · 1–8/19 lệnh', { exact: true }).waitFor();
+    const history = page.locator('#history'), titles = history.locator('h3');
+    const prev = page.locator('#history-prev'), next = page.locator('#history-next');
+    assert.deepEqual(await titles.allTextContents(), commands.slice(0, 8).map(cmd => cmd.payload.scenario));
+    assert(await prev.isDisabled());
+    assert.equal(await history.locator('.history-task--success .history-status').first().textContent(), 'Thành công');
+    assert.equal(await history.locator('.history-task--failure .history-status').first().textContent(), 'Thất bại');
+    assert.equal(await history.locator('.history-profile').first().textContent(), 'Profile · Profile 1');
+    assert.deepEqual(await history.locator('article').first().locator('dt').allTextContents(), ['Tạo lệnh', 'Bắt đầu', 'Kết thúc']);
+    assert.equal(await history.locator('time').first().getAttribute('datetime'), new Date(now).toISOString());
+    await next.click();
+    assert.deepEqual(await titles.allTextContents(), commands.slice(8, 16).map(cmd => cmd.payload.scenario));
+    await next.click();
+    assert.deepEqual(await titles.allTextContents(), commands.slice(16).map(cmd => cmd.payload.scenario));
+    assert(await next.isDisabled());
+    await prev.click();
+
+    // Keep page 2 during refresh and still notify about a result from page 1.
+    commands[0].result.message = 'Kết quả mới ngoài trang';
+    await page.locator('.device').first().click();
+    await taskNotice.getByText('Scenario 1: Kết quả mới ngoài trang').waitFor();
+    await taskNotice.getByRole('button', { name: 'Đã hiểu' }).click();
+    assert.equal(await page.locator('#history-page').textContent(), 'Trang 2/3 · 9–16/19 lệnh');
+    assert.equal(await history.getByText('Kết quả mới ngoài trang').count(), 0);
+
+    await page.getByRole('button', { name: /Máy còn lại/ }).click();
+    await history.getByText('Chưa có lệnh điều khiển.').waitFor();
+    assert(await page.locator('#history-pagination').isHidden());
+    await page.locator('.device').first().click();
+    await history.getByRole('heading', { name: 'Scenario 9', exact: true }).waitFor();
+    assert.equal(await page.locator('#history-page').textContent(), 'Trang 2/3 · 9–16/19 lệnh');
+    for (const width of [320, 390, 1280]) {
+      await page.setViewportSize({ width, height: 844 });
+      assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    }
+    historyFixtures.set(id, commands.slice(0, 5));
+    await page.locator('.device').first().click();
+    await history.getByRole('heading', { name: 'Scenario 1', exact: true }).waitFor();
+    assert.equal(await titles.count(), 5);
+    assert(await page.locator('#history-pagination').isHidden());
+
     // Local approval UI uses its session header and explicit claim, with fake state only.
     const state = { configured: false, url: 'https://control.test', policy: { profiles: [], scenarios: [], variables: {} }, pending: { id, code: 'FIXTURECODE1', expires: Date.now() + 60000, email: 'user@example.test', claim: 'fixture-claim' },
       available: { profiles: [{ directory: 'Default', name: 'Fixture' }], scenarios: [{ name: 'sample', variables: ['caption'] }] } };
@@ -145,6 +202,6 @@ const { chromium } = require('playwright');
     await page.locator('#approve').click(); await page.waitForFunction(() => document.getElementById('pending').hidden);
     assert.equal(posted.find(p => p.path.endsWith('/pair-approve')).data.claim, 'fixture-claim');
     assert.deepEqual(errors, []);
-    console.log('remote web: isolated fixture login, XSS-safe rendering, run variables, step history, mobile layout and local consent passed');
+    console.log('remote web: login, run variables, per-device history pagination, off-page results, mobile layout and local consent passed');
   } finally { await browser.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

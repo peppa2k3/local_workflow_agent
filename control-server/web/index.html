@@ -17,7 +17,15 @@
       <h3>Đang chạy</h3><div id="local-running"></div>
       <h3>Đã lên lịch</h3><div id="local-schedules"></div>
     </section>
-    <div class="panel"><div class="row"><h2>Lịch sử điều khiển</h2><small>200 lệnh gần nhất · tự cập nhật</small></div><div id="history"></div></div>
+    <section class="panel history-panel" aria-labelledby="history-title">
+      <div class="history-heading"><h2 id="history-title">Lịch sử điều khiển</h2><small>Mới nhất trước · Tự cập nhật</small></div>
+      <nav id="history-pagination" class="history-pagination" aria-label="Phân trang lịch sử điều khiển" hidden>
+        <button id="history-prev" type="button" aria-controls="history">‹ Trang trước</button>
+        <span id="history-page" role="status"></span>
+        <button id="history-next" type="button" aria-controls="history">Trang sau ›</button>
+      </nav>
+      <div id="history" class="history-list"></div>
+    </section>
   </section></div></div></section>
   <footer>Local Agent Remote · Thiết bị giữ quyền quyết định kịch bản được phép chạy.</footer>
 </main></body></html>
