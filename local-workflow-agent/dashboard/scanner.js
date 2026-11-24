@@ -11,6 +11,41 @@ async function api(name, data) {
 async function action(fn) {
   try { await fn(); } catch (e) { $('feedback').textContent = e.message; }
 }
+const numericFields = ['minViews','minResolution','minDays','maxDays','minutes','requestsPerDay'];
+const kinds = ['subtitles','automatic_captions'];
+const labels = { pending:'Đang chờ gửi', synced:'Đã đồng bộ', reject:'Không đạt', unknown:'Chưa đủ dữ liệu', candidate:'Chờ xét lại' };
+const checkNames = { id:'ID video', keyword:'Từ khóa', views:'Lượt xem', age:'Tuổi video', duration:'Thời lượng',
+  audio:'Âm thanh', resolution:'Độ phân giải', subtitles:'Phụ đề' };
+let currentConfig, results = [];
+async function loadEditor() {
+  const { config, keywords } = await api('settings');
+  currentConfig = config;
+  for (const key of numericFields) $(key).value = config[key] ?? '';
+  $('subtitleLanguages').value = config.subtitleLanguages.join(', ');
+  for (const kind of kinds) $(kind).checked = config.subtitleKinds.includes(kind);
+  $('keywords').value = keywords;
+  for (const id of ['config','keywordForm']) $(id).querySelector('button').disabled = false;
+}
+function editorForm(id, note, part, read) {
+  $(id).onsubmit = async event => {
+    event.preventDefault();
+    const button = $(id).querySelector('button');
+    button.disabled = true;
+    try {
+      await api('settings', { part, value: read() });
+      $(note).textContent = 'Đã lưu. Áp dụng từ lượt quét tiếp theo.';
+    } catch (e) { $(note).textContent = e.message; }
+    finally { button.disabled = false; }
+  };
+}
+editorForm('config','configNote','config', () => {
+  const cfg = { ...currentConfig };
+  for (const key of numericFields) cfg[key] = $(key).valueAsNumber;
+  cfg.subtitleLanguages = $('subtitleLanguages').value.split(',').map(s => s.trim());
+  cfg.subtitleKinds = kinds.filter(kind => $(kind).checked);
+  return cfg;
+});
+editorForm('keywordForm','keywordNote','keywords', () => $('keywords').value);
 async function refresh() {
   if (refreshing || document.hidden) return;
   refreshing = true;
@@ -20,28 +55,50 @@ async function refresh() {
     $('toggle').disabled = false;
     $('toggle').textContent = enabled ? 'Tắt quét' : 'Bật quét';
     $('state').textContent = [s.scanning ? 'Đang quét' : enabled ? 'Đang chờ quét' : 'Đã tắt', s.error, s.syncError,
-      'Request đã dùng: ' + (s.quota?.used || 0) + '/' + (s.config?.requestsPerDay ?? '?')].filter(Boolean).join(' · ');
-    $('settings').textContent = 'Sửa config.json và keywords.txt trong ' + s.directory;
-    $('topics').textContent = s.topics.map(t => t.code + ': ' + t.phrases.join(', ')).join(' | ');
+      'Yêu cầu API đã dùng: ' + (s.quota?.used || 0) + '/' + (s.config?.requestsPerDay ?? '?')].filter(Boolean).join(' · ');
     const next = JSON.stringify(s.rows);
-    if (signature === next) return;
-    signature = next;
-    $('rows').replaceChildren(...s.rows.map(row => {
-      const article = document.createElement('article'), title = document.createElement('h3'), detail = document.createElement('p');
-      title.textContent = row.title || row.video_id;
-      detail.textContent = row.status + ' · ' + Object.entries(row.checks).map(([k,c]) => k + ': ' + c.status + ' (' + c.reason + ')').join(' · ');
-      article.append(title, detail);
-      function button(label, fn) {
-        const b = document.createElement('button'); b.textContent = label;
-        b.onclick = () => action(async () => { b.disabled = true; try { await fn(); } finally { b.disabled = false; } }); article.append(b);
-      }
-      button('Copy URL', () => navigator.clipboard.writeText(row.video_url));
-      button('Copy JSON', () => navigator.clipboard.writeText(JSON.stringify(row,null,2)));
-      if (row.status === 'synced') button('Tải clip', async () => { $('feedback').textContent = (await api('download',{video_id:row.video_id})).file; });
-      return article;
-    }));
+    if (signature !== next) {
+      results = s.rows;
+      signature = next;
+      renderRows();
+    }
   } finally { refreshing = false; }
 }
+function renderRows() {
+  const mode = $('filter').value;
+  const rows = results.filter(r => mode === 'all' || r.status === mode || mode === 'pass' && ['pending','synced'].includes(r.status));
+  $('rows').replaceChildren(...rows.map(row => {
+    const article = document.createElement('article'), title = document.createElement('h3'), detail = document.createElement('details');
+    article.className = 'run';
+    title.textContent = row.title || row.video_id;
+    const summary = document.createElement('summary'), badge = document.createElement('span');
+    summary.textContent = 'Xem từng điều kiện';
+    detail.append(summary);
+    for (const [key, check] of Object.entries(row.checks)) {
+      const line = document.createElement('p');
+      line.textContent = (checkNames[key] || key) + ' · ' + (labels[check.status] || 'Đạt') + ' · ' + check.reason;
+      detail.append(line);
+    }
+    badge.className = row.status === 'synced' ? 'badge online' : 'badge';
+    badge.textContent = labels[row.status] || row.status;
+    const metadata = document.createElement('p');
+    metadata.className = 'muted';
+    metadata.textContent = [row.type_topic, row.view_count != null && row.view_count.toLocaleString('vi-VN') + ' lượt xem',
+      new Date(row.measured_at).toLocaleString('vi-VN')].filter(Boolean).join(' · ');
+    article.append(badge, title, metadata, detail);
+    function button(label, fn) {
+      const b = document.createElement('button'); b.textContent = label;
+      b.onclick = () => action(async () => { b.disabled = true; try { await fn(); } finally { b.disabled = false; } }); article.append(b);
+    }
+    button('Copy URL', () => navigator.clipboard.writeText(row.video_url));
+    button('Copy JSON', () => navigator.clipboard.writeText(JSON.stringify(row,null,2)));
+    if (row.status === 'synced') button('Tải clip', async () => { $('feedback').textContent = (await api('download',{video_id:row.video_id})).file; });
+    return article;
+  }));
+  if (!rows.length) $('rows').textContent = 'Chưa có kết quả cho lựa chọn này.';
+}
+$('filter').onchange = renderRows;
+void action(loadEditor);
 $('export').onclick = () => action(async () => {
   const json = JSON.stringify(await api('export'), null, 2);
   const url = URL.createObjectURL(new Blob([json], { type: 'application/json;charset=utf-8' }));

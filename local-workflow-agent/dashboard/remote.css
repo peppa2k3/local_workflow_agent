@@ -9,3 +9,7 @@ button.primary{background:#087a55;border-color:#20a879;color:#fff;font-weight:75
 button.primary:hover{background:#0a9063;border-color:#43c492}
 button.danger{background:#a52f3b;border-color:#d34b59;color:#fff;font-weight:750}
 button.danger:hover{background:#bd3947;border-color:#ed6974}
+
+#keywords{width:100%;resize:vertical;padding:12px;background:#0b1526;color:inherit;border:1px solid #506789;border-radius:8px;font:15px/1.6 ui-monospace,monospace}
+#config fieldset{border:1px solid #30465f;border-radius:8px;margin:0 0 16px}
+#rows .run details{margin-bottom:14px}

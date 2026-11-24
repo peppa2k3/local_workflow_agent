@@ -133,8 +133,8 @@ function createControlServer({ store, publicUrl, allowHttp = false, trustProxy =
         const query = (url.searchParams.get('q') || '').trim().toLocaleLowerCase('vi');
         const used = url.searchParams.get('used'), page = Number(url.searchParams.get('page') || 0);
         if (!Number.isSafeInteger(page) || page < 0) c.fail('Invalid page');
-        const rows = store.list('video', user.id).reverse().filter(v =>
-          (!used || String(v.used) === used) && [v.title,v.type_topic,v.source_name,v.video_id,v.source_device_id].some(s => s.toLocaleLowerCase('vi').includes(query)));
+        const rows = store.list('video', user.id).reverse().map(v => ({ ...v, tags: library.tagsFor(v) })).filter(v =>
+          (!used || String(v.used) === used) && [v.title,v.type_topic,v.source_name,v.video_id,v.source_device_id,...v.tags].some(s => s.toLocaleLowerCase('vi').includes(query)));
         return json(200, { videos:rows.slice(page*50,page*50+50).map(v => v.assignment_job
           ? { ...v, assignment_state: store.get('command', v.assignment_job)?.state } : v), total:rows.length });
       }

@@ -123,6 +123,14 @@ const server = http.createServer(async (request, response) => {
   try {
     if (route.startsWith('/api/scanner/')) {
       if (!dashboardAuthorized(request) || (origin && origin !== `http://127.0.0.1:${port}`)) return json(403, { error: 'Local dashboard approval required' });
+      if (route === '/api/scanner/settings') {
+        if (request.method === 'GET') return json(200, scanner.editor());
+        if (request.method === 'POST') {
+          const { part, value } = await readBody(request);
+          scanner.saveSettings(part, value);
+          return json(200, { ok: true });
+        }
+      }
       if (route === '/api/scanner/export' && request.method === 'GET') return json(200, scanner.exportVideos());
       if (route === '/api/scanner/status' && request.method === 'GET') return json(200, scanner.status());
       if (request.method === 'POST' && route === '/api/scanner/toggle') {

@@ -3,6 +3,22 @@
 <meta name="local-agent-session" content="__LOCAL_AGENT_DASHBOARD_TOKEN__"><title>Scan YouTube</title>
 <link rel="stylesheet" href="/remote.css"><script src="/scanner.js" defer></script></head><body><main class="shell">
 <nav class="site-nav" aria-label="Điều hướng chính"><div class="row site-links"><a href="/">Kịch bản</a><a href="/content">Quản lý nội dung</a><a href="/remote">Remote Control</a><a href="/scanner" aria-current="page">Scan YouTube</a></div></nav>
-<h1>Scan YouTube</h1><section class="panel"><button id="toggle" disabled>Bật quét</button><p id="state"></p><p id="settings"></p><p id="topics"></p>
-<p id="feedback" role="status"></p></section><section class="panel"><h2>Kết quả gần nhất</h2><button id="export">Xuất kho JSON</button><div id="rows"></div></section>
-</main></body></html>
+<header><h1>Quét YouTube</h1><button id="toggle" class="primary" disabled>Bật quét</button></header>
+<p id="state" class="muted"></p>
+<div class="two"><form id="config" class="panel"><h2>Điều kiện lọc</h2>
+<div class="two">
+<label>Lượt xem tối thiểu<input id="minViews" type="number" min="0" max="9007199254740991" required></label>
+<label>Cạnh ngắn tối thiểu (px)<input id="minResolution" type="number" min="1" max="8192" required></label>
+<label>Tuổi video từ (ngày)<input id="minDays" type="number" min="0" max="36500" required></label>
+<label>Tuổi video đến (ngày)<input id="maxDays" type="number" min="0" max="36500" required></label>
+<label>Chu kỳ quét (phút)<input id="minutes" type="number" min="1" max="1440" required></label>
+<label>Yêu cầu API mỗi ngày<input id="requestsPerDay" type="number" min="1" max="100" required></label>
+</div>
+<label>Ngôn ngữ phụ đề (cách nhau bằng dấu phẩy)<input id="subtitleLanguages" required placeholder="vi, en"></label>
+<fieldset><legend>Loại phụ đề</legend><label class="check"><input id="subtitles" type="checkbox">Thủ công</label><label class="check"><input id="automatic_captions" type="checkbox">Tự động</label></fieldset>
+<button class="primary" disabled>Lưu bộ lọc</button><p role="status" id="configNote"></p></form>
+<form id="keywordForm" class="panel"><h2>Nhóm từ khóa</h2><label>Nội dung keywords.txt <small>Mỗi nhóm bắt đầu bằng [ma-nhom]. Nhập một cụm từ trên mỗi dòng.</small><textarea id="keywords" rows="15" required spellcheck="false"></textarea></label>
+<button disabled>Lưu từ khóa</button><p role="status" id="keywordNote"></p></form></div>
+<section class="panel"><div class="row"><h2>Kết quả gần nhất</h2><button id="export">Xuất kho JSON</button></div>
+<label>Hiển thị<select id="filter"><option value="all">Mọi kết quả</option><option value="pass">Đạt điều kiện</option><option value="pending">Đang chờ gửi</option><option value="synced">Đã đồng bộ</option><option value="reject">Không đạt</option><option value="unknown">Chưa đủ dữ liệu</option></select></label>
+<p id="feedback" role="status"></p><div id="rows"></div></section></main></body></html>

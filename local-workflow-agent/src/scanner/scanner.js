@@ -164,10 +164,32 @@ function createScanner({ directory, submit, onChange = () => {}, inspect = media
     return { enabled: Boolean(get('enabled')), scanning, error: configurationError || error, syncError,
       quota:get('quota'), next:get('next'), directory, config:cfg || null, topics:groups, rows:rows() };
   }
+  function editor() {
+    let cfg;
+    try { cfg = config(); } catch { cfg = { ...defaults }; }
+    return { config: cfg, keywords: fs.readFileSync(keywordFile, 'utf8') };
+  }
+  function saveSettings(part, value) {
+    let file, content;
+    if (part === 'config') {
+      if (!value || !Object.keys(defaults).every(k => Object.hasOwn(value, k))) throw Error('Thiếu tham số cấu hình');
+      file = configFile;
+      content = JSON.stringify(settings(value), null, 2) + '\n';
+    } else if (part === 'keywords') {
+      if (typeof value !== 'string' || !topicsFrom(value).length) throw Error('Cần ít nhất một nhóm có từ khóa');
+      file = keywordFile;
+      content = value;
+    } else throw Error('Mục cấu hình không hợp lệ');
+    const temp = file + '.' + randomUUID() + '.tmp';
+    try {
+      fs.writeFileSync(temp, content, { flag: 'wx' });
+      fs.renameSync(temp, file);
+    } finally { fs.rmSync(temp, { force: true }); }
+  }
   function exportVideos() {
     return db.prepare("SELECT data FROM clips WHERE status IN ('pending','synced') ORDER BY rowid").all().map(row => JSON.parse(row.data));
   }
-  return { activity: () => ({enabled:Boolean(get('enabled')), scanning}), status, exportVideos, scan, flush, audit, toggle(enabled) {
+  return { activity: () => ({enabled:Boolean(get('enabled')), scanning}), status, editor, saveSettings, exportVideos, scan, flush, audit, toggle(enabled) {
     if (typeof enabled !== 'boolean') throw Error('enabled phải là boolean');
     set('enabled',enabled); if (enabled) set('next',0); onChange();
   }, start() {

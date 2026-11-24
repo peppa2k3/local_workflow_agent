@@ -49,7 +49,13 @@ const protocol = require('../local-workflow-agent/shared/remote-protocol');
   let scanner = createScanner(opts);
   const clock = Date.now;
   try {
-    fs.writeFileSync(path.join(dir,'config.json'),JSON.stringify(cfg));
+    const keywords = '# giữ ghi chú\n[gia-dinh]\nbé con\ngia đình';
+    scanner.saveSettings('config',cfg);
+    scanner.saveSettings('keywords',keywords);
+    assert.throws(() => scanner.saveSettings('keywords','[bad group]'));
+    assert.throws(() => scanner.saveSettings('config',{...cfg,minDays:20}));
+    assert.deepEqual(scanner.editor(),{config:cfg, keywords});
+    assert.equal(fs.readFileSync(path.join(dir,'keywords.txt'),'utf8'),keywords);
     scanner.toggle(true);
     await scanner.scan();
     assert.equal(scanner.status().rows.filter(r=>r.status==='pending').length,3);

@@ -47,6 +47,12 @@ function validate(data) {
   }
   return record;
 }
+function sourceTag(name) {
+  return '#' + (name.normalize('NFC').replace(/[^\p{L}\p{M}\p{N}_]+/gu, '_').replace(/^_+|_+$/g, '') || 'local');
+}
+function tagsFor(record) {
+  return record.tags || [sourceTag(record.source_name)];
+}
 function receive(store, device, data) {
   const clip = validate(data), owner = device.owner;
   const key = (...parts) => JSON.stringify([owner,...parts]);
@@ -70,8 +76,12 @@ function receive(store, device, data) {
         const first = store.get('video',same.record_id);
         if (!first.similar_title) store.put('video',{...first,similar_title:true},owner);
       } else store.put('videoTitle',{id:titleKey,record_id},owner);
-      store.put('video',{...clip,id:record_id,owner,source_device_id:device.id,source_name:device.name,received_at:new Date().toISOString(),
+      store.put('video',{...clip,id:record_id,owner,source_device_id:device.id,source_name:device.name,tags:[sourceTag(device.name)],received_at:new Date().toISOString(),
         similar_title:Boolean(same),used:false,job_ids:[]},owner);
+    } else {
+      const record = store.get('video', record_id);
+      const tags = tagsFor(record), tag = sourceTag(device.name);
+      if (!tags.includes(tag)) store.put('video', { ...record, tags: [...tags, tag] }, owner);
     }
     store.put('videoIdentity',{id:videoKey,record_id},owner);
     if (hashKey) store.put('videoIdentity',{id:hashKey,record_id},owner);
@@ -96,4 +106,4 @@ function variables(record, target) {
   return { variables: { video_url:record.video_url,thu_muc_tai:target.thu_muc_tai,reels_url:target.reels_url,
     ten_phim:'{{download_title}}',ten_file:'{{download_file_name}}' } };
 }
-module.exports = { receive, variables, linkRun };
+module.exports = { receive, variables, linkRun, tagsFor };

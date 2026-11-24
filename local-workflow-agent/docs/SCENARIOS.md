@@ -310,3 +310,9 @@ Khai báo `video_url`, `thu_muc_tai`, `reels_url`, `ten_phim` và `ten_file` tro
 
 
 Mở kịch bản đã lưu, nhập tên mới vào ô **Tên file mới** rồi bấm **Đổi tên file**. Nhập tên không có đuôi `.json`, chỉ dùng chữ thường, số, dấu gạch ngang hoặc gạch dưới. Tên hiển thị chỉnh riêng trong ô **Tên hiển thị**. Agent chuyển các lịch local đang chờ sang tên mới và yêu cầu dừng lượt chạy đang dùng file trước khi đổi tên. Nếu kịch bản được dùng qua Control Server, cập nhật quyền và lịch từ xa theo tên mới.
+
+### Quét và đồng bộ video YouTube
+
+Mở `/scanner` trên dashboard local để lưu các ngưỡng lọc vào `config.json` và các nhóm từ khóa vào `keywords.txt`. Mỗi nhóm có một dòng `[ma-nhom]` theo sau bởi các cụm từ. Thay đổi có hiệu lực từ lượt quét tiếp theo. Bật quét sau khi đặt ngưỡng và cấu hình `YOUTUBE_API_KEY`.
+
+Kết quả đạt điều kiện chờ trong hàng đợi local và tự gửi đến control server đã ghép nối. Xem trạng thái gửi và từng điều kiện ngay dưới biểu mẫu. Trong **Kho video** (`/library`) trên control server, nhấn tag máy gửi như `#Máy_01` để lọc kết quả. Khi nhiều máy gửi cùng video, kho giữ một bản ghi với tag của các máy gửi.
