@@ -320,3 +320,5 @@ Kết quả đạt điều kiện chờ trong hàng đợi local và tự gửi 
 Danh sách local hiển thị tối đa 100 kết quả gần nhất theo thời điểm đo, từ mới đến cũ. Tìm theo tiêu đề, chủ đề hoặc ID, lọc theo trạng thái và chọn 5 hoặc 10 kết quả mỗi trang. Mở từng dòng để xem điều kiện và thao tác với video.
 
 Mở **Lọc theo từng điều kiện** để kết hợp trạng thái của tuổi video, âm thanh, thời lượng, ID, từ khóa, độ phân giải, phụ đề và lượt xem. Kết quả phải khớp tất cả điều kiện đang chọn.
+
+Trong **Điều kiện lọc**, đặt khoảng thời lượng theo giây và nhập cả chiều rộng lẫn chiều cao tối thiểu nếu cần. Hai ô kích thước để trống thì scanner dùng ngưỡng cạnh ngắn.

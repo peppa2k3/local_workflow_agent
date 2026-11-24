@@ -11,7 +11,7 @@ async function api(name, data) {
 async function action(fn) {
   try { await fn(); } catch (e) { $('feedback').textContent = e.message; }
 }
-const numericFields = ['minViews','minResolution','minDays','maxDays','minutes','requestsPerDay'];
+const numericFields = ['minViews','minResolution','minDays','maxDays','minutes','requestsPerDay','minDurationSeconds','maxDurationSeconds'];
 const kinds = ['subtitles','automatic_captions'];
 const labels = { pass:'Đạt', pending:'Đang chờ gửi', synced:'Đã đồng bộ', reject:'Không đạt', unknown:'Chưa đủ dữ liệu', candidate:'Chờ xét lại' };
 const checkNames = { id:'ID video', keyword:'Từ khóa', views:'Lượt xem', age:'Tuổi video', duration:'Thời lượng',
@@ -30,6 +30,8 @@ async function loadEditor() {
   const { config, keywords } = await api('settings');
   currentConfig = config;
   for (const key of numericFields) $(key).value = config[key] ?? '';
+  $('minWidth').value = config.resolution?.width ?? '';
+  $('minHeight').value = config.resolution?.height ?? '';
   $('subtitleLanguages').value = config.subtitleLanguages.join(', ');
   for (const kind of kinds) $(kind).checked = config.subtitleKinds.includes(kind);
   $('keywords').value = keywords;
@@ -50,6 +52,9 @@ function editorForm(id, note, part, read) {
 editorForm('config','configNote','config', () => {
   const cfg = { ...currentConfig };
   for (const key of numericFields) cfg[key] = $(key).valueAsNumber;
+  const width = $('minWidth'), height = $('minHeight');
+  if (Boolean(width.value) !== Boolean(height.value)) throw Error('Nhập cả chiều rộng và chiều cao, hoặc để trống cả hai');
+  cfg.resolution = width.value ? { width: width.valueAsNumber, height: height.valueAsNumber } : null;
   cfg.subtitleLanguages = $('subtitleLanguages').value.split(',').map(s => s.trim());
   cfg.subtitleKinds = kinds.filter(kind => $(kind).checked);
   return cfg;

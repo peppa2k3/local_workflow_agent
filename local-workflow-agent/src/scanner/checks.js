@@ -58,8 +58,13 @@ function evaluate(input, topics, cfg, info, measured = new Date(), extraChecks =
   const vietnamese = formats?.filter(f => /^vi(?:-|$)/i.test(f.language || '') && f.acodec && f.acodec !== 'none');
   const audioOnly = vietnamese?.some(f => f.vcodec === 'none');
   const videos = formats?.filter(f => f.vcodec && f.vcodec !== 'none' && (vietnamese.includes(f) || audioOnly && f.acodec === 'none'));
-  const best = videos?.filter(f => Number.isFinite(f.width) && Number.isFinite(f.height)).sort((a,b) => Math.min(b.width,b.height) - Math.min(a.width,a.height))[0];
-  const resolution = best && Number.isFinite(best.width) && Number.isFinite(best.height) ? { width: best.width, height: best.height } : null;
+  const ranked = videos?.filter(f => [f.width, f.height].every(n => Number.isSafeInteger(n) && n > 0))
+    .sort((a,b) => Math.min(b.width,b.height) - Math.min(a.width,a.height)) || [];
+  const minimum = cfg.resolution;
+  const qualified = ranked.find(({ width, height }) =>
+    Math.min(width, height) >= cfg.minResolution && (!minimum || width >= minimum.width && height >= minimum.height));
+  const best = qualified || ranked[0];
+  const resolution = best ? { width: best.width, height: best.height } : null;
   const duration = info?.duration;
   const langs = new Set();
   for (const kind of cfg.subtitleKinds) {
@@ -68,11 +73,15 @@ function evaluate(input, topics, cfg, info, measured = new Date(), extraChecks =
     }
   }
   const skipped = input.error || (preflight ? 'Thiếu metadata yt-dlp' : 'Chưa qua bộ lọc ban đầu');
-  checks.duration = check(Number.isFinite(duration) ? duration > 0 && duration < 14400 : null, duration == null ? skipped : duration + ' giây');
+  const { minDurationSeconds = 0, maxDurationSeconds = 14400 } = cfg;
+  checks.duration = check(Number.isFinite(duration)
+    ? duration > 0 && duration >= minDurationSeconds && duration < maxDurationSeconds : null,
+    Number.isFinite(duration) ? duration + ' giây / từ ' + minDurationSeconds + ' đến dưới ' + maxDurationSeconds + ' giây' : skipped);
   checks.audio = check(vietnamese?.length ? true : formats?.some(f => f.acodec !== 'none' && !f.language) || !formats?.length ? null : false,
     vietnamese?.length ? 'Có track tiếng Việt' : info ? 'Không xác minh được track tiếng Việt' : skipped);
-  checks.resolution = check(resolution && cfg.minResolution != null ? Math.min(resolution.width,resolution.height) >= cfg.minResolution : null,
-    resolution ? JSON.stringify(resolution) : skipped);
+  const minimumLabel = (minimum ? minimum.width + ' × ' + minimum.height + ' px, ' : '') + 'cạnh ngắn ' + cfg.minResolution + ' px';
+  checks.resolution = check(resolution ? Boolean(qualified) : null,
+    resolution ? resolution.width + ' × ' + resolution.height + ' px / tối thiểu ' + minimumLabel : skipped);
   const subtitleMatch = cfg.subtitleLanguages.some(l => [...langs].some(k => k === l || k.startsWith(l + '-')));
   const subtitleData = cfg.subtitleKinds.every(kind => info?.[kind] && typeof info[kind] === 'object');
   checks.subtitles = check(subtitleMatch ? true : subtitleData ? false : null,

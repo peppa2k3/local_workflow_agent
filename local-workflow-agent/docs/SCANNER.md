@@ -15,12 +15,15 @@
   "minDays": 0,
   "maxDays": 30,
   "minResolution": 720,
+  "minDurationSeconds": 60,
+  "maxDurationSeconds": 3600,
+  "resolution": {"width": 1920, "height": 1080},
   "subtitleLanguages": ["vi"],
   "subtitleKinds": ["subtitles", "automatic_captions"]
 }
 ```
 
-`subtitles` là phụ đề thủ công, `automatic_captions` là phụ đề tự động. Chỉ cần khớp một ngôn ngữ và một loại đã chọn. Scanner bỏ track dịch máy qua tham số `tlang`. Điều kiện âm thanh độc lập và yêu cầu có format tiếng Việt tải được. Tuổi dựa trên thời điểm công khai, hai đầu khoảng được tính. Thời lượng phải lớn hơn 0 và nhỏ hơn 4 giờ.
+`subtitles` là phụ đề thủ công, `automatic_captions` là phụ đề tự động. Chỉ cần khớp một ngôn ngữ và một loại đã chọn. Scanner bỏ track dịch máy qua tham số `tlang`. Điều kiện âm thanh độc lập và yêu cầu có format tiếng Việt tải được. Tuổi dựa trên thời điểm công khai, hai đầu khoảng được tính. Thời lượng tính bằng giây, bao gồm ngưỡng dưới và nhỏ hơn ngưỡng trên. Mặc định video phải dài hơn 0 giây và dưới 4 giờ. Với `resolution`, cùng một format tải được phải đạt cả chiều rộng, chiều cao và ngưỡng cạnh ngắn `minResolution`. Dùng `null` cho `resolution` để chỉ áp dụng ngưỡng cạnh ngắn.
 
 Ví dụ file từ khóa:
 

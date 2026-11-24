@@ -6,15 +6,25 @@ const { topicsFrom, youtubeId, evaluate } = require('./checks');
 const media = require('./media');
 const defaults = { minutes: 30, requestsPerDay: 80, minViews: null, minDays: null, maxDays: null, minResolution: 720,
   subtitleLanguages: ['vi'], subtitleKinds: ['subtitles', 'automatic_captions'] };
+const mediaDefaults = { minDurationSeconds: 0, maxDurationSeconds: 14400, resolution: null };
 const sample = '[gia-dinh]\ngia đình\nbé con\nđược giúp đỡ\n\n[xuyen-khong]\nxuyên không\n';
 function settings(raw) {
-  const cfg = { ...defaults, ...raw };
+  const cfg = { ...defaults, ...mediaDefaults, ...raw };
   for (const [key, min, max] of [['minutes',1,1440], ['requestsPerDay',1,100], ['minViews',0,Number.MAX_SAFE_INTEGER],
-    ['minDays',0,36500], ['maxDays',0,36500], ['minResolution',1,8192]]) {
+    ['minDays',0,36500], ['maxDays',0,36500], ['minResolution',1,8192],
+    ['minDurationSeconds',0,14399], ['maxDurationSeconds',1,14400]]) {
     if (cfg[key] === null && ['minViews','minDays','maxDays'].includes(key)) continue;
     if (!Number.isSafeInteger(cfg[key]) || cfg[key] < min || cfg[key] > max) throw Error('Giá trị không hợp lệ: ' + key);
   }
   if (cfg.minDays != null && cfg.maxDays != null && cfg.minDays > cfg.maxDays) throw Error('Khoảng tuổi không hợp lệ');
+  if (cfg.minDurationSeconds >= cfg.maxDurationSeconds) throw Error('Thời lượng tối thiểu phải nhỏ hơn giới hạn trên');
+  if (cfg.resolution !== null) {
+    const { width, height } = cfg.resolution;
+    if (![width, height].every(value => Number.isSafeInteger(value) && value >= 1 && value <= 8192)) {
+      throw Error('Chiều rộng và chiều cao phải là số nguyên từ 1 đến 8192 px');
+    }
+    cfg.resolution = { width, height };
+  }
   if (!Array.isArray(cfg.subtitleKinds) || !cfg.subtitleKinds.length || !cfg.subtitleKinds.every(k => ['subtitles','automatic_captions'].includes(k)) ||
       !Array.isArray(cfg.subtitleLanguages) || !cfg.subtitleLanguages.length || !cfg.subtitleLanguages.every(l => /^[a-z]{2,3}(-[A-Za-z0-9]+)*$/.test(l))) throw Error('Cấu hình phụ đề không hợp lệ');
   return cfg;
@@ -22,7 +32,7 @@ function settings(raw) {
 function createScanner({ directory, submit, onChange = () => {}, inspect = media.inspect, request = fetch, extraChecks = {}, key = process.env.YOUTUBE_API_KEY }) {
   fs.mkdirSync(directory, { recursive: true });
   const configFile = path.join(directory, 'config.json'), keywordFile = path.join(directory, 'keywords.txt');
-  for (const [file, content] of [[configFile, JSON.stringify(defaults,null,2)], [keywordFile,sample]]) {
+  for (const [file, content] of [[configFile, JSON.stringify(settings(),null,2)], [keywordFile,sample]]) {
     try { fs.writeFileSync(file, content, { flag: 'wx' }); } catch (e) { if (e.code !== 'EEXIST') throw e; }
   }
   const db = new DatabaseSync(path.join(directory, 'scanner.sqlite'));
@@ -98,7 +108,8 @@ function createScanner({ directory, submit, onChange = () => {}, inspect = media
       const cfg = config(), groups = topics();
       if (!groups.length || [cfg.minViews,cfg.minDays,cfg.maxDays].includes(null)) throw Error('Thiếu nhóm từ khóa hoặc ngưỡng minViews/minDays/maxDays');
       if (!key) throw Error('Thiếu YOUTUBE_API_KEY');
-      const filter = JSON.stringify([groups, cfg.minViews, cfg.minDays, cfg.maxDays, cfg.minResolution, cfg.subtitleLanguages, cfg.subtitleKinds]);
+      const filter = JSON.stringify([groups, cfg.minViews, cfg.minDays, cfg.maxDays, cfg.minResolution, cfg.minDurationSeconds,
+        cfg.maxDurationSeconds, cfg.resolution, cfg.subtitleLanguages, cfg.subtitleKinds]);
       if (filter !== get('filter')) transaction(() => {
         db.prepare("UPDATE clips SET status='candidate',due=0 WHERE status IN ('unknown','reject')").run();
         set('filter',filter);
@@ -166,7 +177,7 @@ function createScanner({ directory, submit, onChange = () => {}, inspect = media
   }
   function editor() {
     let cfg;
-    try { cfg = config(); } catch { cfg = { ...defaults }; }
+    try { cfg = config(); } catch { cfg = settings(); }
     return { config: cfg, keywords: fs.readFileSync(keywordFile, 'utf8') };
   }
   function saveSettings(part, value) {
