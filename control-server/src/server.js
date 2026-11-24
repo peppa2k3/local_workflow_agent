@@ -4,6 +4,7 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const c = require('../shared/remote-protocol');
 const library = require('./video-library');
+const assignment = require('./assignment');
 const { createClientIp } = require('./proxy');
 async function addUser(store, email, password) {
   email = c.text(email, 254).toLowerCase();
@@ -93,7 +94,12 @@ function createControlServer({ store, publicUrl, allowHttp = false, trustProxy =
         });
         return json(200, { id: pair.id, email: pair.email });
       }
-      if (route === '/api/scanner/videos' && req.method === 'POST') return json(200, library.receive(store, device(req,data), data));
+      if (route === '/api/scanner/videos' && req.method === 'POST') {
+        const sender = device(req, data), receipt = library.receive(store, sender, data);
+        if (receipt.status === 'accepted' && assignment.settings(store, sender.owner).enabled)
+          store.transaction(() => assignment.allocate(store, sender.owner, Date.now()));
+        return json(200, receipt);
+      }
       if (route === '/device/revoke') {
         const d = device(req, data); d.revoked = true; store.put('device', d, d.owner); return json(200, { ok: true });
       }
@@ -128,7 +134,8 @@ function createControlServer({ store, publicUrl, allowHttp = false, trustProxy =
         if (!Number.isSafeInteger(page) || page < 0) c.fail('Invalid page');
         const rows = store.list('video', user.id).reverse().filter(v =>
           (!used || String(v.used) === used) && [v.title,v.type_topic,v.source_name,v.video_id,v.source_device_id].some(s => s.toLocaleLowerCase('vi').includes(query)));
-        return json(200, { videos:rows.slice(page*50,page*50+50), total:rows.length });
+        return json(200, { videos:rows.slice(page*50,page*50+50).map(v => v.assignment_job
+          ? { ...v, assignment_state: store.get('command', v.assignment_job)?.state } : v), total:rows.length });
       }
       if (route === '/api/scanner/variables' && req.method === 'POST') {
         const v = store.get('video',c.uuid(data.record_id)), d = store.get('device',c.uuid(data.device_id));
@@ -149,6 +156,9 @@ function createControlServer({ store, publicUrl, allowHttp = false, trustProxy =
   server.requestTimeout = 20000; server.headersTimeout = 10000;
   const cleanup = setInterval(() => {
     const now = Date.now();
+    for (const rule of store.list('assignmentSettings')) {
+      if (rule.enabled) store.transaction(() => assignment.allocate(store, rule.id, now));
+    }
     for (const kind of ['session', 'pair']) for (const record of store.list(kind)) if (record.expires < now) store.remove(kind, record.id);
   }, 60000); cleanup.unref(); server.on('close', () => clearInterval(cleanup));
   return server;

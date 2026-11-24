@@ -87,6 +87,7 @@ function linkRun(store, command) {
   const identity = store.get('videoIdentity', JSON.stringify([command.owner, 'youtube', videoId]));
   if (!identity) return;
   const record = store.get('video', identity.record_id);
+  command.videoRecord = record.id;
   record.job_ids.push(command.id);
   store.put('video', record, command.owner);
 }

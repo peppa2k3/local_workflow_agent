@@ -60,3 +60,15 @@ Phản hồi gồm `status`, `record_id`, `reason`. Lần đầu là `accepted`;
 Nếu local có SHA-256 đã tính từ byte media thực, có thể gửi thêm `content_hash: { "algorithm": "sha256", "verified": true, "value": "<64 ký tự hex>" }`. Server tin chứng thực hash từ thiết bị đã ghép nối. Scanner gửi metadata trước khi tải nên thông thường so theo ID YouTube. Hai ID khác nhau chỉ trùng tiêu đề vẫn là hai bản ghi, được gắn nhãn nghi trùng.
 
 Kiểm thử từ gốc repo bằng `node tests/video-library.js` (HTTP loopback, SQLite và Chrome test riêng) hoặc `npm test`.
+
+### Tự giao job
+
+Trong **Kho video**, công tắc **Tự tạo và giao job từ kho video** mặc định tắt. Bấm **Lưu cài đặt** sau khi đổi công tắc hoặc số giờ chờ. Cài đặt áp dụng cho tài khoản đang đăng nhập và được lưu trong SQLite. Khi tắt, server vẫn nhận clip, xử lý kết quả đang chạy và nhận lệnh thủ công.
+
+Server xét clip theo thứ tự nhập kho. Clip cần có topic trùng một mục trong `accepted_topics` của kịch bản. Trong các lựa chọn còn slot, số `assignment_priority` lớn hơn được chọn trước, tiếp theo là tên file kịch bản, ID máy và tên thư mục profile theo thứ tự tăng dần. Máy phải có heartbeat và lease còn hiệu lực. Profile phải được cấp quyền, rảnh và có extension kết nối nếu kịch bản dùng trình duyệt. Lần polling của máy được chọn giữ clip và giao lệnh trong cùng giao dịch SQLite.
+
+Nếu chưa có cấu hình khớp, clip được xét lại khi agent đồng bộ cấu hình. Nếu có cấu hình khớp nhưng các máy đều bận hoặc offline, **Kho video** hiển thị thời điểm xét lại. Khoảng chờ mặc định là 1 giờ. Thay đổi khoảng chờ áp dụng cho lần lập lịch kế tiếp. Lịch hiện có giữ thời hạn qua restart. Bấm **Làm mới** sau khi đến hạn để xem kết quả.
+
+Chỉ kết quả `succeeded` của kịch bản mới đánh dấu clip đã dùng, kèm ID job, ID máy và thời điểm server ghi nhận. Khi truyền lệnh gặp lỗi, hệ thống dùng lại ID cũ và local đối chiếu nhật ký trước khi thực thi. Job lỗi, bị hủy hoặc gián đoạn giữ clip ở **Chưa dùng** và giữ liên kết đến lần thử. Nếu mất tín hiệu sau upload, mở lịch sử trên máy nhận theo ID job và kiểm tra trang đích trước khi quyết định chạy lại thủ công. Server tiếp nhận kết quả đến muộn của job chưa rõ trạng thái.
+
+Từ gốc repo, chạy `node tests/assignment.js` để kiểm tra luồng scanner → kho → kịch bản với hai agent thử nghiệm, SQLite và bước tải mô phỏng. Chạy toàn bộ bộ kiểm thử bằng `npm test`.

@@ -293,6 +293,20 @@ Control Server nhận tiến độ của lượt chạy local và các lịch lo
 
 Chọn **Chrome profile của kịch bản** trong trình chỉnh sửa rồi bấm **Lưu**. File JSON lưu tên thư mục Chrome ở trường `"profile"`, ví dụ `"profile": "Profile 2"`. Khi chạy hoặc tạo lịch từ dashboard local, agent ưu tiên profile đã lưu. Chọn **Dùng profile đang chọn trên dashboard** để bỏ thiết lập riêng. Nếu profile đã lưu không có trên máy, dashboard báo lỗi và chờ bạn chọn lại. Mỗi lịch giữ profile tại thời điểm tạo. Các lệnh CLI, API v1 và lượt chạy từ Control Server tiếp tục dùng profile chỉ định cho lượt chạy.
 
+## Topic tự nhận video
+
+Điền **Topic tự nhận** và **Ưu tiên giao job** trên dashboard local, hoặc thêm hai trường dưới đây vào JSON kịch bản. Topic cách nhau bằng dấu phẩy trên dashboard. Trong JSON, dùng danh sách mã nhóm. Agent bỏ khoảng trắng ở hai đầu và chuyển mã sang chữ thường khi ghép. Danh sách trống dành cho kịch bản chạy thủ công.
+
+```json
+{
+  "accepted_topics": ["gia-dinh", "am-thuc"],
+  "assignment_priority": 10
+}
+```
+
+Khai báo `video_url`, `thu_muc_tai`, `reels_url`, `ten_phim` và `ten_file` trong `variables`. Cấp quyền sửa cả năm biến cho kịch bản trong **Remote Control**. Bước `downloadVideo` dùng `{{video_url}}` và `{{thu_muc_tai}}`. Sau khi bước tải hoàn tất, bước đăng dùng `{{reels_url}}`, `{{ten_phim}}` và `{{ten_file}}`. Agent lấy tiêu đề và tên file từ kết quả tải thực tế. Nếu kịch bản đã gắn Chrome profile, cấp quyền cho đúng profile đó và kết nối extension khi có bước trình duyệt.
+
 ## Đổi tên file kịch bản
+
 
 Mở kịch bản đã lưu, nhập tên mới vào ô **Tên file mới** rồi bấm **Đổi tên file**. Nhập tên không có đuôi `.json`, chỉ dùng chữ thường, số, dấu gạch ngang hoặc gạch dưới. Tên hiển thị chỉnh riêng trong ô **Tên hiển thị**. Agent chuyển các lịch local đang chờ sang tên mới và yêu cầu dừng lượt chạy đang dùng file trước khi đổi tên. Nếu kịch bản được dùng qua Control Server, cập nhật quyền và lịch từ xa theo tên mới.

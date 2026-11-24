@@ -2,6 +2,7 @@ const path = require('node:path');
 const c = require('../../../shared/remote-protocol');
 const { randomUUID } = require('node:crypto');
 const { createRemoteExecutor } = require('./remote-executor');
+const { assignmentConfig } = require('../../workflow/scenario-store');
 const { clipTargets } = require('../../workflow/clip-library');
 function createRemoteClient({ dataDir, profiles, scenarios, workflows, localTasks, network, scanActivity, performance = () => ({}) , allowHttp = false }) {
   const file = path.join(dataDir, 'remote.json');
@@ -88,6 +89,12 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, localTask
                 const target = {thu_muc_tai,reels_url};
                 const bytes = Buffer.byteLength(JSON.stringify(target)) + 20;
                 if (bytes <= targetBudget) { entry.libraryTarget = target; targetBudget -= bytes; }
+              }
+              if (entry.libraryTarget && s.accepted_topics?.length) {
+                const a = { ...assignmentConfig(s), profile: s.profile || '',
+                  browser: s.steps.some(step => !['downloadVideo','wait','openFolder'].includes(step.action)) };
+                const bytes = Buffer.byteLength(JSON.stringify(a)) + 20;
+                if (bytes <= targetBudget) { entry.assignment = a; targetBudget -= bytes; }
               }
               if (policy.clipScenarios?.includes(name)) {
                 try {

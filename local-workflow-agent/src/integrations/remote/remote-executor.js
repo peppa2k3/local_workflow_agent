@@ -1,6 +1,7 @@
 const path = require('node:path');
 const c = require('../../../shared/remote-protocol');
 const { clipTargets, isClip, isVideoName, listClips, prefix } = require('../../workflow/clip-library');
+const { assignmentConfig, scenarioProfile } = require('../../workflow/scenario-store');
 const { overrideVariables } = require('../../workflow/variables');
 function createRemoteExecutor({ dataDir, workflows, scenarios, getPolicy, localTasks }) {
   const file = path.join(dataDir, 'remote-journal.json');
@@ -35,6 +36,12 @@ function createRemoteExecutor({ dataDir, workflows, scenarios, getPolicy, localT
         const scenario = scenarios.load(p.scenario);
         if (!c.object(p.variables) || Object.entries(p.variables).some(([k, v]) => !policy.variables[p.scenario]?.includes(k)
           || !Object.hasOwn(scenario.variables || {}, k) || !['string', 'number', 'boolean'].includes(typeof v))) c.fail('Variable override not allowed');
+        if (command.assignmentTopic !== undefined) {
+          const config = assignmentConfig(scenario);
+          if (!config.topics.includes(command.assignmentTopic) || scenarioProfile(scenario, p.profile) !== p.profile ||
+              p.variables.thu_muc_tai !== scenario.variables.thu_muc_tai || p.variables.reels_url !== scenario.variables.reels_url)
+            c.fail('Local assignment configuration changed');
+        }
         const clips = p.clips ?? {};
         if (!c.object(clips) || Object.keys(clips).length > 30) c.fail('Invalid clip selections');
         const clipVariables = Object.keys(p.variables).filter(name => isClip(p.variables[name]));

@@ -1,8 +1,7 @@
 const c = require('../shared/remote-protocol');
 const { linkRun } = require('./video-library');
-const ACTIVE = ['queued', 'dispatched', 'running'];
-const SCHEDULE_STATES = ['scheduled', 'confirming', 'approved'];
-const RESERVED = [...ACTIVE, 'confirming', 'approved'];
+const assignment = require('./assignment');
+const { ACTIVE, SCHEDULE_STATES, RESERVED, createCommand } = require('./command-record');
 const TERMINAL = ['succeeded', 'failed', 'cancelled', 'interrupted', 'rejected', 'unknown', 'expired'];
 const clipTargetId = id => typeof id === 'string' && /^[a-f0-9]{64}$/.test(id);
 const clipName = name => typeof name === 'string' && name.length <= 255 &&
@@ -27,6 +26,13 @@ function metadata(value) {
         try { url = new URL(target); } catch {}
         if (require('node:path').win32.isAbsolute(folder) && url && ['https:','http:'].includes(url.protocol) && !url.username && !url.password)
           scenario.libraryTarget = { thu_muc_tai:folder, reels_url:target };
+      }
+      const a = s.assignment;
+      if (scenario.libraryTarget && a && Array.isArray(a.topics) && a.topics.length <= 64 &&
+          a.topics.every(t => typeof t === 'string' && /^[a-z0-9_-]{1,64}$/.test(t)) &&
+          Number.isSafeInteger(a.priority) && typeof a.browser === 'boolean' &&
+          (a.profile === '' || value.profiles.some(p => p.directory === a.profile))) {
+        scenario.assignment = { topics: [...new Set(a.topics)], priority: a.priority, browser: a.browser, profile: a.profile };
       }
       if (Array.isArray(s.clipTargets)) scenario.clipTargets = s.clipTargets.slice(0, 150)
         .filter(t => c.object(t) && clipTargetId(t.id) && Number.isInteger(t.index) && t.index >= 0 && t.index < s.steps && ['upload', 'downloadVideo'].includes(t.action))
@@ -111,6 +117,14 @@ function createCommandApi(store) {
     return { ok: true };
   }
   function account(route, method, user, data, url) {
+    if (route === '/api/scanner/assignment') {
+      if (method === 'GET') return assignment.settings(store, user.id);
+      if (method === 'POST') return store.transaction(() => {
+        const rule = assignment.configure(store, user.id, data);
+        assignment.allocate(store, user.id, Date.now());
+        return rule;
+      });
+    }
     if (route === '/api/schedule-decision' && method === 'POST') return scheduleDecision(owned(user, data.deviceId), data);
     if (route === '/api/download-confirmation' && method === 'POST') {
       const d = owned(user, data.deviceId), id = c.uuid(data.id);
@@ -170,11 +184,11 @@ function createCommandApi(store) {
         if (Object.keys(data.clips).length) payload.clips = Object.fromEntries(Object.entries(data.clips).sort(([a], [b]) => a.localeCompare(b)));
       }
     }
-    const fingerprint = c.hash(JSON.stringify({ deviceId: d.id, type, payload }));
+    const command = createCommand(id, user.id, d.id, type, payload);
     expire(user.id, d.id);
     const previous = store.get('command', id);
     if (previous) {
-      if (previous.owner !== user.id || previous.fingerprint !== fingerprint) c.fail('Request ID already used for a different command', 409);
+      if (previous.owner !== user.id || previous.fingerprint !== command.fingerprint) c.fail('Request ID already used for a different command', 409);
       return { command: previous, duplicate: true };
     }
     if (payload.scheduledAt !== undefined && payload.scheduledAt < Math.floor(Date.now() / 60000) * 60000) c.fail('Chọn phút hiện tại hoặc tương lai.');
@@ -204,15 +218,13 @@ function createCommandApi(store) {
       const run = store.get('command', payload.runId);
       if (!run || run.owner !== user.id || run.deviceId !== d.id || run.type !== 'run') c.fail('Remote run not found', 404);
     }
-    const command = { id, owner: user.id, deviceId: d.id, type, payload, fingerprint, state: type === 'run' && payload.scheduledAt ? 'scheduled' : 'queued', created: Date.now(),
-      expires: Date.now() + 300000, deliveryUntil: 0, seq: 0, result: null };
     store.transaction(() => {
       if (type === 'stop') {
         const run = store.get('command', payload.runId);
         if (run.state === 'queued' || SCHEDULE_STATES.includes(run.state)) { run.state = 'cancelled'; run.updated = Date.now(); store.put('command', run, user.id); command.state = 'succeeded'; }
       }
-      store.put('command', command, user.id);
       linkRun(store, command);
+      store.put('command', command, user.id);
     });
     return { command };
   }
@@ -258,6 +270,7 @@ function createCommandApi(store) {
             cmd.result = result; cmd.state = result.state; cmd.updated = now;
             if (cmd.downloadDecision?.id !== result.confirmation?.id) delete cmd.downloadDecision;
           }
+          assignment.recordResult(store, cmd, now);
           cmd.seq = report.seq; store.put('command', cmd, d.owner);
         }
         ack.push({ id: cmd.id, seq: report.seq });
@@ -284,10 +297,13 @@ function createCommandApi(store) {
       }));
       const downloadDecisions = commands.filter(cmd => cmd.state === 'running' && cmd.downloadDecision)
         .map(cmd => ({ runId: cmd.id, ...cmd.downloadDecision }));
-      const next = commands.filter(cmd => ['queued', 'dispatched'].includes(cmd.state) && cmd.expires >= now && cmd.deliveryUntil <= now)
+      const enabled = assignment.settings(store, d.owner).enabled;
+      let next = commands.filter(cmd => ['queued', 'dispatched'].includes(cmd.state) && cmd.expires >= now &&
+        cmd.deliveryUntil <= now && (!cmd.automatic || (enabled && assignment.canRedeliver(store, cmd, d))))
         .sort((a, b) => Number(a.type === 'run' || a.type === 'browseClips') - Number(b.type === 'run' || b.type === 'browseClips') || a.created - b.created)[0];
+      if (!next && enabled) next = assignment.allocate(store, d.owner, now, d.id);
       if (next) { next.state = 'dispatched'; next.deliveryUntil = now + 10000; store.put('command', next, d.owner); }
-      return { ack, schedulePrompts, command: next ? { id: next.id, type: next.type, payload: next.payload, expires: next.expires } : null, serverTime: now, downloadDecisions };
+      return { ack, schedulePrompts, command: next ? { id: next.id, type: next.type, payload: next.payload, ...(next.automatic && { assignmentTopic: next.topic }), expires: next.expires } : null, serverTime: now, downloadDecisions };
     });
   }
   return { account, device };

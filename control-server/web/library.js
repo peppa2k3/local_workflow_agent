@@ -26,6 +26,8 @@ function row(v) {
     v.similar_title?'Nghi trùng tiêu đề':''].filter(Boolean).join(' · ')),
     node('p','Đo: '+new Date(v.measured_at).toLocaleString('vi-VN')+' · Nhận: '+new Date(v.received_at).toLocaleString('vi-VN')),
     node('p','Job: '+(v.job_ids.join(', ') || 'Chưa có')));
+  if (v.next_attempt_at && !v.used) article.append(node('p','Xét lại lúc '+new Date(v.next_attempt_at).toLocaleString('vi-VN')));
+  if (v.assignment_job) article.append(node('p','Job tự động: '+v.assignment_job+' · '+v.assignment_state));
   const details=node('details',''); details.append(node('summary','Kết quả kiểm tra'));
   for (const [key,check] of Object.entries(v.checks)) details.append(node('p',key+' · '+check.status+' · '+check.reason));
   article.append(details);
@@ -58,4 +60,13 @@ $('device').onchange=targets;
 $('prev').onclick=()=>{page--;action(refresh);}; $('next').onclick=()=>{page++;action(refresh);};
 $('used').onchange=()=>{page=0;action(refresh);};
 $('query').oninput=()=>{page=0;clearTimeout(debounce);debounce=setTimeout(()=>action(refresh),200);};
-action(async()=>{csrf=(await api('/api/me')).csrf; $('library').hidden=false; await refresh();});
+$('assignment').onsubmit = event => {
+  event.preventDefault();
+  action(async () => {
+    await api('/api/scanner/assignment',{enabled:$('autoEnabled').checked,retryHours:Number($('retryHours').value)});
+    $('feedback').textContent='Đã lưu cài đặt giao job.';
+    await refresh();
+  });
+};
+action(async()=>{csrf=(await api('/api/me')).csrf; const rule=await api('/api/scanner/assignment');
+  $('autoEnabled').checked=rule.enabled; $('retryHours').value=rule.retryHours; $('library').hidden=false; await refresh();});

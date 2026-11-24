@@ -155,6 +155,8 @@
     <section class="editor">
       <div class="editor-head"><div><h2>Các bước thực hiện</h2><p>Dùng ↑ ↓ để đổi thứ tự. Mở chi tiết để sửa từng bước.</p></div><label>Tên hiển thị<input id="scenarioName" placeholder="Tên kịch bản"></label>
         <label>Chrome profile của kịch bản<select id="scenarioProfile" aria-label="Chrome profile của kịch bản"></select></label></div>
+        <div class="two"><label>Topic tự nhận (cách nhau bằng dấu phẩy)<input id="acceptedTopics" placeholder="gia-dinh, am-thuc"></label>
+        <label>Ưu tiên giao job (số lớn trước)<input id="assignmentPriority" type="number" step="1" value="0"></label></div>
       <div class="steps" id="steps"></div>
       <button class="add" id="addBtn">＋ Thêm bước</button>
       <div class="bottom"><div class="message" id="message" role="status"></div><span id="stepCount"></span></div>
@@ -262,7 +264,7 @@
 
     function updateButtons() {
       const profileState = knownProfiles.find(item => item.directory === executionProfile());
-      setProperty($('scenarioProfile'), 'disabled', editorBusy);
+      for (const id of ['scenarioProfile','acceptedTopics','assignmentPriority']) setProperty($(id), 'disabled', editorBusy);
       setProperty($('stopBtn'), 'disabled', !profileState?.running);
       setProperty($('openProfileBtn'), 'disabled', !profileState);
       for (const id of ['loadBtn', 'newBtn', 'saveBtn', 'cloneBtn', 'addBtn', 'addVariableBtn', 'scenarioSelect']) setProperty($(id), 'disabled', editorBusy);
@@ -423,6 +425,8 @@
     const expandedSteps = new WeakSet();
     function render() {
       $('scenarioName').value = scenario.name || '';
+      $('acceptedTopics').value = (scenario.accepted_topics || []).join(', ');
+      $('assignmentPriority').value = scenario.assignment_priority ?? 0;
       renderScenarioProfiles();
       $('stepCount').textContent = `${scenario.steps.length} bước`;
       updateButtons();
@@ -723,6 +727,10 @@
       }
       setProperty(select, 'value', saved);
     }
+    $('acceptedTopics').oninput = e => {
+      scenario.accepted_topics = e.target.value.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+    };
+    $('assignmentPriority').oninput = e => { scenario.assignment_priority = Number(e.target.value); };
     $('scenarioProfile').onchange = event => {
       if (event.target.value) scenario.profile = event.target.value;
       else delete scenario.profile;

@@ -63,6 +63,16 @@ function scenarioProfile(scenario, fallback) {
   return profile;
 }
 
+function assignmentConfig(scenario) {
+  const topics = scenario.accepted_topics ?? [];
+  const priority = scenario.assignment_priority ?? 0;
+  if (!Array.isArray(topics) || topics.length > 64 || !Number.isSafeInteger(priority))
+    throw Error('Cấu hình topic hoặc ưu tiên giao job không hợp lệ.');
+  const normalized = topics.map(t => typeof t === 'string' ? t.trim().toLowerCase() : '');
+  if (normalized.some(t => !/^[a-z0-9_-]{1,64}$/.test(t))) throw Error('Mã topic chỉ gồm a-z, 0-9, _ và -.');
+  return { topics: [...new Set(normalized)], priority };
+}
+
 function createScenarioStore(scenariosDir) {
   function file(name) {
     if (typeof name !== 'string' || !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(name)) throw new Error('Invalid scenario filename');
@@ -101,6 +111,7 @@ function createScenarioStore(scenariosDir) {
     load: name => JSON.parse(fs.readFileSync(file(name), 'utf8')),
     save: (name, scenario) => {
       scenarioProfile(scenario);
+      assignmentConfig(scenario);
       if (!Array.isArray(scenario.steps) || !scenario.steps.length) throw new Error('Add at least one step');
       fs.writeFileSync(file(name), JSON.stringify(scenario, null, 2) + '\n');
     },
@@ -136,4 +147,4 @@ function createScenarioStore(scenariosDir) {
   };
 }
 
-module.exports = { scenarioProfile, createScenarioStore };
+module.exports = { scenarioProfile, assignmentConfig, createScenarioStore };
