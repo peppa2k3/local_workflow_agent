@@ -2,11 +2,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
-const { topicsFrom, youtubeId, evaluate } = require('./checks');
+const { topicsFrom, youtubeId, youtubeDuration, evaluate, dayMs } = require('./checks');
 const media = require('./media');
-const defaults = { minutes: 30, requestsPerDay: 80, minViews: null, minDays: null, maxDays: null, minResolution: 720,
+const defaults = { minutes: 30, requestsPerDay: 80, minViews: 100000, minDays: 0, maxDays: 7, minResolution: 720,
   subtitleLanguages: ['vi'], subtitleKinds: ['subtitles', 'automatic_captions'] };
-const mediaDefaults = { minDurationSeconds: 0, maxDurationSeconds: 14400, resolution: null };
+const mediaDefaults = { minDurationSeconds: 1800, maxDurationSeconds: 14400, resolution: null };
+const batchSize = 50;
 const sample = '[gia-dinh]\ngia đình\nbé con\nđược giúp đỡ\n\n[xuyen-khong]\nxuyên không\n';
 function settings(raw) {
   const cfg = { ...defaults, ...mediaDefaults, ...raw };
@@ -68,20 +69,23 @@ function createScanner({ directory, submit, onChange = () => {}, inspect = media
     if (!Array.isArray(result.items)) throw Error('YouTube thiếu danh sách items');
     return result.items;
   }
-  async function measure(id, item, groups, cfg, failure) {
+  function videos(ids, cfg) {
+    return api('videos', { hl: 'vi', part: 'snippet,statistics,contentDetails', id: ids.join(',') }, cfg);
+  }
+  async function measure(id, item, groups, cfg, measured, failure) {
     const input = { id, title: item?.snippet?.localized?.title || item?.snippet?.title, published: item?.snippet?.publishedAt,
-      views: /^\d+$/.test(item?.statistics?.viewCount) ? Number(item.statistics.viewCount) : null, error: failure };
-    const measured = new Date();
-    const initial = evaluate(input, groups, cfg);
+      views: /^\d+$/.test(item?.statistics?.viewCount) ? Number(item.statistics.viewCount) : null,
+      durationSeconds: youtubeDuration(item?.contentDetails?.duration), error: failure };
+    const initial = evaluate(input, groups, cfg, undefined, measured);
     if (!initial.preflight) return initial;
     try { return evaluate(input, groups, cfg, await inspect(id, abort.signal), measured, extraChecks); }
-    catch { return evaluate({ ...input, error: 'yt-dlp không đọc được metadata' }, groups, cfg); }
+    catch { return evaluate({ ...input, error: 'yt-dlp không đọc được metadata' }, groups, cfg, undefined, measured); }
   }
   async function audit(urls) {
     const cfg = config(), groups = topics(), ids = [...new Set(urls.map(youtubeId).filter(Boolean))];
     if (ids.length > 50) throw Error('Tối đa 50 ID mỗi lần audit.');
     let items = [], failure;
-    try { if (ids.length) items = await api('videos', { hl:'vi', part:'snippet,statistics', id:ids.join(',') }, cfg); }
+    try { if (ids.length) items = await videos(ids, cfg); }
     catch (e) { failure = e.message; }
     const results = [];
     for (const url of urls) {
@@ -96,11 +100,11 @@ function createScanner({ directory, submit, onChange = () => {}, inspect = media
           continue;
         } catch {
           const reason = [failure, 'yt-dlp không đọc được URL'].filter(Boolean).join(' · ');
-          results.push({ url, error: reason, ...await measure(id, item, groups, cfg, reason) });
+          results.push({ url, error: reason, ...await measure(id, item, groups, cfg, new Date(), reason) });
           continue;
         }
       }
-      results.push({ url, error: failure, ...await measure(id, item, groups, cfg, failure) });
+      results.push({ url, error: failure, ...await measure(id, item, groups, cfg, new Date(), failure) });
     }
     return results;
   }
@@ -117,10 +121,15 @@ function createScanner({ directory, submit, onChange = () => {}, inspect = media
         db.prepare("UPDATE clips SET status='candidate',due=0 WHERE status IN ('unknown','reject')").run();
         set('filter',filter);
       });
-      let pending = db.prepare("SELECT id FROM clips WHERE status='candidate' OR (status='unknown' AND due<=?) ORDER BY due LIMIT 25").all(Date.now());
+      const measured = new Date();
+      let pending = db.prepare("SELECT id FROM clips WHERE status='candidate' OR (status='unknown' AND due<=?) ORDER BY due LIMIT ?").all(measured.getTime(), batchSize);
       if (!pending.length) {
-        const queries = [...new Set(groups.flatMap(t => t.phrases))], cursor = get('cursor') || 0;
-        const items = await api('search',{ part:'id', type:'video', order:'date', maxResults:'25', q:queries[cursor % queries.length] },cfg);
+        const queries = [...new Set(groups.flatMap(t => t.queries))], cursor = get('cursor') || 0;
+        const items = await api('search', {
+          part: 'id', type: 'video', order: 'relevance', maxResults: batchSize, q: queries[cursor % queries.length],
+          publishedAfter: new Date(measured - cfg.maxDays * dayMs).toISOString(),
+          ...(cfg.minDurationSeconds > 1200 && { videoDuration: 'long' })
+        }, cfg);
         transaction(() => {
           const enqueue = db.prepare("INSERT OR IGNORE INTO clips(id,status) VALUES(?,'candidate')");
           for (const item of items) {
@@ -129,13 +138,13 @@ function createScanner({ directory, submit, onChange = () => {}, inspect = media
           }
           set('cursor',cursor + 1);
         });
-        pending = db.prepare("SELECT id FROM clips WHERE status='candidate' LIMIT 25").all();
+        pending = db.prepare("SELECT id FROM clips WHERE status='candidate' LIMIT ?").all(batchSize);
       }
       if (pending.length && get('enabled')) {
-        const items = await api('videos',{ hl:'vi', part:'snippet,statistics', id:pending.map(p=>p.id).join(',') },cfg);
+        const items = new Map((await videos(pending.map(p => p.id), cfg)).map(item => [item.id, item]));
         for (const {id} of pending) {
           if (!get('enabled') || abort.signal.aborted) break;
-          const result = await measure(id,items.find(i=>i.id===id),groups,cfg);
+          const result = await measure(id, items.get(id), groups, cfg, measured);
           if (abort.signal.aborted) break;
           const data = result.payload;
           if (result.verdict === 'pass') data.submission_id = randomUUID();

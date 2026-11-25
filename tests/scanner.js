@@ -4,7 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
 const { createScanner, settings } = require('../local-workflow-agent/src/scanner/scanner');
-const { youtubeId, topicsFrom, evaluate } = require('../local-workflow-agent/src/scanner/checks');
+const { youtubeId, topicsFrom, youtubeDuration, evaluate } = require('../local-workflow-agent/src/scanner/checks');
 const { download } = require('../local-workflow-agent/src/scanner/media');
 const { run, binary } = require('../local-workflow-agent/src/integrations/video/video-download');
 const protocol = require('../local-workflow-agent/shared/remote-protocol');
@@ -60,10 +60,86 @@ const protocol = require('../local-workflow-agent/shared/remote-protocol');
   assert.equal(groups[0].phrases.length,2);
   const opts = { directory:dir, key:'fixture', submit:payload=>protocol.post(origin,'/api/scanner/videos',{...payload,id:'local-fixture'},'fixture-token',{allowHttp:true}),
     inspect:async()=>info, request:async url=>({ok:true,json:async()=>({items:url.pathname.endsWith('/search') ? ids.map(videoId=>({id:{videoId}}))
-      : ids.map((id,i)=>({id,snippet:{title:i===2?'Ngoài chủ đề':title,publishedAt:published}, statistics:{viewCount:'1000'}}))})}) };
+      : ids.map((id,i)=>({id,snippet:{title:i===2?'Ngoài chủ đề':title,publishedAt:published}, statistics:{viewCount:'1000'},
+        contentDetails:{ duration:'PT3H59M59S' }}))})}) };
   let scanner = createScanner(opts);
   const clock = Date.now;
   try {
+    const strictDefaults = settings();
+    assert.deepEqual([strictDefaults.minDurationSeconds, strictDefaults.minViews, strictDefaults.maxDays], [1800, 100000, 7]);
+    assert.equal(youtubeDuration('P1DT2H3M4S'), 93784);
+    assert.equal(youtubeDuration('PT0S'), 0);
+    for (const malformed of [undefined, 'PT', 'P1DT', 'PT3Q']) assert.equal(youtubeDuration(malformed), null);
+    const now = Date.now();
+    const cutoff = 7 * 86400000;
+    const query = 'Bé con gặp lại gia đình sau nhiều năm';
+    const candidates = [
+      ['PT29M59S', '150000', published],
+      ['PT30M', '99999', published],
+      ['PT30M', '100000', published],
+      ['PT30M', '150000', new Date(now - cutoff - 3600000).toISOString()],
+      [undefined, '150000', published],
+      ['PT30M', 'invalid', published],
+      ['PT30M', '150000', '2026'],
+      ['PT4H', '150000', published],
+      ['PT30M', '150000', published, 'Ngoài chủ đề'],
+      ['PT30M', '150000', published]
+    ].map(([duration, viewCount, publishedAt, videoTitle = query], i) => ({
+      id: 'preflight0' + i, contentDetails: { duration }, statistics: { viewCount }, snippet: { publishedAt, title: videoTitle }
+    }));
+    const inspected = [], submitted = [];
+    const preflight = createScanner({
+      directory: path.join(dir, 'preflight'), key: 'fixture',
+      inspect: async id => { inspected.push(id); return id === candidates[9].id ? { ...info, subtitles: {} } : info; },
+      submit: async payload => { submitted.push(payload); return { status: 'accepted' }; },
+      request: async url => {
+        const params = url.searchParams;
+        const search = url.pathname.endsWith('/search');
+        if (search) {
+          assert.equal(params.get('q'), query);
+          assert.equal(params.get('type'), 'video');
+          assert.equal(params.get('order'), 'relevance');
+          assert.equal(params.get('maxResults'), '50');
+          assert.equal(params.get('videoDuration'), 'long');
+          assert(Date.parse(params.get('publishedAfter')) + cutoff >= now);
+          assert(Date.parse(params.get('publishedAfter')) + cutoff <= Date.now());
+        } else {
+          assert.equal(params.get('part'), 'snippet,statistics,contentDetails');
+          assert.deepEqual(params.get('id').split(',').sort(), candidates.map(item => item.id).sort());
+        }
+        return { ok: true, json: async () => ({
+          items: search ? [...candidates, candidates[0]].map(({ id }) => ({ id: { videoId: id } })) : candidates
+        }) };
+      }
+    });
+    try {
+      preflight.saveSettings('config', { ...strictDefaults, minResolution: 128 });
+      preflight.saveSettings('keywords', '[gia-dinh]\n' + query);
+      preflight.toggle(true);
+      await preflight.scan();
+      assert.equal(preflight.status().error, '');
+      assert.deepEqual(inspected.sort(), [candidates[2].id, candidates[9].id]);
+      const rows = new Map(preflight.status().rows.map(row => [row.video_id, row]));
+      function expectCheck(index, check, status) {
+        assert.equal(rows.get(candidates[index].id).checks[check].status, status);
+      }
+      expectCheck(0, 'duration', 'reject');
+      assert.equal(rows.get(candidates[0].id).duration_seconds, 1799);
+      expectCheck(1, 'views', 'reject');
+      assert.equal(rows.get(candidates[1].id).view_count, 99999);
+      expectCheck(3, 'age', 'reject');
+      expectCheck(4, 'duration', 'unknown');
+      expectCheck(5, 'views', 'unknown');
+      expectCheck(6, 'age', 'unknown');
+      expectCheck(7, 'duration', 'reject');
+      expectCheck(8, 'keyword', 'reject');
+      expectCheck(9, 'subtitles', 'reject');
+      assert.deepEqual(preflight.exportVideos().map(row => row.video_id), [candidates[2].id]);
+      await preflight.flush();
+      await preflight.flush();
+      assert.deepEqual(submitted.map(row => [row.video_id, row.duration_seconds]), [[candidates[2].id, 1800]]);
+    } finally { await preflight.close(); }
+
     const keywords = '# giữ ghi chú\n[gia-dinh]\nbé con\ngia đình';
     scanner.saveSettings('config',strict);
     assert.deepEqual(scanner.editor().config,strict);

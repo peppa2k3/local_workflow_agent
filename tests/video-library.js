@@ -24,7 +24,7 @@ const c = require('../control-server/shared/remote-protocol');
   const first=device(f.alice), second=device(f.alice), isolated=device(f.bob);
   const push=(d,payload)=>c.post(f.origin,'/api/scanner/videos',{...payload,id:d.id},d.token,{allowHttp:true});
   const id='aB12Cd34Ef5';
-  const cfg=settings({minViews:10,minDays:0,maxDays:40});
+  const cfg=settings({minViews:10,minDays:0,maxDays:40,minDurationSeconds:60});
   const input={id,title:'Gia đình',published:new Date(Date.now()-3600000).toISOString(),views:20};
   const checked=evaluate(input,topicsFrom('[family]\ngia đình'),cfg,{duration:60,formats:[
     {language:'vi',width:1920,height:1080,acodec:'aac',vcodec:'h264',url:'fixture'}],subtitles:{vi:[{url:'fixture'}]}});

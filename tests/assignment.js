@@ -55,7 +55,7 @@ const c = require('../control-server/shared/remote-protocol');
     await poll();
     async function submit(id, topic) {
       const checked = evaluate({ id, title: 'Fixture video', published: new Date(Date.now()-3600000).toISOString(), views: 20 },
-        topicsFrom('[' + topic + ']\nfixture'), settings({ minViews: 10, minDays: 0, maxDays: 40 }),
+        topicsFrom('[' + topic + ']\nfixture'), settings({ minViews: 10, minDays: 0, maxDays: 40, minDurationSeconds: 60 }),
         { duration: 60, formats: [{ language: 'vi', width: 1920, height: 1080, acodec: 'aac', vcodec: 'h264', url: 'fixture' }],
           subtitles: { vi: [{ url: 'fixture' }] } });
       assert.equal(checked.verdict, 'pass');

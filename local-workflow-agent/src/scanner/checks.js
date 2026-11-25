@@ -1,19 +1,21 @@
 const normalize = text => text.normalize('NFC').toLocaleLowerCase('vi').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 const stop = new Set('và của một là thì mà các những này đó trong với cho khi tập phần full phim'.split(' '));
+const dayMs = 86400000;
 function topicsFrom(text) {
   const topics = new Map();
-  let phrases;
+  let topic;
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.replace(/^\uFEFF/, '').trim();
     if (!line || line.startsWith('#')) continue;
     const header = /^\[([a-z0-9_-]{1,64})\]$/.exec(line);
     if (header) {
-      if (!topics.has(header[1])) topics.set(header[1], new Set());
-      phrases = topics.get(header[1]);
+      if (!topics.has(header[1])) topics.set(header[1], { phrases: new Set(), queries: new Set() });
+      topic = topics.get(header[1]);
       continue;
     }
-    if (!phrases || line.startsWith('[')) throw Error('Cần mã nhóm dạng [gia-dinh].');
+    if (!topic || line.startsWith('[')) throw Error('Cần mã nhóm dạng [gia-dinh].');
     const words = normalize(line).split(' ');
+    const phrases = new Set();
     if (words.length <= 5) {
       if (words.some(word => word && !stop.has(word))) phrases.add(words.join(' '));
     } else {
@@ -21,8 +23,13 @@ function topicsFrom(text) {
         if (!stop.has(words[i - 1]) && !stop.has(words[i])) phrases.add(words.slice(i - 1, i + 1).join(' '));
       }
     }
+    if (phrases.size) {
+      topic.queries.add(line);
+      for (const phrase of phrases) topic.phrases.add(phrase);
+    }
   }
-  return [...topics].map(([code, terms]) => ({ code, phrases: [...terms].filter(Boolean) })).filter(t => t.phrases.length);
+  return [...topics].filter(([, topic]) => topic.phrases.size)
+    .map(([code, { phrases, queries }]) => ({ code, phrases: [...phrases], queries: [...queries] }));
 }
 function youtubeId(value) {
   if (typeof value !== 'string') return null;
@@ -41,18 +48,37 @@ function youtubeId(value) {
 function check(value, reason) {
   return { status: value == null ? 'unknown' : value ? 'pass' : 'reject', reason };
 }
+function youtubeDuration(value) {
+  if (typeof value !== 'string') return null;
+  const match = /^P(?=\d|T\d)(?:(\d+)D)?(?:T(?=\d)(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(value);
+  if (!match) return null;
+  const [, days = 0, hours = 0, minutes = 0, seconds = 0] = match;
+  const total = days * 86400 + hours * 3600 + minutes * 60 + Number(seconds);
+  return Number.isSafeInteger(total) ? total : null;
+}
 function evaluate(input, topics, cfg, info, measured = new Date(), extraChecks = {}) {
   const { id, title, views, published } = input;
-  const matches = topics.map(t => ({ code: t.code, phrases: t.phrases.filter(p => (' ' + normalize(title || '') + ' ').includes(' ' + p + ' ')) }))
+  const normalizedTitle = typeof title === 'string' ? normalize(title) : '';
+  const matches = topics.map(t => ({ code: t.code, phrases: t.phrases.filter(p => (' ' + normalizedTitle + ' ').includes(' ' + p + ' ')) }))
     .filter(t => t.phrases.length).sort((a, b) => b.phrases.length - a.phrases.length || a.code.localeCompare(b.code));
-  const age = (measured - Date.parse(published)) / 86400000;
+  const timestamp = typeof published === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z$/.test(published)
+    ? Date.parse(published) : NaN;
+  const age = Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0, 19) === published.slice(0, 19)
+    ? (measured - timestamp) / dayMs : NaN;
+  const hasApiDuration = Object.hasOwn(input, 'durationSeconds');
+  const duration = hasApiDuration ? input.durationSeconds : info?.duration;
+  const { minDurationSeconds = 0, maxDurationSeconds = 14400 } = cfg;
   const checks = {
     id: check(Boolean(youtubeId(id)) && id === youtubeId(id), String(id)),
-    keyword: check(title && topics.length ? matches.length > 0 : null, matches.length ? JSON.stringify(matches) : title && topics.length ? 'Không khớp cụm từ' : 'Thiếu tiêu đề hoặc từ khóa'),
-    views: check(Number.isSafeInteger(views) && cfg.minViews != null ? views >= cfg.minViews : null, String(views ?? 'Thiếu view') + ' / min ' + cfg.minViews),
+    keyword: check(normalizedTitle && topics.length ? matches.length > 0 : null, matches.length ? JSON.stringify(matches) : normalizedTitle && topics.length ? 'Không khớp cụm từ' : 'Thiếu tiêu đề hoặc từ khóa'),
+    views: check(Number.isSafeInteger(views) && views >= 0 && cfg.minViews != null ? views >= cfg.minViews : null, String(views ?? 'Thiếu view') + ' / min ' + cfg.minViews),
     age: check(Number.isFinite(age) && cfg.minDays != null && cfg.maxDays != null ? age >= cfg.minDays && age <= cfg.maxDays : null,
       (Number.isFinite(age) ? age.toFixed(2) : '?') + ' ngày / ' + cfg.minDays + '–' + cfg.maxDays)
   };
+  checks.duration = check(Number.isFinite(duration)
+    ? duration > 0 && duration >= minDurationSeconds && duration < maxDurationSeconds : null,
+    Number.isFinite(duration) ? duration + ' giây / từ ' + minDurationSeconds + ' đến dưới ' + maxDurationSeconds + ' giây'
+      : input.error || (hasApiDuration ? 'Thiếu hoặc sai thời lượng từ YouTube Data API' : 'Thiếu thời lượng yt-dlp'));
   const preflight = Object.values(checks).every(c => c.status === 'pass');
   const formats = info?.formats?.filter(f => !f.has_drm && f.url && f.protocol !== 'mhtml');
   const vietnamese = formats?.filter(f => /^vi(?:-|$)/i.test(f.language || '') && f.acodec && f.acodec !== 'none');
@@ -65,7 +91,6 @@ function evaluate(input, topics, cfg, info, measured = new Date(), extraChecks =
     Math.min(width, height) >= cfg.minResolution && (!minimum || width >= minimum.width && height >= minimum.height));
   const best = qualified || ranked[0];
   const resolution = best ? { width: best.width, height: best.height } : null;
-  const duration = info?.duration;
   const langs = new Set();
   for (const kind of cfg.subtitleKinds) {
     for (const [lang, tracks] of Object.entries(info?.[kind] || {})) {
@@ -73,10 +98,6 @@ function evaluate(input, topics, cfg, info, measured = new Date(), extraChecks =
     }
   }
   const skipped = input.error || (preflight ? 'Thiếu metadata yt-dlp' : 'Chưa qua bộ lọc ban đầu');
-  const { minDurationSeconds = 0, maxDurationSeconds = 14400 } = cfg;
-  checks.duration = check(Number.isFinite(duration)
-    ? duration > 0 && duration >= minDurationSeconds && duration < maxDurationSeconds : null,
-    Number.isFinite(duration) ? duration + ' giây / từ ' + minDurationSeconds + ' đến dưới ' + maxDurationSeconds + ' giây' : skipped);
   checks.audio = check(vietnamese?.length ? true : formats?.some(f => f.acodec !== 'none' && !f.language) || !formats?.length ? null : false,
     vietnamese?.length ? 'Có track tiếng Việt' : info ? 'Không xác minh được track tiếng Việt' : skipped);
   const minimumLabel = (minimum ? minimum.width + ' × ' + minimum.height + ' px, ' : '') + 'cạnh ngắn ' + cfg.minResolution + ' px';
@@ -93,4 +114,4 @@ function evaluate(input, topics, cfg, info, measured = new Date(), extraChecks =
       type_topic: matches[0]?.code || null, matched_phrases: matches[0]?.phrases || [], view_count: views ?? null, published_at: published || null, measured_at: measured.toISOString(),
       duration_seconds: duration ?? null, resolution, subtitle_languages: [...langs], checks } };
 }
-module.exports = { topicsFrom, youtubeId, evaluate };
+module.exports = { topicsFrom, youtubeId, youtubeDuration, evaluate, dayMs };
