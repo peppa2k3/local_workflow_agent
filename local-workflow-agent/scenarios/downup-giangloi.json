@@ -76,9 +76,10 @@
       "locator": "Tiếp",
       "timeoutMs": 30000,
       "completion": {
-        "locatorType": "label",
-        "locator": "Mô tả thước phim của bạn...",
-        "state": "visible"
+        "locatorType": "role",
+        "role": "button",
+        "locator": "Đăng",
+        "state": "enabled"
       }
     },
     {
