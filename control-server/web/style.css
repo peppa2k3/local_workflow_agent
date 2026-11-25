@@ -1206,6 +1206,10 @@ footer {
 .video-badges span { padding: 4px 10px; border-radius: 20px; background: #483519; color: #ffdb92; font-size: .85rem; }
 .video-badges .available, .video-pages [aria-current=page] { background: #143f38; color: #a3f3d9; }
 .video-badges .used { background: #233752; color: #b9d5ff; }
+.video-options { margin-left: auto; }
+.video-options summary { padding: 8px; }
+.video-options button { margin: 4px; }
+.video-options .remove-video { color: var(--danger); }
 .video-tags button { min-height: 32px; padding: 4px 10px; color: #d6c6ff; background: #302742; overflow-wrap: anywhere; max-width: 100%; }
 .video-actions { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--line); }
 .video-actions button { color: #c1ddff; }

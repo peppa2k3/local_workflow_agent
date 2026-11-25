@@ -1,5 +1,6 @@
 const { randomUUID } = require('node:crypto');
 const c = require('../shared/remote-protocol');
+const { PENDING_RUN } = require('./command-record');
 const requiredChecks = ['id','keyword','views','age','duration','audio','resolution','subtitles'];
 
 function canonicalVideo(raw) {
@@ -53,6 +54,44 @@ function sourceTag(name) {
 function tagsFor(record) {
   return record.tags || [sourceTag(record.source_name)];
 }
+function titleKey(owner,title) {
+  return JSON.stringify([owner,'title',title.normalize('NFKC').toLocaleLowerCase('vi').replace(/\s+/g,' ').trim()]);
+}
+function editRecord(store, owner, data, remove) {
+  return store.transaction(() => {
+    const record = store.get('video',c.uuid(data.record_id));
+    if (!record || record.owner !== owner) c.fail('Không tìm thấy video.',404);
+    if (remove) {
+      store.remove('video',record.id);
+      for (const identity of store.list('videoIdentity',owner)) {
+        if (identity.record_id === record.id) store.remove('videoIdentity',identity.id);
+      }
+      const key = titleKey(owner,record.title);
+      const matches = store.list('video',owner).filter(v => titleKey(owner,v.title) === key);
+      if (matches.length) store.put('videoTitle',{id:key,record_id:matches[0].id},owner);
+      else store.remove('videoTitle',key);
+      if (matches.length === 1) store.put('video',{...matches[0],similar_title:false},owner);
+    } else {
+      if (typeof data.used !== 'boolean') c.fail('Trạng thái không hợp lệ.');
+      if (record.used !== data.used) {
+        record.used = data.used;
+        delete record.used_job;
+        delete record.used_device;
+        if (data.used) record.used_at = Date.now();
+        else {
+          delete record.used_at;
+          delete record.next_attempt_at;
+          const prior = record.job_ids.filter(id => store.get('command',id)?.state === 'succeeded');
+          record.ignored_successes = prior;
+          const job = record.assignment_job && store.get('command',record.assignment_job);
+          if (!job || !PENDING_RUN.has(job.state)) delete record.assignment_job;
+        }
+        store.put('video',record,owner);
+      }
+    }
+    return {ok:true};
+  });
+}
 function receive(store, device, data) {
   const clip = validate(data), owner = device.owner;
   const key = (...parts) => JSON.stringify([owner,...parts]);
@@ -70,12 +109,12 @@ function receive(store, device, data) {
     const record_id = existing?.record_id || randomUUID();
     const reply = { status:existing ? 'duplicate' : 'accepted', record_id, reason:byId ? 'same_video_id' : byHash ? 'same_sha256' : 'new_video' };
     if (!existing) {
-      const titleKey = key('title',clip.title.normalize('NFKC').toLocaleLowerCase('vi').replace(/\s+/g,' ').trim());
-      const same = store.get('videoTitle',titleKey);
+      const normalizedTitle = titleKey(owner,clip.title);
+      const same = store.get('videoTitle',normalizedTitle);
       if (same) {
         const first = store.get('video',same.record_id);
         if (!first.similar_title) store.put('video',{...first,similar_title:true},owner);
-      } else store.put('videoTitle',{id:titleKey,record_id},owner);
+      } else store.put('videoTitle',{id:normalizedTitle,record_id},owner);
       store.put('video',{...clip,id:record_id,owner,source_device_id:device.id,source_name:device.name,tags:[sourceTag(device.name)],received_at:new Date().toISOString(),
         similar_title:Boolean(same),used:false,job_ids:[]},owner);
     } else {
@@ -106,4 +145,4 @@ function variables(record, target) {
   return { variables: { video_url:record.video_url,thu_muc_tai:target.thu_muc_tai,reels_url:target.reels_url,
     ten_phim:'{{download_title}}',ten_file:'{{download_file_name}}' } };
 }
-module.exports = { receive, variables, linkRun, tagsFor };
+module.exports = { editRecord, receive, variables, linkRun, tagsFor };

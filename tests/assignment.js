@@ -145,6 +145,9 @@ const c = require('../control-server/shared/remote-protocol');
       exchange([{id:lost.id,seq:1,result:{state:'succeeded'}}]);
       assert.equal(db.get('video',other).used_job,lost.id);
       assert.deepEqual(db.get('video',other).job_ids,[lost.id]);
+      require('../control-server/src/video-library').editRecord(db,owner,{record_id:other,used:false},false);
+      exchange([{id:lost.id,seq:2,result:{state:'succeeded'}}]);
+      assert.equal(db.get('video',other).used,false);
     } finally { db.close(); }
     console.log('Automatic assignments: scanner → library → engine, priority, concurrency, pause, receipts, failure and durable retries passed');
   } finally {

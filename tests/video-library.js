@@ -134,6 +134,25 @@ const c = require('../control-server/shared/remote-protocol');
     await page.locator('#pageSize').selectOption('24');
     await page.waitForFunction(()=>document.querySelectorAll('.video-card').length===13);
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));
+    await bob('/api/scanner/videos/status',{record_id,used:true},404);
+    await bob('/api/scanner/videos/delete',{record_id},404);
+    await page.locator('#query').fill(id);
+    await page.waitForFunction(()=>document.querySelectorAll('.video-card').length===1);
+    for (const label of ['Đánh dấu đã dùng','Đánh dấu chưa dùng']) {
+      await page.getByText('Tùy chọn',{exact:true}).click();
+      await page.getByRole('button',{name:label}).click();
+      await page.locator('.video-options:not([open])').waitFor();
+      assert.equal((await client('/api/scanner/videos?q='+id)).videos[0].used,label==='Đánh dấu đã dùng');
+    }
+    await page.getByText('Tùy chọn',{exact:true}).click();
+    page.once('dialog',dialog=>dialog.dismiss());
+    await page.getByRole('button',{name:'Xóa video'}).click();
+    assert.equal(await page.locator('.video-card').count(),1);
+    page.once('dialog',dialog=>dialog.accept());
+    await page.getByRole('button',{name:'Xóa video'}).click();
+    await page.getByText('Không có video khớp bộ lọc.').waitFor();
+    assert.equal((await push(first,payload)).record_id,record_id);
+    assert.equal((await push(first,{...payload,submission_id:randomUUID()})).status,'accepted');
     console.log('Video library: authenticated concurrency, replay, duplicate aliases, isolated owners, heartbeat/reconnect and scenario clipboard passed');
   } finally { remote?.close(); await browser?.close(); await f.close(); fs.rmSync(dir,{recursive:true,force:true}); }
 })().catch(e=>{console.error(e);process.exitCode=1;});

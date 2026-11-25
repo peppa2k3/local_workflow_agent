@@ -61,6 +61,23 @@ function row(v) {
     const value=await api('/api/scanner/variables',{record_id:v.id,device_id:$('device').value,scenario:$('scenario').value});
     return JSON.stringify(value,null,2);
   });
+  const menu=node('details',''); menu.className='video-options';
+  menu.append(node('summary','Tùy chọn'));
+  const toggle=node('button',v.used?'Đánh dấu chưa dùng':'Đánh dấu đã dùng');
+  const remove=node('button','Xóa video'); remove.className='remove-video';
+  function submit(option) {
+    toggle.disabled=remove.disabled=true;
+    action(async()=>{
+      try {
+        await api('/api/scanner/videos/'+option,{record_id:v.id,used:!v.used});
+        $('feedback').textContent=option==='delete'?'Đã xóa video.':'Đã cập nhật trạng thái video.';
+        await refresh();
+      } finally { toggle.disabled=remove.disabled=false; }
+    });
+  }
+  toggle.onclick=()=>submit('status');
+  remove.onclick=()=>{ if (confirm('Xóa video “'+v.title+'” khỏi kho?')) submit('delete'); };
+  menu.append(toggle,remove); header.append(menu);
   return article;
 }
 async function refresh() {

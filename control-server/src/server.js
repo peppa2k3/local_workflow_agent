@@ -140,6 +140,8 @@ function createControlServer({ store, publicUrl, allowHttp = false, trustProxy =
         return json(200, { videos:rows.slice(page * pageSize, (page + 1) * pageSize).map(v => v.assignment_job
           ? { ...v, assignment_state: store.get('command', v.assignment_job)?.state } : v), total:rows.length });
       }
+      if (req.method === 'POST' && ['/api/scanner/videos/status','/api/scanner/videos/delete'].includes(route))
+        return json(200,library.editRecord(store,user.id,data,route.endsWith('/delete')));
       if (route === '/api/scanner/variables' && req.method === 'POST') {
         const v = store.get('video',c.uuid(data.record_id)), d = store.get('device',c.uuid(data.device_id));
         if (!v || !d || d.revoked || d.owner !== user.id || v.owner !== user.id) c.fail('Video or device unavailable',404);

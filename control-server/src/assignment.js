@@ -2,8 +2,7 @@ const { randomUUID } = require('node:crypto');
 const { variables } = require('./video-library');
 const c = require('../shared/remote-protocol');
 
-const { RESERVED, createCommand } = require('./command-record');
-const pending = new Set([...RESERVED, 'scheduled', 'unknown', 'interrupted']);
+const { RESERVED, PENDING_RUN, createCommand } = require('./command-record');
 const variableNames = ['video_url', 'thu_muc_tai', 'reels_url', 'ten_phim', 'ten_file'];
 
 function settings(store, owner) {
@@ -40,13 +39,13 @@ function allocate(store, owner, now, pollingDevice) {
   for (const clip of store.list('video', owner)) {
     if (clip.used || clip.assignment_job || clip.next_attempt_at > now) continue;
     const linked = clip.job_ids.map(id => commands.get(id)).filter(Boolean);
-    const success = linked.find(job => job.state === 'succeeded');
+    const success = linked.find(job => job.state === 'succeeded' && !clip.ignored_successes?.includes(job.id));
     if (success) {
       // Older library entries linked manual runs before commands carried a videoRecord.
       recordResult(store, { ...success, videoRecord: clip.id }, success.updated || success.created);
       continue;
     }
-    if (linked.some(job => pending.has(job.state))) continue;
+    if (linked.some(job => PENDING_RUN.has(job.state))) continue;
     const matches = routes.filter(r => r.scenario.assignment.topics.includes(clip.type_topic));
     if (!matches.length) continue;
     let available = false;
@@ -92,7 +91,7 @@ function canRedeliver(store, job, device) {
 function recordResult(store, job, now) {
   if (!job.videoRecord || job.state !== 'succeeded') return;
   const clip = store.get('video', job.videoRecord);
-  if (!clip || clip.used || clip.owner !== job.owner) return;
+  if (!clip || clip.used || clip.owner !== job.owner || clip.ignored_successes?.includes(job.id)) return;
   clip.used = true;
   clip.used_job = job.id;
   clip.used_device = job.deviceId;
