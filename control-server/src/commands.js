@@ -21,14 +21,21 @@ function metadata(value) {
       if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(s.name) || !Number.isInteger(s.steps) || s.steps < 1 || s.steps > 10000 || !Array.isArray(s.variables) || s.variables.length > 100) c.fail('Invalid scenario metadata');
       const scenario = { name: s.name, steps: s.steps, variables: s.variables.map(v => c.text(v, 100)) };
       if (s.libraryTarget) {
-        const folder = c.text(s.libraryTarget.thu_muc_tai,1024), target = c.text(s.libraryTarget.reels_url,2048);
-        let url;
-        try { url = new URL(target); } catch {}
-        if (require('node:path').win32.isAbsolute(folder) && url && ['https:','http:'].includes(url.protocol) && !url.username && !url.password)
-          scenario.libraryTarget = { thu_muc_tai:folder, reels_url:target };
+        const target = {};
+        if (s.libraryTarget.thu_muc_tai !== undefined) {
+          const folder = c.text(s.libraryTarget.thu_muc_tai,1024);
+          if (require('node:path').win32.isAbsolute(folder)) target.thu_muc_tai = folder;
+        }
+        if (s.libraryTarget.reels_url !== undefined) {
+          const value = c.text(s.libraryTarget.reels_url,2048);
+          let url;
+          try { url = new URL(value); } catch {}
+          if (url && ['https:','http:'].includes(url.protocol) && !url.username && !url.password) target.reels_url = value;
+        }
+        if (Object.keys(target).length) scenario.libraryTarget = target;
       }
       const a = s.assignment;
-      if (scenario.libraryTarget && a && Array.isArray(a.topics) && a.topics.length <= 64 &&
+      if (a && Array.isArray(a.topics) && a.topics.length <= 64 &&
           a.topics.every(t => typeof t === 'string' && /^[a-z0-9_-]{1,64}$/.test(t)) &&
           (a.id === undefined || (typeof a.id === 'string' && /^[a-z0-9][a-z0-9_-]{0,63}$/.test(a.id))) && Number.isSafeInteger(a.priority) && typeof a.browser === 'boolean' &&
           (a.profile === '' || value.profiles.some(p => p.directory === a.profile))) {

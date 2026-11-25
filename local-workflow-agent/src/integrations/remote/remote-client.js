@@ -83,14 +83,16 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, localTask
               const s = scenarios.load(name), variables = (policy.variables[name] || []).filter(v => Object.hasOwn(s.variables || {}, v));
               const entry = { name, steps: s.steps.length, variables };
               const { thu_muc_tai, reels_url } = s.variables || {};
-              if (typeof thu_muc_tai === 'string' && thu_muc_tai.length <= 1024 && path.win32.isAbsolute(thu_muc_tai) &&
-                  typeof reels_url === 'string' && /^https?:\/\//.test(reels_url) && reels_url.length <= 2048 &&
-                  ['video_url','ten_phim','ten_file'].every(key => Object.hasOwn(s.variables,key))) {
-                const target = {thu_muc_tai,reels_url};
+              const target = {};
+              if (typeof thu_muc_tai === 'string' && thu_muc_tai.length <= 1024 && path.win32.isAbsolute(thu_muc_tai))
+                target.thu_muc_tai = thu_muc_tai;
+              if (typeof reels_url === 'string' && /^https?:\/\//.test(reels_url) && reels_url.length <= 2048)
+                target.reels_url = reels_url;
+              if (Object.keys(target).length) {
                 const bytes = Buffer.byteLength(JSON.stringify(target)) + 20;
                 if (bytes <= targetBudget) { entry.libraryTarget = target; targetBudget -= bytes; }
               }
-              if (entry.libraryTarget) {
+              if (entry.libraryTarget || variables.some(key=>['video_url','ten_phim','ten_file'].includes(key))) {
                 const a = { ...assignmentConfig(s), id: s.scenario_id ?? name, profile: s.profile || '',
                   browser: s.steps.some(step => !['downloadVideo','wait','openFolder'].includes(step.action)) };
                 const bytes = Buffer.byteLength(JSON.stringify(a)) + 20;

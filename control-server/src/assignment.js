@@ -5,6 +5,11 @@ const c = require('../shared/remote-protocol');
 const { RESERVED, PENDING_RUN, createCommand } = require('./command-record');
 const variableNames = ['video_url', 'thu_muc_tai', 'reels_url', 'ten_phim', 'ten_file'];
 
+function overrides(clip,scenario) {
+  const candidates = variables(clip,scenario.libraryTarget || {}).variables;
+  return {variables:Object.fromEntries(Object.entries(candidates).filter(([key,value]) =>
+    value !== undefined && scenario.variables.includes(key)))};
+}
 function settings(store, owner) {
   return store.get('assignmentSettings', owner) || { id: owner, enabled: false, retryHours: 1 };
 }
@@ -40,13 +45,13 @@ function assignManual(store,owner,data,now) {
   const device = store.get('device',c.uuid(data.device_id));
   if (!clip || clip.owner !== owner || !device || device.owner !== owner) c.fail('Không tìm thấy video hoặc máy.',404);
   const scenario = device.metadata.scenarios?.find(s=>s.name === data.scenario);
-  if (!scenario?.assignment || !scenario.libraryTarget || !variableNames.every(k=>scenario.variables.includes(k)))
-    c.fail('Máy chưa cho phép giao kịch bản với đủ năm biến.',409);
+  if (!scenario?.assignment || !Object.keys(overrides(clip,scenario).variables).length)
+    c.fail('Máy chưa cho phép giao kịch bản với biến phù hợp.',409);
   if (clip.used || clip.job_ids.some(id=>PENDING_RUN.has(store.get('command',id)?.state)))
     c.fail('Video đã dùng hoặc đang có job.',409);
   const profile = freeProfile(device,scenario,store.list('command',owner),now);
   if (!profile) c.fail('Máy đang offline, bận hoặc profile chưa sẵn sàng.',409);
-  const payload = {profile:profile.directory,scenario:scenario.name,...variables(clip,scenario.libraryTarget)};
+  const payload = {profile:profile.directory,scenario:scenario.name,...overrides(clip,scenario)};
   const job = createCommand(randomUUID(),owner,device.id,'run',payload,now);
   job.videoRecord = clip.id;
   job.scenarioId = scenario.assignment.id ?? scenario.name;
@@ -65,7 +70,7 @@ function allocate(store, owner, now, pollingDevice) {
   const commands = new Map(store.list('command', owner).map(job => [job.id, job]));
   const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
   const routes = devices.flatMap(device => (device.metadata?.scenarios || [])
-    .filter(s => s.assignment && s.libraryTarget && variableNames.every(key => s.variables.includes(key)))
+    .filter(s => s.assignment && variableNames.some(key => s.variables.includes(key) && (s.libraryTarget?.[key] || !['thu_muc_tai','reels_url'].includes(key))))
     .map(scenario => ({ device, scenario })))
     .sort((a, b) => b.scenario.assignment.priority - a.scenario.assignment.priority ||
       compare(a.scenario.name, b.scenario.name) || compare(a.device.id, b.device.id));
@@ -97,7 +102,7 @@ function allocate(store, owner, now, pollingDevice) {
       if (!profile) continue;
       available = true;
       if (device.id !== pollingDevice) break;
-      const payload = { profile: profile.directory, scenario: scenario.name, ...variables(clip, scenario.libraryTarget) };
+      const payload = { profile: profile.directory, scenario: scenario.name, ...overrides(clip,scenario) };
       const job = { ...createCommand(randomUUID(), owner, device.id, 'run', payload, now),
         videoRecord: clip.id, automatic: true, scenarioId, topic: clip.type_topic };
       store.put('scenarioQuota',{...quota,id:quotaKey(owner,scenarioId),scenarioId,day,count:count+1},owner);
@@ -124,8 +129,8 @@ function canRedeliver(store, job, device) {
   return s?.assignment && (!job.scenarioId || job.scenarioId === (s.assignment.id ?? s.name)) &&
     (!job.automatic || s.assignment.topics.includes(clip.type_topic)) && p && !p.running &&
     (!s.assignment.profile || s.assignment.profile === profile) && (!s.assignment.browser || p.extensionConnected) &&
-    !device.activity.active.some(run => run.profile === profile) && variableNames.every(key => s.variables.includes(key)) &&
-    s.libraryTarget?.thu_muc_tai === vars.thu_muc_tai && s.libraryTarget?.reels_url === vars.reels_url;
+    !device.activity.active.some(run => run.profile === profile) && Object.keys(vars).every(key => s.variables.includes(key)) &&
+    (vars.thu_muc_tai === undefined || s.libraryTarget?.thu_muc_tai === vars.thu_muc_tai) && (vars.reels_url === undefined || s.libraryTarget?.reels_url === vars.reels_url);
 }
 
 function recordResult(store, job, now) {

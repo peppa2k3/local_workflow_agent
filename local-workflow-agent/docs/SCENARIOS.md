@@ -304,7 +304,7 @@ Chọn **Chrome profile của kịch bản** trong trình chỉnh sửa rồi b�
 }
 ```
 
-Khai báo `video_url`, `thu_muc_tai`, `reels_url`, `ten_phim` và `ten_file` trong `variables`. Cấp quyền sửa cả năm biến cho kịch bản trong **Remote Control**. Bước `downloadVideo` dùng `{{video_url}}` và `{{thu_muc_tai}}`. Sau khi bước tải hoàn tất, bước đăng dùng `{{reels_url}}`, `{{ten_phim}}` và `{{ten_file}}`. Agent lấy tiêu đề và tên file từ kết quả tải thực tế. Nếu kịch bản đã gắn Chrome profile, cấp quyền cho đúng profile đó và cấu hình extension trong profile đó khi có bước trình duyệt.
+Khai báo `video_url`, `thu_muc_tai`, `reels_url`, `ten_phim` và `ten_file` trong `variables`. Cấp quyền sửa các biến cần nhận từ server cho kịch bản trong **Remote Control**. Bước `downloadVideo` dùng `{{video_url}}` và `{{thu_muc_tai}}`. Sau khi bước tải hoàn tất, bước đăng dùng `{{reels_url}}`, `{{ten_phim}}` và `{{ten_file}}`. Agent lấy tiêu đề và tên file từ kết quả tải thực tế. Nếu kịch bản đã gắn Chrome profile, cấp quyền cho đúng profile đó và cấu hình extension trong profile đó khi có bước trình duyệt.
 
 ## Đổi tên file kịch bản
 
@@ -329,6 +329,6 @@ Trong **Chi tiết và chỉnh sửa**, chọn đánh giá thủ công hoặc qu
 
 ### Giao job từ thẻ video
 
-Chọn máy và kịch bản trong Kho video, sau đó bấm **Giao job cho máy đã chọn**. Máy phải online và có profile rảnh phù hợp. Server lấy URL từ video và đích tải/đăng từ kịch bản. Local cần cho phép cả năm biến. Giao thủ công dùng được khi tắt chế độ tự động và không tính vào hạn mức.
+Chọn máy và kịch bản trong Kho video, sau đó bấm **Giao job cho máy đã chọn**. Máy phải online và có profile rảnh phù hợp. Server lấy URL từ video và đích tải/đăng từ kịch bản. Server chỉ gửi các biến trùng key được local cho phép. Ví dụ, chỉ cấp quyền video_url để giữ các giá trị còn lại của kịch bản trên máy. Giao thủ công dùng được khi tắt chế độ tự động và không tính vào hạn mức.
 
 Đặt `scenario_id` (ví dụ `downup-giangloi`) giống nhau trên các máy đồng bộ. Nếu bỏ trống, hệ thống dùng tên file bỏ đuôi JSON. Trong Kho video, chọn kịch bản và lưu hạn mức hằng ngày. Hạn mức dùng chung theo tài khoản và ID, số 0 dừng giao tự động, ô trống cho phép không giới hạn. Server tính một lượt khi tạo job tự động, kể cả job sau đó chạy lỗi. Giao lại cùng job không tăng số lượt. Ngày mới bắt đầu lúc 00:00 UTC+7.

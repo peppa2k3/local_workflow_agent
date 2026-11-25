@@ -29,7 +29,7 @@ function showQuota() {
 }
 function targets() {
   const device=devices.find(d=>d.id===$('device').value);
-  options($('scenario'),(device?.metadata.scenarios || []).filter(s=>s.libraryTarget).map(s=>[s.name,s.name]));
+  options($('scenario'),(device?.metadata.scenarios || []).filter(s=>s.libraryTarget || s.assignment).map(s=>[s.name,s.name]));
   showQuota();
 }
 function row(v) {

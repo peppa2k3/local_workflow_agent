@@ -67,7 +67,7 @@ const c = require('../control-server/shared/remote-protocol');
     const scenario={variables:{video_url:'',reels_url:'https://example.test/reels',thu_muc_tai:dir,ten_phim:'{{download_title}}',ten_file:'{{download_file_name}}'},
       steps:[{action:'downloadVideo',url:'{{video_url}}',directory:'{{thu_muc_tai}}'}, {action:'type',selector:'#title',text:'{{ten_phim}}'}]};
     const scenarios=createScenarioStore(dir); scenarios.save('target',scenario);
-    c.atomicJson(path.join(dir,'remote.json'),{url:f.origin,device:{id:first.id},token:first.token,policy:{scenarios:['target'],profiles:['Default'],variables:{target:Object.keys(scenario.variables)}}});
+    c.atomicJson(path.join(dir,'remote.json'),{url:f.origin,device:{id:first.id},token:first.token,policy:{scenarios:['target'],profiles:['Default'],variables:{target:['video_url']}}});
     let scanning=false,running=false;
     const runId=randomUUID();
     const options={dataDir:dir,profiles:()=>[{name:'Default',directory:'Default'}],scenarios,allowHttp:true,
@@ -153,6 +153,8 @@ const c = require('../control-server/shared/remote-protocol');
     const manualCard = await filterToVideo('00000000000');
     await manualCard.getByRole('button',{name:'Giao job cho máy đã chọn'}).click();
     await page.locator('#feedback').filter({hasText:'Đã giao job'}).waitFor();
+    const assignedId=(await client('/api/scanner/videos?q=00000000000')).videos[0].job_ids[0];
+    assert.deepEqual(f.store.get('command',assignedId).payload.variables,{video_url:'https://www.youtube.com/watch?v=00000000000'});
     await filterToVideo(id);
     for (const label of ['Đánh dấu đã dùng','Đánh dấu chưa dùng']) {
       await originalCard.getByText('Tùy chọn',{exact:true}).click();

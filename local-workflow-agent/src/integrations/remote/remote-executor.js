@@ -39,7 +39,8 @@ function createRemoteExecutor({ dataDir, workflows, scenarios, getPolicy, localT
         if (command.assignmentScenarioId || command.assignmentTopic !== undefined) {
           const config = assignmentConfig(scenario);
           if ((command.assignmentScenarioId && command.assignmentScenarioId !== (scenario.scenario_id ?? p.scenario)) || (command.assignmentTopic !== undefined && !config.topics.includes(command.assignmentTopic)) || scenarioProfile(scenario, p.profile) !== p.profile ||
-              p.variables.thu_muc_tai !== scenario.variables.thu_muc_tai || p.variables.reels_url !== scenario.variables.reels_url)
+              (p.variables.thu_muc_tai !== undefined && p.variables.thu_muc_tai !== scenario.variables.thu_muc_tai) ||
+              (p.variables.reels_url !== undefined && p.variables.reels_url !== scenario.variables.reels_url))
             c.fail('Local assignment configuration changed');
         }
         const clips = p.clips ?? {};
