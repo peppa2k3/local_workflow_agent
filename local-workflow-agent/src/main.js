@@ -36,7 +36,7 @@ const mongoSync = createMongoSync(activity, { settings: mongoSettings });
 const content = createContentApi({ mongo: mongoSync, activity, readBody });
 const mediaGuard = createMediaGuard({ activity, mongo: mongoSync });
 const cachedDownloader = createCachedDownloader(activity, downloadVideo);
-const workflows = createWorkflows({ onChange: () => remote.activityChanged(), scenarios, defaultProfile: profile, profiles, activity, mediaGuard, prepareUpload: content.prepareUpload, async downloadVideo(step, signal, context) {
+const workflows = createWorkflows({ onChange: () => remote.activityChanged(), scenarios, defaultProfile: profile, profiles, activity, mediaGuard, openProfile, prepareUpload: content.prepareUpload, async downloadVideo(step, signal, context) {
   if (isClip(step.url)) {
     const clip = await downloadVideo(step, signal);
     const file = await activity.registerFile(clip.filePath, { duration: clip.duration, tag: step.folderTag || 'automation', signal });
@@ -57,6 +57,9 @@ const workflows = createWorkflows({ onChange: () => remote.activityChanged(), sc
   if (!fs.existsSync(folder) || !fs.statSync(folder).isDirectory()) throw new Error(`Folder does not exist: ${folder}`);
   return launch('explorer.exe', [folder]);
 } });
+function openProfile(directory, ...urls) {
+  return launch(chromePath, [`--user-data-dir=${userDataDir}`, `--profile-directory=${directory}`, ...urls]);
+}
 function launch(command, args) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { detached: true, stdio: 'ignore' });
@@ -196,7 +199,7 @@ const server = http.createServer(async (request, response) => {
       if (request.method === 'POST' && route === '/api/profiles/open') {
         const body = await readBody(request);
         workflows.session(body.profile);
-        await launch(chromePath, [`--user-data-dir=${userDataDir}`, `--profile-directory=${body.profile}`, `http://127.0.0.1:${port}`]);
+        await openProfile(body.profile, `http://127.0.0.1:${port}`);
         return json(200, { ok: true });
       }
       if (request.method === 'GET' && route === '/api/pick/status') return json(200, workflows.session(selected).picker);

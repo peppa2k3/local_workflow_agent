@@ -2,7 +2,7 @@ const { randomUUID } = require('crypto');
 const { setTimeout: delay } = require('timers/promises');
 const { overrideVariables } = require('./variables');
 
-function createWorkflows({ scenarios, defaultProfile, profiles, onChange = () => {}, openFolder, downloadVideo, activity, prepareUpload, mediaGuard }) {
+function createWorkflows({ scenarios, defaultProfile, profiles, onChange = () => {}, openProfile, openFolder, downloadVideo, activity, prepareUpload, mediaGuard }) {
   const sessions = new Map();
   const completed = new Map();
   activity?.onPageRemap?.(remap => {
@@ -52,7 +52,7 @@ function createWorkflows({ scenarios, defaultProfile, profiles, onChange = () =>
       executionId: s.executionId || null, state: s.running ? 'running' : s.outcome || 'idle', scenario: s.scenarioName || null,
       total: s.workflow?.steps.length || 0, action: s.workflow?.steps[s.index]?.action || null,
       stepLabel: s.currentStep?.label?.trim() || s.workflow?.steps[s.index]?.label?.trim() || `Bước ${s.index + 1}`,
-      extensionConnected: Date.now() - s.lastContact < 10000, error: s.error,
+      extensionConnected: Date.now() - s.lastContact < 10000, waitingForProfile: s.running && Boolean(s.connectionDeadline), error: s.error,
       paused: Boolean(s.confirmation), confirmation: s.confirmation ? structuredClone(s.confirmation) : null,
       tabId: s.tabId, waiting: s.inFlight || s.localPending,
       elapsedMs: s.startedAt ? (s.endedAt || Date.now()) - s.startedAt : 0,
@@ -153,7 +153,10 @@ function createWorkflows({ scenarios, defaultProfile, profiles, onChange = () =>
           }
         }
         else if (step.action === 'openFolder') await openFolder(step.path);
-        else { persist(s); break; }
+        else {
+          if (s.awaitingFirstBrowserStep) ensureProfile(s);
+          break;
+        }
         if (!s.running || s.runId !== runId) return;
         s.lastStepMs = Date.now() - s.stepStartedAt;
         endStep(s, 'succeeded'); persist(s);
@@ -166,6 +169,14 @@ function createWorkflows({ scenarios, defaultProfile, profiles, onChange = () =>
       if (s.runId === runId) s.localPending = false;
     }
   }
+  function ensureProfile(s) {
+    if (s.connectionDeadline || Date.now() - s.lastContact < 10000) return;
+    const runId = s.runId;
+    s.connectionDeadline = Date.now() + 60000;
+    openProfile(s.profile).catch(error => {
+      if (s.running && s.runId === runId && s.connectionDeadline) fail(s, error);
+    });
+  }
   function start(profile, scenario, uploadPath = '', scenarioName = null, variables = {}, timeoutMs = 3600000, executionId = null, remote = false) {
     if (executionId) {
       if (!/^[0-9a-f-]{36}$/.test(executionId)) throw new Error('Invalid execution ID');
@@ -174,14 +185,11 @@ function createWorkflows({ scenarios, defaultProfile, profiles, onChange = () =>
     const s = session(profile);
     if (s.running) throw new Error('Stop this profile before starting another scenario');
     const workflow = scenarios.prepare(overrideVariables(scenario, variables), uploadPath);
-    if (!status(profile).extensionConnected && workflow.steps.some(step => !['wait', 'openFolder', 'downloadVideo'].includes(step.action))) {
-      throw new Error('Extension chưa kết nối profile này. Mở profile, cài/reload extension và chọn đúng profile trong Extension options.');
-    }
     stop(profile);
     Object.assign(s, { workflow, remote, scenarioName: scenarioName || scenario.name || null, uploadPath, currentStep: null, currentUrl: '', uploadFile: null,
       steps: workflow.steps.map((step, index) => ({ index, number: index + 1, action: step.action, label: step.label?.trim() || `Bước ${index + 1}`,
         state: 'pending', started_at: null, ended_at: null, error: '' })),
-      runtime: {}, index: 0, download: null, error: '', tabId: null, openedTabIds: [], running: true, startedAt: Date.now(), endedAt: null, lastStepMs: null });
+      awaitingFirstBrowserStep: true, connectionDeadline: 0, runtime: {}, index: 0, download: null, error: '', tabId: null, openedTabIds: [], running: true, startedAt: Date.now(), endedAt: null, lastStepMs: null });
     s.executionId = executionId || s.runId; s.outcome = 'running';
     s.runDeadline = Date.now() + timeoutMs;
     try { persist(s); } catch (error) { s.running = false; s.outcome = 'failed'; throw error; }
@@ -203,6 +211,8 @@ function createWorkflows({ scenarios, defaultProfile, profiles, onChange = () =>
   function next(s) {
     const answer = { running: s.running, paused: Boolean(s.confirmation), runId: s.runId, step: null, tabId: s.tabId };
     if (s.running && !s.confirmation && !s.localPending && !s.inFlight) {
+      s.awaitingFirstBrowserStep = false;
+      s.connectionDeadline = 0;
       s.inFlight = true;
       s.stepStartedAt = Date.now();
       s.steps[s.index].started_at = new Date(s.stepStartedAt).toISOString(); persist(s);
@@ -248,6 +258,13 @@ function createWorkflows({ scenarios, defaultProfile, profiles, onChange = () =>
   function expire() {
     for (const s of sessions.values()) {
       if (s.running && Date.now() > s.runDeadline) { fail(s, 'Workflow execution timed out'); continue; }
+      if (s.running && s.awaitingFirstBrowserStep && !s.localPending) {
+        if (s.connectionDeadline && Date.now() >= s.connectionDeadline) {
+          fail(s, `Extension chưa kết nối với ${s.profile} sau 60 giây. Kiểm tra extension và profile trong Extension options.`);
+          continue;
+        }
+        ensureProfile(s);
+      }
       if (s.running && s.inFlight && Date.now() > s.deadline) fail(s, `Step ${s.index + 1}: extension action timed out`);
     }
   }

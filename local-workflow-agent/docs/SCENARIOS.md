@@ -108,7 +108,7 @@ Page load does not tell an agent when a website's business operation is finished
 
 The condition should identify the **new** result of this action. For a spinner, `hidden` succeeds as soon as no matching visible spinner exists, including when it has not appeared yet; prefer a result element that appears after success. With a result condition, the default DOM quiet interval is 0 because the explicit condition determines readiness. Set `settleMs` explicitly to override it. A clicked button may remain visible and be clicked again in the following step: its disappearance is never required implicitly. An unfinished `completion` object with only type/state and no locator/selector is ignored on the prepared copy; saved JSON is not rewritten. Use a completion locator or a separate `waitFor` for the actual next UI control. Explicit DOM quiet timeouts report `Page DOM did not settle...`; increasing page-load timeout alone does not fix an endlessly changing DOM.
 
-`navigationTimeoutMs` defaults to 30000 ms for page readiness and separately for the completion condition; `timeoutMs` continues to control finding the action target (default 10000 ms). A timeout/error stops that profile without issuing later steps. Stop cancels pending waits and rejects stale results; it cannot undo an input already delivered to the website. The agent also times out a browser action if its extension disappears. Browser actions require the selected profile's extension to be connected before Run.
+`navigationTimeoutMs` defaults to 30000 ms for page readiness and separately for the completion condition; `timeoutMs` continues to control finding the action target (default 10000 ms). A timeout/error stops that profile without issuing later steps. Stop cancels pending waits and rejects stale results; it cannot undo an input already delivered to the website. The agent also times out a browser action if its extension disappears. At the first browser step, the agent launches the selected profile if its extension is offline and waits up to 60 seconds for it to poll.
 
 For point-and-click selection, press **Chọn trên trang** on a step in the dashboard, switch to the Chrome tab, and click the target element. The picked locator is filled into the step. Press Esc to cancel. Save the scenario afterward.
 
@@ -148,7 +148,7 @@ For example, keep `"text": "{{tenphimn}}"` in the step and set `variables.tenphi
 
 ## Selecting and cloning scenarios
 
-Changing **Kịch bản đã lưu** loads that scenario immediately; save edits before switching. Select a connected profile, select a scenario, then press Run. Run saves the editor and dispatches it to the profile captured when Run was pressed. Each profile still needs the one-time extension Options mapping described above. The dashboard locks editor operations while loading/saving/cloning to prevent overlapping requests from mixing scenarios.
+Changing **Kịch bản đã lưu** loads that scenario immediately; save edits before switching. Select a profile, select a scenario, then press Run. Run saves the editor and dispatches it to the profile captured when Run was pressed. Each profile still needs the one-time extension Options mapping described above. The dashboard locks editor operations while loading/saving/cloning to prevent overlapping requests from mixing scenarios.
 
 **Clone kịch bản** saves the editor and creates an independent file with all steps and variables, using `-copy`, `-copy-2`, etc. It opens the copy for editing. The source is preserved; a destination that already exists is never overwritten. HTTP clients can use `POST /api/scenarios/<source>/clone` with `{ "name": "destination" }`.
 
@@ -203,7 +203,7 @@ JSON dùng `clip:tên-file.mp4` trong `downloadVideo.url`, `upload.filePath` ho�
 
 ## Nối download → mở URL → upload Reels
 
-Mẫu hoàn chỉnh: `scenarios/download-upload-reels.json`. Chọn mẫu trong dashboard, sửa `video_url`, `thu_muc_tai`, `reels_url`, chọn Chrome profile đã kết nối và chạy. Mẫu tải clip, xác nhận file, mở Reels, tạo thước phim, upload chính clip đó, bấm Tiếp và điền mô tả bằng tiêu đề. Mẫu dừng ở màn hình soạn/xem lại, không tự bấm Đăng. Có thể thêm bước click Đăng và điều kiện hoàn tất phù hợp nếu muốn tự xuất bản.
+Mẫu hoàn chỉnh: `scenarios/download-upload-reels.json`. Chọn mẫu trong dashboard, sửa `video_url`, `thu_muc_tai`, `reels_url`, chọn Chrome profile và chạy. Mẫu tải clip, xác nhận file, mở Reels, tạo thước phim, upload chính clip đó, bấm Tiếp và điền mô tả bằng tiêu đề. Mẫu dừng ở màn hình soạn/xem lại, không tự bấm Đăng. Có thể thêm bước click Đăng và điều kiện hoàn tất phù hợp nếu muốn tự xuất bản.
 
 Các locator tiếng Việt lấy theo luồng hiện có trong dự án; nút/ô mô tả có thể khác theo tài khoản, phiên bản hoặc ngôn ngữ Facebook. Dùng “Chọn trên trang” để chỉnh. Bước upload mẫu chờ nút Tiếp enabled tối đa 300000 ms; đây là dấu hiệu tiếp tục của giao diện, không khẳng định máy chủ Facebook đã xử lý xong video. Nếu trang có dấu hiệu xử lý riêng, đổi completion hoặc thêm waitFor cho dấu hiệu đó.
 
@@ -283,7 +283,7 @@ Popup lỗi có nút **Đã hiểu** trên các trang local. Control-server hư�
 
 Trên dashboard local, chọn profile và kịch bản, chọn ngày giờ rồi bấm **Đặt lịch**. Agent lưu các chỉnh sửa kịch bản hiện tại và đường dẫn upload của lượt chạy. Trên control server, chọn thiết bị và cấu hình lượt chạy trong mục **Chạy kịch bản** rồi bấm **Đặt lịch**. Lịch dùng múi giờ của trình duyệt, mặc định là phút hiện tại. Có thể đổi giờ hoặc hủy lịch đang chờ ngay trong danh sách.
 
-Agent lưu lịch local trong `data/schedules.json`. Control server lưu lịch từ xa trong SQLite. Khi đến giờ, agent phải hoạt động và profile phải rảnh. Lịch chờ qua thời gian máy tắt và được xét lại khi agent hoạt động. Kịch bản dùng bản đã lưu tại thời điểm chạy. Giữ Chrome cùng extension kết nối đúng profile cho các bước trình duyệt.
+Agent lưu lịch local trong `data/schedules.json`. Control server lưu lịch từ xa trong SQLite. Khi đến giờ, agent phải hoạt động và profile phải rảnh. Lịch chờ qua thời gian máy tắt và được xét lại khi agent hoạt động. Kịch bản dùng bản đã lưu tại thời điểm chạy. Khi tới bước trình duyệt đầu tiên, agent tự mở Chrome profile đã chọn nếu extension chưa kết nối và chờ tối đa 60 giây. Cần cài extension và chọn đúng profile trong Extension options một lần trước khi chạy. Có thể đặt bước `closeTab` sau `openUrl` để đóng tab mà scenario đã mở.
 
 Popup hiển thị trên dashboard đã đặt lịch và trên màn hình Windows nếu agent chạy trong phiên desktop. Chọn **Yes** để chạy, **No** để hủy. Sau 30 giây hệ thống mặc định chạy dù dashboard đã đóng. Lượt remote giữ nguyên quyền profile/kịch bản và biến đã cấu hình trên máy local.
 
@@ -304,7 +304,7 @@ Chọn **Chrome profile của kịch bản** trong trình chỉnh sửa rồi b�
 }
 ```
 
-Khai báo `video_url`, `thu_muc_tai`, `reels_url`, `ten_phim` và `ten_file` trong `variables`. Cấp quyền sửa cả năm biến cho kịch bản trong **Remote Control**. Bước `downloadVideo` dùng `{{video_url}}` và `{{thu_muc_tai}}`. Sau khi bước tải hoàn tất, bước đăng dùng `{{reels_url}}`, `{{ten_phim}}` và `{{ten_file}}`. Agent lấy tiêu đề và tên file từ kết quả tải thực tế. Nếu kịch bản đã gắn Chrome profile, cấp quyền cho đúng profile đó và kết nối extension khi có bước trình duyệt.
+Khai báo `video_url`, `thu_muc_tai`, `reels_url`, `ten_phim` và `ten_file` trong `variables`. Cấp quyền sửa cả năm biến cho kịch bản trong **Remote Control**. Bước `downloadVideo` dùng `{{video_url}}` và `{{thu_muc_tai}}`. Sau khi bước tải hoàn tất, bước đăng dùng `{{reels_url}}`, `{{ten_phim}}` và `{{ten_file}}`. Agent lấy tiêu đề và tên file từ kết quả tải thực tế. Nếu kịch bản đã gắn Chrome profile, cấp quyền cho đúng profile đó và cấu hình extension trong profile đó khi có bước trình duyệt.
 
 ## Đổi tên file kịch bản
 

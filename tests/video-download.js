@@ -180,7 +180,7 @@ const { createCachedDownloader } = require('../local-workflow-agent/src/storage/
       assert.equal(saved.steps[0].url, 'clip:Tên phim.mp4');
       assert.equal(await page.locator('#runBtn').isEnabled(), true, 'download-only workflow runs without extension');
       await page.locator('.step-head select').selectOption('openUrl');
-      assert.equal(await page.locator('#runBtn').isEnabled(), false, 'browser action still requires extension');
+      assert.equal(await page.locator('#runBtn').isEnabled(), true, 'Run can launch the offline profile for a browser action');
       const stepName = page.getByRole('textbox', { name: 'Tên bước (tùy chọn)', exact: true });
       assert.equal(await page.locator('.step-title').textContent(), 'Bước 1');
       await stepName.fill('Mở trang Reels');

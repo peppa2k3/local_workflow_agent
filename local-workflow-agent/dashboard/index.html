@@ -254,7 +254,7 @@ function updateButtons() {
   setProperty($('openProfileBtn'), 'disabled', !profileState);
   for (const id of ['loadBtn', 'newBtn', 'saveBtn', 'cloneBtn', 'addBtn', 'addVariableBtn', 'scenarioSelect']) setProperty($(id), 'disabled', editorBusy);
   setProperty($('schedule-create'), 'disabled', editorBusy || !profileState);
-  setProperty($('runBtn'), 'disabled', editorBusy || !agentCompatible || (!profileState?.extensionConnected && scenario.steps.some(step => !['wait', 'openFolder', 'downloadVideo'].includes(step.action))) || !profileState || profileState.running || (scenario.steps.some(step => step.action === 'downloadVideo') && !videoCompatible) || (usesDownloadReferences() && !referencesCompatible));
+  setProperty($('runBtn'), 'disabled', editorBusy || !agentCompatible || !profileState || profileState.running || (scenario.steps.some(step => step.action === 'downloadVideo') && !videoCompatible) || (usesDownloadReferences() && !referencesCompatible));
   const saved = Array.from($('scenarioSelect').options).some(option => option.value === fileName);
   setProperty($('deleteBtn'), 'disabled', editorBusy || !managementCompatible || !saved);
   setProperty($('renameBtn'), 'disabled', editorBusy || !renameCompatible || !saved || $('fileName').value.trim() === fileName);
@@ -769,8 +769,8 @@ async function updateStatus() {
     const activeProfile = executionProfile();
     const state = knownProfiles.find(item => item.directory === activeProfile) || { profile: activeProfile };
     if ($('connectionDot').classList.contains('ok') !== !!state.extensionConnected) $('connectionDot').classList.toggle('ok', !!state.extensionConnected);
-    setText('connectionText', agentCompatible ? `${state.profile} · ${knownProfiles.includes(state) ? (state.extensionConnected ? 'Extension đã kết nối' : 'Extension chưa kết nối') : 'Profile không có trên máy local'}` : 'Agent cũ: dừng và chạy lại node local-agent.js');
-    let progress = state.confirmation?.message || state.error || (state.running ? `Đang chạy bước ${state.index + 1}/${state.total}: ${state.stepLabel || state.action || 'đang chờ'}` : state.download ? `Đã lưu: ${state.download.filePath} · ${state.download.width || '?'}×${state.download.height || '?'} · ${Math.round(state.download.fps || 0)} fps · ${state.download.videoCodec || ''}` : 'Đang chờ lệnh');
+    setText('connectionText', agentCompatible ? `${state.profile} · ${knownProfiles.includes(state) ? (state.extensionConnected ? 'Extension đã kết nối' : 'Agent sẽ mở profile khi cần trình duyệt') : 'Profile không có trên máy local'}` : 'Agent cũ: dừng và chạy lại node local-agent.js');
+    let progress = state.confirmation?.message || state.error || (state.waitingForProfile ? `Đang chờ extension của ${activeProfile} kết nối…` : state.running ? `Đang chạy bước ${state.index + 1}/${state.total}: ${state.stepLabel || state.action || 'đang chờ'}` : state.download ? `Đã lưu: ${state.download.filePath} · ${state.download.width || '?'}×${state.download.height || '?'} · ${Math.round(state.download.fps || 0)} fps · ${state.download.videoCodec || ''}` : 'Đang chờ lệnh');
     if (state.executionId) progress += ` · ${state.state} · runId: ${state.executionId}`;
     if (state.download?.reused) progress += ' · Đã tải URL này, dùng file đã lưu';
     setText('progress', progress);

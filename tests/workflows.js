@@ -3,11 +3,35 @@ const { createWorkflows } = require('../local-workflow-agent/src/workflow/workfl
 const { createScenarioStore } = require('../local-workflow-agent/src/workflow/scenario-store');
 
 (async () => {
+  const launched = [];
   const workflows = createWorkflows({
     scenarios: createScenarioStore('.'), defaultProfile: 'Profile 1',
     profiles: () => ['Profile 1', 'Profile 2'].map(directory => ({ directory })),
-    openFolder: async () => {}
+    openFolder: async () => {},
+    openProfile: async profile => { launched.push(profile); }
   });
+  const coldScenario = { steps: [{ action: 'openUrl', url: 'https://example.test/' }, { action: 'closeTab' }] };
+  const cold = workflows.start('Profile 2', coldScenario);
+  workflows.expire();
+  assert.deepEqual(launched, ['Profile 2']);
+  assert.equal(workflows.status('Profile 2').extensionConnected, false);
+  assert.equal(workflows.next(workflows.connect({ profile: 'Profile 1', clientId: 'first' })).step, null);
+  const target = workflows.connect({ profile: 'Profile 2', clientId: 'second' });
+  assert.equal(workflows.next(target).step.action, 'openUrl');
+  workflows.result(target, { runId: cold.runId, id: 0, ok: true, tabId: 10 });
+  assert.equal(workflows.next(target).step.closeTabId, 10);
+  workflows.result(target, { runId: cold.runId, id: 1, ok: true });
+  assert.equal(workflows.getRun(cold.runId).state, 'succeeded');
+
+  // Chrome closed just before Run, while the last heartbeat still looks fresh.
+  const missing = workflows.start('Profile 2', coldScenario);
+  assert.deepEqual(launched, ['Profile 2']);
+  target.lastContact = 0;
+  workflows.expire();
+  assert.deepEqual(launched, ['Profile 2', 'Profile 2']);
+  target.connectionDeadline = Date.now() - 1;
+  workflows.expire();
+  assert.equal(workflows.getRun(missing.runId).state, 'failed');
   const first = workflows.connect({ profile: 'Profile 1', clientId: 'first' });
   const second = workflows.connect({ profile: 'Profile 2', clientId: 'second' });
   assert.throws(() => workflows.connect({ profile: 'Profile 1', clientId: 'imposter' }), /Another extension/);

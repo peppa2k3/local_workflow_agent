@@ -20,7 +20,7 @@ const root = path.resolve(__dirname, '..');
     await new Promise(resolve => probe.close(resolve));
     const base = `http://127.0.0.1:${port}`;
     const token = randomBytes(32).toString('hex');
-    const env = { ...process.env, LOCAL_AGENT_ENV_FILE: path.join(temp, '.env'), MONGODB_URI: '', LOCAL_AGENT_DATA_DIR: path.join(temp, 'activity'), LOCAL_AGENT_PORT: String(port), CHROME_PROFILE: 'Profile 1', CHROME_USER_DATA_DIR: temp, LOCAL_AGENT_SCENARIOS_DIR: temp, LOCAL_AGENT_API_TOKEN: token };
+    const env = { ...process.env, LOCAL_AGENT_ENV_FILE: path.join(temp, '.env'), MONGODB_URI: '', LOCAL_AGENT_DATA_DIR: path.join(temp, 'activity'), LOCAL_AGENT_PORT: String(port), CHROME_PROFILE: 'Profile 1', CHROME_PATH: path.join(temp, 'missing-chrome.exe'), CHROME_USER_DATA_DIR: temp, LOCAL_AGENT_SCENARIOS_DIR: temp, LOCAL_AGENT_API_TOKEN: token };
     fs.writeFileSync(path.join(temp, 'Local State'), JSON.stringify({ profile: { info_cache: { 'Profile 1': { name: 'Fixture' }, 'Profile 2': { name: 'Other' } } } }));
     const browserScenario = { variables: { caption: 'Saved', delay: 10 }, steps: [{ action: 'wait', ms: '{{delay}}' }, { action: 'type', selector: '#caption', text: '{{caption}}' }] };
     fs.writeFileSync(path.join(temp, 'browser.json'), JSON.stringify(browserScenario));
@@ -83,7 +83,14 @@ const root = path.resolve(__dirname, '..');
     assert.equal((await api('/api/profiles', { headers: { Origin: 'chrome-extension://abc', Authorization: '' } })).profiles.length, 2, 'extension discovery still works');
     const client = { profile: 'Profile 1', clientId: 'fixture' };
     const payload = { scenario: 'browser', profile: 'Profile 1', variables: { caption: 'Tiếng Việt = value', delay: 0 } };
-    await api('/api/v1/runs', { body: payload, code: 400 }); // browser steps require extension
+    const coldRun = await api('/api/v1/runs', { body: payload, code: 202 });
+    let launchFailure;
+    for (let i = 0; i < 100; i++) {
+      launchFailure = await api('/api/v1/runs/' + coldRun.runId);
+      if (launchFailure.state === 'failed') break;
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    assert.match(launchFailure.error, /ENOENT/);
     await api('/state', { body: client });
     const run = await api('/api/v1/runs', { body: payload, headers: { 'Idempotency-Key': 'one' }, code: 202 });
     assert.equal((await api('/api/v1/runs', { body: payload, headers: { 'Idempotency-Key': 'one' } })).runId, run.runId);
