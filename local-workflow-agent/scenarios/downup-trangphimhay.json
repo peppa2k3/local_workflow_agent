@@ -3,7 +3,7 @@
   "variables": {
     "video_url": "clip:[Trọn bộ] Chiến Thần Y Tiên Xuống Núi Cưới Nữ Tổng Tài, Lộ Thân Thế Quét Sạch Kẻ Thù Mùa 1 #phimhay.mp4",
     "thu_muc_tai": "D:\\Videos\\trangphimhay",
-    "reels_url": "https://www.facebook.com/profile.php?id=61560176683071&sk=reels_tab",
+    "reels_url": "https://www.facebook.com/profile.php?id=61560176683071&sk=reels_tab&locale=vi_VN",
     "ten_phim": "{{download_title}}",
     "ten_file": "{{download_file_name}}"
   },
@@ -83,5 +83,12 @@
       "action": "closeTab",
       "label": "Đóng tab"
     }
-  ]
+  ],
+  "scenario_id": "trangphimhay",
+  "accepted_topics": [
+    "thu-vat",
+    "dong-vat",
+    "nghe-hieu-tieng-dong-vat"
+  ],
+  "profile": "Profile 24"
 }

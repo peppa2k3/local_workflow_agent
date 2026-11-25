@@ -84,5 +84,11 @@
       "label": "dangbai"
     }
   ],
-  "profile": "Profile 2"
+  "profile": "Profile 22",
+  "scenario_id": "liliphim",
+  "accepted_topics": [
+    "bi-coi-thuong",
+    "than-luc",
+    "sieu-nang-luc"
+  ]
 }

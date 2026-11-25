@@ -1,7 +1,7 @@
 {
   "name": "Tải clip → upload Reels và điền tên phim (bản sao)",
   "variables": {
-    "video_url": "https://youtu.be/Qg_yHCWCwpA?si=MjctI6KaurL2oVUZ",
+    "video_url": "clip:Tổng Tài nghe được tiếng lòng nữ thực tập sinh, vạch mặt ả trà xanh âm mưu hãm hại gia tộc!.mp4",
     "thu_muc_tai": "D:\\Videos\\khoahoc",
     "reels_url": "https://www.facebook.com/profile.php?id=61594335706080&sk=reels_tab",
     "ten_phim": "{{download_title}}",
@@ -44,7 +44,7 @@
       "action": "upload",
       "label": "Upload chính clip vừa tải",
       "locatorType": "role",
-      "locator": "Tải video lên cho Thước phim",
+      "locator": "Thêm video hoặc kéo và thả",
       "filePath": "{{download_file_path}}",
       "timeoutMs": 30000,
       "navigationTimeoutMs": 300000,
@@ -97,6 +97,11 @@
       "label": "nhap ten phim"
     },
     {
+      "action": "wait",
+      "ms": 180000,
+      "label": "Chờ nút Đăng"
+    },
+    {
       "action": "click",
       "locatorType": "role",
       "role": "button",
@@ -108,7 +113,16 @@
         "state": "visible"
       },
       "label": "Đăng"
+    },
+    {
+      "action": "closeTab",
+      "label": "Đóng tab"
     }
   ],
-  "profile": "Profile 3"
+  "profile": "Profile 23",
+  "accepted_topics": [
+    "xuyen-khong",
+    "bi-coi-thuong"
+  ],
+  "scenario_id": "khoahoc"
 }
