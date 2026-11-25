@@ -8,7 +8,7 @@ async function api(route, data) {
   if (!response.ok) throw Error(body.error);
   return body;
 }
-function action(fn) { Promise.resolve().then(fn).catch(e=>{ $('feedback').textContent=e.message; }); }
+function action(fn) { Promise.resolve().then(fn).catch(e=>{ toast.error(e.message); }); }
 function node(tag,text) { const n=document.createElement(tag); n.textContent=text; return n; }
 function options(select, pairs) {
   const saved = select.value;
@@ -64,7 +64,7 @@ function row(v) {
   const actions=node('div',''); actions.className='video-actions'; article.append(actions);
   function copy(label,get) {
     const btn=node('button',label);
-    btn.onclick=()=>action(async()=>{ const text=await get(); await navigator.clipboard.writeText(text); $('feedback').textContent='Đã sao chép.'; });
+    btn.onclick=()=>action(async()=>{ const text=await get(); await navigator.clipboard.writeText(text); toast.success('Đã sao chép.'); });
     actions.append(btn);
   }
   copy('Copy URL',()=>v.video_url);
@@ -81,7 +81,7 @@ function row(v) {
     assign.disabled=true;
     try {
       const job=await api('/api/scanner/assign',{record_id:v.id,device_id:$('device').value,scenario:$('scenario').value});
-      $('feedback').textContent='Đã giao job '+job.id;
+      toast.success('Đã giao job '+job.id);
       await refresh();
     } finally { assign.disabled=v.used; }
   });
@@ -95,7 +95,7 @@ function row(v) {
     action(async()=>{
       try {
         await api('/api/scanner/videos/'+option,{record_id:v.id,used:!v.used});
-        $('feedback').textContent=option==='delete'?'Đã xóa video.':'Đã cập nhật trạng thái video.';
+        toast.success(option==='delete'?'Đã xóa video.':'Đã cập nhật trạng thái video.');
         await refresh();
       } finally { toggle.disabled=remove.disabled=false; }
     });
@@ -148,7 +148,7 @@ $('quotaForm').onsubmit=event=>{
     const value=$('dailyLimit').value;
     await api('/api/scanner/quotas',{scenarioId:scenario.assignment?.id ?? scenario.name,limit:value==='' ? null : Number(value)});
     await refresh();
-    $('feedback').textContent='Đã lưu hạn mức.';
+    toast.success('Đã lưu hạn mức.');
   });
 };
 $('prev').onclick=()=>goTo(Math.max(0,page-1)); $('next').onclick=()=>goTo(page+1);
@@ -159,7 +159,7 @@ $('assignment').onsubmit = event => {
   event.preventDefault();
   action(async () => {
     await api('/api/scanner/assignment',{enabled:$('autoEnabled').checked,retryHours:Number($('retryHours').value)});
-    $('feedback').textContent='Đã lưu cài đặt giao job.';
+    toast.success('Đã lưu cài đặt giao job.');
     await refresh();
   });
 };

@@ -40,7 +40,7 @@
     if (!Number.isFinite(time) || time < Math.floor(Date.now() / 60000) * 60000) throw Error('Chọn phút hiện tại hoặc tương lai.');
     return time;
   }
-  const notices = new Set(), noticeQueue = [];
+  const noticeQueue = [];
   const reportedResults = new Map();
   let notice;
   let downloadPrompt, submittedDownload;
@@ -100,12 +100,7 @@
     downloadPrompt = { id: confirmation.id, dialog, timer: setInterval(update, 250) };
     document.body.append(dialog); dialog.showModal(); update();
   }
-  function popup(text, fromHistory = false) {
-    if (!text || (!fromHistory && notices.has(text))) return;
-    if (!fromHistory) {
-      notices.add(text);
-      if (notices.size > 200) notices.delete(notices.values().next().value);
-    }
+  function popup(text) {
     noticeQueue.push(text); showNotice();
   }
   function showNotice() {
@@ -116,7 +111,7 @@
     notice.addEventListener('close', () => { notice.remove(); notice = null; showNotice(); });
     document.body.append(notice); notice.showModal();
   }
-  function message(text, error = false) { $('message').textContent = text; $('message').className = error ? 'notice error' : 'notice'; $('message').hidden = !text; if (error) popup(text); }
+  function message(text, error = false) { if (text) toast[error ? 'error' : 'success'](text); }
   async function api(route, data) {
     const r = await fetch(route, { method: data === undefined ? 'GET' : 'POST', credentials: 'same-origin', redirect: 'error',
       headers: { 'content-type': 'application/json', 'x-csrf-token': csrf }, body: data === undefined ? undefined : JSON.stringify(data), signal: AbortSignal.timeout(18000) });
@@ -297,7 +292,7 @@
     const withResults = commands.filter(cmd => cmd.result?.message);
     reportedResults.set(deviceId, new Set(withResults.map(cmd => cmd.id)));
     if (previousResults) for (const cmd of withResults) {
-      if (!previousResults.has(cmd.id)) popup(`${cmd.payload.scenario || cmd.type}: ${cmd.result.message}`, true);
+      if (!previousResults.has(cmd.id)) popup(`${cmd.payload.scenario || cmd.type}: ${cmd.result.message}`);
     }
     historyCommands = [...commands].sort((a, b) => b.created - a.created);
     renderHistory(deviceId);

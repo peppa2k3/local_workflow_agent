@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kho video · Control Server</title>
-<link rel="stylesheet" href="/style.css"><script defer src="/library.js"></script></head><body><main class="shell">
+<link rel="stylesheet" href="/style.css"><script src="/toast.js" defer></script><script defer src="/library.js"></script></head><body><main class="shell">
   <nav class="main-nav" aria-label="Điều hướng chính"><a href="/devices">Thiết bị</a><a href="/library" aria-current="page">Kho video</a></nav>
-<header><div><span class="eyebrow">Local Agent / Control Center</span><h1>Kho video</h1></div></header><p id="feedback" role="status"></p>
+<header><div><span class="eyebrow">Local Agent / Control Center</span><h1>Kho video</h1></div></header>
 <div id="library" hidden>
 <section class="panel"><h2>Giao việc tự động</h2><form id="assignment"><label><input id="autoEnabled" type="checkbox"> Tự tạo và giao job từ kho video</label><label>Chờ khi hết slot (giờ)<input id="retryHours" type="number" min="0.016666666666666666" max="720" step="any" required></label><button>Lưu cài đặt</button></form></section>
 <section class="panel"><h2>Danh sách video</h2><div class="two"><label>Tìm theo tiêu đề, chủ đề, ID, máy gửi hoặc #tag<input id="query" type="search"></label>

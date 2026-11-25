@@ -37,7 +37,7 @@ const { chromium } = require('playwright');
     let loggedIn = false, online = true, downloadConfirmation, scheduledRun;
     await page.route('https://control.test/**', async route => {
       const req = route.request(), url = new URL(req.url());
-      if (['/', '/app.js', '/style.css'].includes(url.pathname)) return route.fulfill({ contentType: url.pathname === '/' ? 'text/html' : url.pathname.endsWith('.js') ? 'text/javascript' : 'text/css',
+      if (['/', '/toast.js', '/app.js', '/style.css'].includes(url.pathname)) return route.fulfill({ contentType: url.pathname === '/' ? 'text/html' : url.pathname.endsWith('.js') ? 'text/javascript' : 'text/css',
         body: fs.readFileSync(path.join(__dirname, '../control-server/web', url.pathname === '/' ? 'index.html' : url.pathname.slice(1)), 'utf8') });
       if (req.method() === 'POST') { assert.equal(req.headers()['x-csrf-token'], url.pathname === '/api/login' ? '' : 'fixture-csrf'); posted.push({ path: url.pathname, data: req.postDataJSON() }); }
       if (url.pathname === '/api/login') { loggedIn = true; return route.fulfill({ json: { email: 'user@example.test', csrf: 'fixture-csrf' } }); }
@@ -90,7 +90,7 @@ const { chromium } = require('playwright');
     assert.equal(await page.getByRole('textbox', { name: 'Giá trị caption' }).inputValue(), 'clip:' + clip);
     await page.getByRole('button', { name: 'Chọn clip · Bước 2 (Upload)' }).click();
     await page.getByRole('button', { name: 'Dùng clip' }).click();
-    await page.locator('#run').click(); await page.waitForFunction(() => document.getElementById('message').textContent.includes('Đã gửi lệnh chạy'));
+    await page.locator('#run').click(); await page.locator('.toast').filter({hasText:'Đã gửi lệnh chạy'}).waitFor();
     assert.deepEqual(posted.filter(p => p.data.type === 'browseClips').map(p => p.data.target), [target, uploadTarget]);
     const request = posted.find(p => p.path === '/api/commands' && p.data.type === 'run').data;
     assert.equal(request.variables.caption, 'clip:' + clip); assert.match(request.requestId, /^[0-9a-f-]{36}$/);
@@ -114,7 +114,7 @@ const { chromium } = require('playwright');
     assert.equal(await taskNotice.count(), 0);
     assert.match(await page.locator('#metrics').textContent(), /8.25 Mbps/);
     await page.locator('#local-running').getByRole('button', { name: 'Dừng lượt local' }).click();
-    await page.waitForFunction(() => document.getElementById('message').textContent === 'Đã gửi yêu cầu đến máy local.');
+    await page.getByText('Đã gửi yêu cầu đến máy local.',{exact:true}).waitFor();
     assert.equal(posted.find(p => p.data.type === 'manageLocalTask').data.taskId, uploadTarget);
     assert.equal(await page.locator('#local-schedules').getByRole('button', { name: 'Hủy lịch' }).count(), 1);
     await page.locator('#schedule-later').click();
