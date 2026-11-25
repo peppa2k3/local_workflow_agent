@@ -30,9 +30,9 @@ function metadata(value) {
       const a = s.assignment;
       if (scenario.libraryTarget && a && Array.isArray(a.topics) && a.topics.length <= 64 &&
           a.topics.every(t => typeof t === 'string' && /^[a-z0-9_-]{1,64}$/.test(t)) &&
-          Number.isSafeInteger(a.priority) && typeof a.browser === 'boolean' &&
+          (a.id === undefined || (typeof a.id === 'string' && /^[a-z0-9][a-z0-9_-]{0,63}$/.test(a.id))) && Number.isSafeInteger(a.priority) && typeof a.browser === 'boolean' &&
           (a.profile === '' || value.profiles.some(p => p.directory === a.profile))) {
-        scenario.assignment = { topics: [...new Set(a.topics)], priority: a.priority, browser: a.browser, profile: a.profile };
+        scenario.assignment = { id: a.id ?? s.name, topics: [...new Set(a.topics)], priority: a.priority, browser: a.browser, profile: a.profile };
       }
       if (Array.isArray(s.clipTargets)) scenario.clipTargets = s.clipTargets.slice(0, 150)
         .filter(t => c.object(t) && clipTargetId(t.id) && Number.isInteger(t.index) && t.index >= 0 && t.index < s.steps && ['upload', 'downloadVideo'].includes(t.action))
@@ -299,11 +299,11 @@ function createCommandApi(store) {
         .map(cmd => ({ runId: cmd.id, ...cmd.downloadDecision }));
       const enabled = assignment.settings(store, d.owner).enabled;
       let next = commands.filter(cmd => ['queued', 'dispatched'].includes(cmd.state) && cmd.expires >= now &&
-        cmd.deliveryUntil <= now && (!cmd.automatic || (enabled && assignment.canRedeliver(store, cmd, d))))
+        cmd.deliveryUntil <= now && (!cmd.automatic || enabled) && (!(cmd.automatic || cmd.scenarioId) || assignment.canRedeliver(store,cmd,d)))
         .sort((a, b) => Number(a.type === 'run' || a.type === 'browseClips') - Number(b.type === 'run' || b.type === 'browseClips') || a.created - b.created)[0];
       if (!next && enabled) next = assignment.allocate(store, d.owner, now, d.id);
       if (next) { next.state = 'dispatched'; next.deliveryUntil = now + 10000; store.put('command', next, d.owner); }
-      return { ack, schedulePrompts, command: next ? { id: next.id, type: next.type, payload: next.payload, ...(next.automatic && { assignmentTopic: next.topic }), expires: next.expires } : null, serverTime: now, downloadDecisions };
+      return { ack, schedulePrompts, command: next ? { id: next.id, type: next.type, payload: next.payload, ...(next.automatic && { assignmentTopic: next.topic }), ...(next.scenarioId && {assignmentScenarioId:next.scenarioId}), expires: next.expires } : null, serverTime: now, downloadDecisions };
     });
   }
   return { account, device };

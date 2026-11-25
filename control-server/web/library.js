@@ -15,9 +15,22 @@ function options(select, pairs) {
   select.replaceChildren(...pairs.map(([value,label])=>new Option(label,value)));
   if (pairs.some(([value])=>value===saved)) select.value=saved;
 }
+let quotaData = {quotas:[]};
+function selectedScenario() {
+  return devices.find(d=>d.id===$('device').value)?.metadata.scenarios?.find(s=>s.name===$('scenario').value);
+}
+function showQuota() {
+  const scenario=selectedScenario();
+  const id=scenario?.assignment?.id ?? scenario?.name;
+  const quota=quotaData.quotas.find(q=>q.scenarioId===id);
+  $('dailyLimit').value=quota?.limit ?? '';
+  $('saveLimit').disabled=!id;
+  $('quotaStatus').textContent=id ? id+' · Đã giao hôm nay: '+(quota && quota.day===quotaData.day ? quota.count : 0) : '';
+}
 function targets() {
   const device=devices.find(d=>d.id===$('device').value);
   options($('scenario'),(device?.metadata.scenarios || []).filter(s=>s.libraryTarget).map(s=>[s.name,s.name]));
+  showQuota();
 }
 function row(v) {
   const article=node('article',''); article.className='video-card';
@@ -61,6 +74,18 @@ function row(v) {
     const value=await api('/api/scanner/variables',{record_id:v.id,device_id:$('device').value,scenario:$('scenario').value});
     return JSON.stringify(value,null,2);
   });
+  const assign=node('button','Giao job cho máy đã chọn');
+  assign.disabled=v.used;
+  assign.onclick=()=>action(async()=>{
+    if (!selectedScenario()) throw Error('Chọn máy và kịch bản đích.');
+    assign.disabled=true;
+    try {
+      const job=await api('/api/scanner/assign',{record_id:v.id,device_id:$('device').value,scenario:$('scenario').value});
+      $('feedback').textContent='Đã giao job '+job.id;
+      await refresh();
+    } finally { assign.disabled=v.used; }
+  });
+  actions.prepend(assign);
   const menu=node('details',''); menu.className='video-options';
   menu.append(node('summary','Tùy chọn'));
   const toggle=node('button',v.used?'Đánh dấu chưa dùng':'Đánh dấu đã dùng');
@@ -83,12 +108,13 @@ function row(v) {
 async function refresh() {
   const pageSize=Number($('pageSize').value);
   const n=++generation, params=new URLSearchParams({q:$('query').value,used:$('used').value,page,pageSize});
-  const [library, list]=await Promise.all([api('/api/scanner/videos?'+params),api('/api/devices')]);
+  const [library,list,quotas]=await Promise.all([api('/api/scanner/videos?'+params),api('/api/devices'),api('/api/scanner/quotas')]);
   if(n!==generation) return;
   const pages=Math.ceil(library.total/pageSize);
   if (page >= Math.max(1,pages)) { page=Math.max(0,pages-1); return refresh(); }
+  quotaData=quotas;
   devices=list.devices.filter(d=>!d.revoked);
-  options($('device'),devices.map(d=>[d.id,d.name])); targets();
+  options($('device'),devices.map(d=>[d.id,d.name+(d.online ? '' : ' (offline)')])); targets();
   $('videos').replaceChildren(...library.videos.map(row));
   if (!library.videos.length) {
     $('videos').append(node('p', $('query').value || $('used').value
@@ -113,6 +139,18 @@ function goTo(index) {
 }
 $('refresh').onclick=()=>action(refresh);
 $('device').onchange=targets;
+$('scenario').onchange=showQuota;
+$('quotaForm').onsubmit=event=>{
+  event.preventDefault();
+  action(async()=>{
+    const scenario=selectedScenario();
+    if (!scenario) throw Error('Chọn kịch bản đích.');
+    const value=$('dailyLimit').value;
+    await api('/api/scanner/quotas',{scenarioId:scenario.assignment?.id ?? scenario.name,limit:value==='' ? null : Number(value)});
+    await refresh();
+    $('feedback').textContent='Đã lưu hạn mức.';
+  });
+};
 $('prev').onclick=()=>goTo(Math.max(0,page-1)); $('next').onclick=()=>goTo(page+1);
 $('pageSize').onchange=()=>{page=0;action(refresh);};
 $('used').onchange=()=>{page=0;action(refresh);};

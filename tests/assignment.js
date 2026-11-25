@@ -32,7 +32,7 @@ const c = require('../control-server/shared/remote-protocol');
       const profiles = () => [{ directory: 'Default', name: 'Fixture' }];
       const scenarios = createScenarioStore(dir);
       const vars = { video_url: '', thu_muc_tai: dir, reels_url: 'https://example.test/reels', ten_phim: '', ten_file: '' };
-      const template = { accepted_topics: [' NEWS '], variables: vars, steps: [
+      const template = { scenario_id:'shared', accepted_topics: [' NEWS '], variables: vars, steps: [
         { action: 'downloadVideo', url: '{{video_url}}', directory: '{{thu_muc_tai}}' },
         { action: 'openFolder', path: '{{ten_file}}' }
       ] };
@@ -65,6 +65,7 @@ const c = require('../control-server/shared/remote-protocol');
     await poll();
     const video = id => f.store.get('video', id);
     assert.deepEqual(video(clip).job_ids, []);
+    await account('/api/scanner/quotas',{scenarioId:'shared',limit:1});
     await configure(true);
     await poll();
     const job = f.store.get('command',video(clip).assignment_job);
@@ -91,6 +92,24 @@ const c = require('../control-server/shared/remote-protocol');
     exchange.device('/device/exchange', d, { instanceId: d.instanceId, metadata: d.metadata,
       reports: [{ id: job.id, seq: receipt.seq+1, result: receipt.result }] });
     assert.deepEqual(video(clip), original);
+    const limited = await submit('fixture0003','news');
+    await configure(true); await poll();
+    assert.deepEqual(video(limited).job_ids,[]);
+    const quotas = await account('/api/scanner/quotas');
+    assert.equal(quotas.quotas.find(q=>q.scenarioId==='shared').count,1);
+    await configure(false);
+    const manual = {record_id:limited,device_id:d.id,scenario:'low'};
+    const savedDevice = f.store.get('device',d.id);
+    f.store.put('device',{...savedDevice,lastSeen:0},f.alice.id);
+    await account('/api/scanner/assign',manual,409);
+    f.store.put('device',savedDevice,f.alice.id);
+    const manualJob = await account('/api/scanner/assign',manual);
+    await account('/api/scanner/assign',manual,409);
+    assert.equal(f.store.get('command',manualJob.id).payload.variables.video_url,video(limited).video_url);
+    await poll(); await poll(); await poll();
+    assert.equal(video(limited).used_job,manualJob.id);
+    assert.equal((await account('/api/scanner/quotas')).quotas[0].count,1);
+    await account('/api/scanner/quotas',{scenarioId:'shared',limit:null});
     const failed = await submit('fixture0002', 'news');
     await poll(); assert.deepEqual(video(failed).job_ids, []);
     await configure(true); await poll(); await poll(); await poll();
@@ -123,7 +142,13 @@ const c = require('../control-server/shared/remote-protocol');
       assignment.configure(db,owner,{enabled:false,retryHours:2});
       assert.equal(attempt(due),undefined);
       assignment.configure(db,owner,{enabled:true,retryHours:2});
+      assert.equal(assignment.quotaDay(Date.UTC(2026,0,1,16,59)), '2026-01-01');
+      assert.equal(assignment.quotaDay(Date.UTC(2026,0,1,17)), '2026-01-02');
+      const quota = assignment.setLimit(db,owner,'shared',1);
+      db.put('scenarioQuota',{...quota,count:1,day:assignment.quotaDay(due-86400000)},owner);
       const waitingJob = attempt(due);
+      assert.equal(db.get('scenarioQuota',quota.id).count,1);
+      assert.equal(db.get('scenarioQuota',quota.id).day,assignment.quotaDay(due));
       assert.equal(waitingJob.payload.scenario,'a-high');
       assert.equal(attempt(due),undefined);
 

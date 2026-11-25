@@ -64,6 +64,8 @@ function scenarioProfile(scenario, fallback) {
 }
 
 function assignmentConfig(scenario) {
+  if (scenario.scenario_id !== undefined && (typeof scenario.scenario_id !== 'string' || !/^[a-z0-9][a-z0-9_-]{0,63}$/.test(scenario.scenario_id)))
+    throw Error('ID kịch bản phải gồm 1–64 ký tự a-z, 0-9, dấu gạch ngang hoặc gạch dưới.');
   const topics = scenario.accepted_topics ?? [];
   const priority = scenario.assignment_priority ?? 0;
   if (!Array.isArray(topics) || topics.length > 64 || !Number.isSafeInteger(priority))

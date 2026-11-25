@@ -90,8 +90,8 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, localTask
                 const bytes = Buffer.byteLength(JSON.stringify(target)) + 20;
                 if (bytes <= targetBudget) { entry.libraryTarget = target; targetBudget -= bytes; }
               }
-              if (entry.libraryTarget && s.accepted_topics?.length) {
-                const a = { ...assignmentConfig(s), profile: s.profile || '',
+              if (entry.libraryTarget) {
+                const a = { ...assignmentConfig(s), id: s.scenario_id ?? name, profile: s.profile || '',
                   browser: s.steps.some(step => !['downloadVideo','wait','openFolder'].includes(step.action)) };
                 const bytes = Buffer.byteLength(JSON.stringify(a)) + 20;
                 if (bytes <= targetBudget) { entry.assignment = a; targetBudget -= bytes; }

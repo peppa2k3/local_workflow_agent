@@ -94,7 +94,7 @@ const usesDownloadReferences = () => /\{\{\s*download_(title|file_name|file_path
 
 function updateButtons() {
   const profileState = knownProfiles.find(item => item.directory === executionProfile());
-  for (const id of ['scenarioProfile','acceptedTopics','assignmentPriority']) setProperty($(id), 'disabled', editorBusy);
+  for (const id of ['scenarioProfile','scenarioId','acceptedTopics','assignmentPriority']) setProperty($(id), 'disabled', editorBusy);
   setProperty($('stopBtn'), 'disabled', !profileState?.running);
   setProperty($('openProfileBtn'), 'disabled', !profileState);
   for (const id of ['loadBtn', 'newBtn', 'saveBtn', 'cloneBtn', 'addBtn', 'addVariableBtn', 'scenarioSelect']) setProperty($(id), 'disabled', editorBusy);
@@ -255,6 +255,7 @@ function field(labelText, value, type, update) {
 const expandedSteps = new WeakSet();
 function render() {
   $('scenarioName').value = scenario.name || '';
+  $('scenarioId').value = scenario.scenario_id ?? '';
   $('acceptedTopics').value = (scenario.accepted_topics || []).join(', ');
   $('assignmentPriority').value = scenario.assignment_priority ?? 0;
   renderScenarioProfiles();
@@ -559,6 +560,11 @@ function renderScenarioProfiles() {
 }
 $('acceptedTopics').oninput = e => {
   scenario.accepted_topics = e.target.value.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+};
+$('scenarioId').oninput = e => {
+  const id = e.target.value.trim();
+  if (id) scenario.scenario_id = id;
+  else delete scenario.scenario_id;
 };
 $('assignmentPriority').oninput = e => { scenario.assignment_priority = Number(e.target.value); };
 $('scenarioProfile').onchange = event => {

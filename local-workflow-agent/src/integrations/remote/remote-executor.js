@@ -36,9 +36,9 @@ function createRemoteExecutor({ dataDir, workflows, scenarios, getPolicy, localT
         const scenario = scenarios.load(p.scenario);
         if (!c.object(p.variables) || Object.entries(p.variables).some(([k, v]) => !policy.variables[p.scenario]?.includes(k)
           || !Object.hasOwn(scenario.variables || {}, k) || !['string', 'number', 'boolean'].includes(typeof v))) c.fail('Variable override not allowed');
-        if (command.assignmentTopic !== undefined) {
+        if (command.assignmentScenarioId || command.assignmentTopic !== undefined) {
           const config = assignmentConfig(scenario);
-          if (!config.topics.includes(command.assignmentTopic) || scenarioProfile(scenario, p.profile) !== p.profile ||
+          if ((command.assignmentScenarioId && command.assignmentScenarioId !== (scenario.scenario_id ?? p.scenario)) || (command.assignmentTopic !== undefined && !config.topics.includes(command.assignmentTopic)) || scenarioProfile(scenario, p.profile) !== p.profile ||
               p.variables.thu_muc_tai !== scenario.variables.thu_muc_tai || p.variables.reels_url !== scenario.variables.reels_url)
             c.fail('Local assignment configuration changed');
         }

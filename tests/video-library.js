@@ -67,7 +67,7 @@ const c = require('../control-server/shared/remote-protocol');
     const scenario={variables:{video_url:'',reels_url:'https://example.test/reels',thu_muc_tai:dir,ten_phim:'{{download_title}}',ten_file:'{{download_file_name}}'},
       steps:[{action:'downloadVideo',url:'{{video_url}}',directory:'{{thu_muc_tai}}'}, {action:'type',selector:'#title',text:'{{ten_phim}}'}]};
     const scenarios=createScenarioStore(dir); scenarios.save('target',scenario);
-    c.atomicJson(path.join(dir,'remote.json'),{url:f.origin,device:{id:first.id},token:first.token,policy:{scenarios:['target'],profiles:['Default'],variables:{target:['video_url']}}});
+    c.atomicJson(path.join(dir,'remote.json'),{url:f.origin,device:{id:first.id},token:first.token,policy:{scenarios:['target'],profiles:['Default'],variables:{target:Object.keys(scenario.variables)}}});
     let scanning=false,running=false;
     const runId=randomUUID();
     const options={dataDir:dir,profiles:()=>[{name:'Default',directory:'Default'}],scenarios,allowHttp:true,
@@ -136,6 +136,14 @@ const c = require('../control-server/shared/remote-protocol');
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));
     await bob('/api/scanner/videos/status',{record_id,used:true},404);
     await bob('/api/scanner/videos/delete',{record_id},404);
+    await page.locator('#dailyLimit').fill('2');
+    await page.locator('#saveLimit').click();
+    await page.getByText('Đã lưu hạn mức.').waitFor();
+    assert.equal((await client('/api/scanner/quotas')).quotas[0].limit,2);
+    await page.locator('#query').fill('00000000000');
+    await page.waitForFunction(()=>document.querySelectorAll('.video-card').length===1);
+    await page.getByRole('button',{name:'Giao job cho máy đã chọn'}).click();
+    await page.locator('#feedback').filter({hasText:'Đã giao job'}).waitFor();
     await page.locator('#query').fill(id);
     await page.waitForFunction(()=>document.querySelectorAll('.video-card').length===1);
     for (const label of ['Đánh dấu đã dùng','Đánh dấu chưa dùng']) {

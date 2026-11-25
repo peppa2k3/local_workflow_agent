@@ -326,3 +326,9 @@ Trong **Điều kiện lọc**, đặt khoảng thời lượng theo giây và n
 Trong **Chi tiết và chỉnh sửa**, chọn đánh giá thủ công hoặc quay về kết quả tự động. Dùng ô chọn từng dòng hoặc **Chọn cả trang** để áp dụng thao tác hàng loạt. Các mục đã chọn được giữ khi chuyển trang.
 
 Đánh giá thủ công dùng để phân loại kết quả local. Đánh dấu không đạt tạm giữ video đang chờ gửi. Chỉ video đạt đầy đủ kiểm tra tự động mới đủ điều kiện gửi. Xóa kết quả dọn bản ghi local và giữ ID chống quét lại. Bản ghi đã nhận vẫn xem được trong kho của Control Server.
+
+### Giao job từ thẻ video
+
+Chọn máy và kịch bản trong Kho video, sau đó bấm **Giao job cho máy đã chọn**. Máy phải online và có profile rảnh phù hợp. Server lấy URL từ video và đích tải/đăng từ kịch bản. Local cần cho phép cả năm biến. Giao thủ công dùng được khi tắt chế độ tự động và không tính vào hạn mức.
+
+Đặt `scenario_id` (ví dụ `downup-giangloi`) giống nhau trên các máy đồng bộ. Nếu bỏ trống, hệ thống dùng tên file bỏ đuôi JSON. Trong Kho video, chọn kịch bản và lưu hạn mức hằng ngày. Hạn mức dùng chung theo tài khoản và ID, số 0 dừng giao tự động, ô trống cho phép không giới hạn. Server tính một lượt khi tạo job tự động, kể cả job sau đó chạy lỗi. Giao lại cùng job không tăng số lượt. Ngày mới bắt đầu lúc 00:00 UTC+7.

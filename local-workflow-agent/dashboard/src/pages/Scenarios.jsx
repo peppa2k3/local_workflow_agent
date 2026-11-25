@@ -193,6 +193,7 @@ function StepEditor() {
           </Field>
         </div>
         <div className="two">
+          <Field label="ID kịch bản dùng chung giữa các máy"><input id="scenarioId" maxLength="64" placeholder="Mặc định dùng tên file" /></Field>
           <Field label="Topic tự nhận (cách nhau bằng dấu phẩy)">
             <input id="acceptedTopics" placeholder="gia-dinh, am-thuc" />
           </Field>

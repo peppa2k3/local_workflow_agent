@@ -7,7 +7,8 @@
 <section class="panel"><h2>Giao việc tự động</h2><form id="assignment"><label><input id="autoEnabled" type="checkbox"> Tự tạo và giao job từ kho video</label><label>Chờ khi hết slot (giờ)<input id="retryHours" type="number" min="0.016666666666666666" max="720" step="any" required></label><button>Lưu cài đặt</button></form></section>
 <section class="panel"><h2>Danh sách video</h2><div class="two"><label>Tìm theo tiêu đề, chủ đề, ID, máy gửi hoặc #tag<input id="query" type="search"></label>
 <label>Trạng thái sử dụng<select id="used"><option value="">Tất cả</option><option value="false">Chưa dùng</option><option value="true">Đã dùng</option></select></label></div>
-<div class="two"><label>Máy đích<select id="device"></select></label><label>Kịch bản lấy biến<select id="scenario"></select></label></div>
+<div class="two"><label>Máy đích<select id="device"></select></label><label>Kịch bản đích<select id="scenario"></select></label></div>
+<form id="quotaForm" class="video-toolbar"><label>Hạn mức job tự động mỗi ngày (để trống nếu không giới hạn)<input id="dailyLimit" type="number" min="0" step="1"></label><span id="quotaStatus"></span><button id="saveLimit">Lưu hạn mức</button></form>
 <div class="video-toolbar"><label>Video mỗi trang<select id="pageSize"><option>12</option><option>24</option><option>48</option></select></label>
 <button id="refresh">Làm mới</button></div><p id="page" role="status"></p>
 <div id="videos"></div><nav class="video-pages" aria-label="Phân trang video"><button id="prev" disabled>Trang trước</button><span id="pageNumbers"></span><button id="next" disabled>Trang sau</button></nav></section></div></main></body></html>

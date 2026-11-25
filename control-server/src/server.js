@@ -142,6 +142,12 @@ function createControlServer({ store, publicUrl, allowHttp = false, trustProxy =
       }
       if (req.method === 'POST' && ['/api/scanner/videos/status','/api/scanner/videos/delete'].includes(route))
         return json(200,library.editRecord(store,user.id,data,route.endsWith('/delete')));
+      if (route === '/api/scanner/assign' && req.method === 'POST')
+        return json(200,store.transaction(()=>assignment.assignManual(store,user.id,data,Date.now())));
+      if (route === '/api/scanner/quotas') {
+        if (req.method === 'POST') return json(200,store.transaction(()=>assignment.setLimit(store,user.id,data.scenarioId,data.limit)));
+        if (req.method === 'GET') return json(200,{day:assignment.quotaDay(Date.now()),quotas:store.list('scenarioQuota',user.id)});
+      }
       if (route === '/api/scanner/variables' && req.method === 'POST') {
         const v = store.get('video',c.uuid(data.record_id)), d = store.get('device',c.uuid(data.device_id));
         if (!v || !d || d.revoked || d.owner !== user.id || v.owner !== user.id) c.fail('Video or device unavailable',404);
