@@ -116,9 +116,19 @@ const c = require('../control-server/shared/remote-protocol');
     assert.equal(await page.locator('#retryHours').inputValue(),'2.5');
     await page.locator('#device').selectOption(first.id);
     await page.locator('#scenario').selectOption('target');
-    await page.locator('#query').fill(id);
-    await page.waitForFunction(()=>document.querySelectorAll('#videos article').length===1);
-    await page.getByRole('button',{name:'Copy biến scenario'}).click();
+    async function filterToVideo(videoId) {
+      const link = page.locator('a[href="https://www.youtube.com/watch?v='+videoId+'"]');
+      const cards = page.locator('.video-card');
+      const card = cards.filter({has:link});
+      await page.locator('#query').fill(videoId);
+      // The debounced search can leave the previous results visible, even when
+      // both queries return exactly one card.
+      await cards.filter({hasNot:link}).first().waitFor({state:'detached'});
+      await card.waitFor();
+      return card;
+    }
+    const originalCard = await filterToVideo(id);
+    await originalCard.getByRole('button',{name:'Copy biến scenario'}).click();
     await page.getByText('Đã sao chép.').waitFor();
     assert.deepEqual(JSON.parse(await page.evaluate(()=>navigator.clipboard.readText())),pasted);
     for (let i=0;i<11;i++) {
@@ -140,24 +150,23 @@ const c = require('../control-server/shared/remote-protocol');
     await page.locator('#saveLimit').click();
     await page.getByText('Đã lưu hạn mức.').waitFor();
     assert.equal((await client('/api/scanner/quotas')).quotas[0].limit,2);
-    await page.locator('#query').fill('00000000000');
-    await page.waitForFunction(()=>document.querySelectorAll('.video-card').length===1);
-    await page.getByRole('button',{name:'Giao job cho máy đã chọn'}).click();
+    const manualCard = await filterToVideo('00000000000');
+    await manualCard.getByRole('button',{name:'Giao job cho máy đã chọn'}).click();
     await page.locator('#feedback').filter({hasText:'Đã giao job'}).waitFor();
-    await page.locator('#query').fill(id);
-    await page.waitForFunction(()=>document.querySelectorAll('.video-card').length===1);
+    await filterToVideo(id);
     for (const label of ['Đánh dấu đã dùng','Đánh dấu chưa dùng']) {
-      await page.getByText('Tùy chọn',{exact:true}).click();
-      await page.getByRole('button',{name:label}).click();
-      await page.locator('.video-options:not([open])').waitFor();
+      await originalCard.getByText('Tùy chọn',{exact:true}).click();
+      await originalCard.getByRole('button',{name:label}).click();
+      const nextLabel = label==='Đánh dấu đã dùng' ? 'Đánh dấu chưa dùng' : 'Đánh dấu đã dùng';
+      await originalCard.getByRole('button',{name:nextLabel,includeHidden:true}).waitFor({state:'attached'});
       assert.equal((await client('/api/scanner/videos?q='+id)).videos[0].used,label==='Đánh dấu đã dùng');
     }
-    await page.getByText('Tùy chọn',{exact:true}).click();
+    await originalCard.getByText('Tùy chọn',{exact:true}).click();
     page.once('dialog',dialog=>dialog.dismiss());
-    await page.getByRole('button',{name:'Xóa video'}).click();
+    await originalCard.getByRole('button',{name:'Xóa video'}).click();
     assert.equal(await page.locator('.video-card').count(),1);
     page.once('dialog',dialog=>dialog.accept());
-    await page.getByRole('button',{name:'Xóa video'}).click();
+    await originalCard.getByRole('button',{name:'Xóa video'}).click();
     await page.getByText('Không có video khớp bộ lọc.').waitFor();
     assert.equal((await push(first,payload)).record_id,record_id);
     assert.equal((await push(first,{...payload,submission_id:randomUUID()})).status,'accepted');
