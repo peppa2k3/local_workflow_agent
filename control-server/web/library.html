@@ -8,4 +8,6 @@
 <section class="panel"><h2>Danh sách video</h2><div class="two"><label>Tìm theo tiêu đề, chủ đề, ID, máy gửi hoặc #tag<input id="query" type="search"></label>
 <label>Trạng thái sử dụng<select id="used"><option value="">Tất cả</option><option value="false">Chưa dùng</option><option value="true">Đã dùng</option></select></label></div>
 <div class="two"><label>Máy đích<select id="device"></select></label><label>Kịch bản lấy biến<select id="scenario"></select></label></div>
-<button id="refresh">Làm mới</button><div id="videos"></div><div class="row"><button id="prev">Trang trước</button><span id="page"></span><button id="next">Trang sau</button></div></section></div></main></body></html>
+<div class="video-toolbar"><label>Video mỗi trang<select id="pageSize"><option>12</option><option>24</option><option>48</option></select></label>
+<button id="refresh">Làm mới</button></div><p id="page" role="status"></p>
+<div id="videos"></div><nav class="video-pages" aria-label="Phân trang video"><button id="prev" disabled>Trang trước</button><span id="pageNumbers"></span><button id="next" disabled>Trang sau</button></nav></section></div></main></body></html>

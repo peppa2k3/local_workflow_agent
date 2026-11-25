@@ -20,26 +20,39 @@ function targets() {
   options($('scenario'),(device?.metadata.scenarios || []).filter(s=>s.libraryTarget).map(s=>[s.name,s.name]));
 }
 function row(v) {
-  const article=node('article',''); article.className='run';
-  const link=node('a',v.video_url); link.href=v.video_url; link.target='_blank'; link.rel='noopener';
-  article.append(node('h2',v.title),link,node('p',[v.type_topic,v.source_name,v.used?'Đã dùng':'Chưa dùng',
-    v.similar_title?'Nghi trùng tiêu đề':''].filter(Boolean).join(' · ')),
-    node('p','Đo: '+new Date(v.measured_at).toLocaleString('vi-VN')+' · Nhận: '+new Date(v.received_at).toLocaleString('vi-VN')),
-    node('p','Job: '+(v.job_ids.join(', ') || 'Chưa có')));
-  for (const tag of v.tags) {
-    const badge = node('button', tag);
-    badge.onclick = () => { $('query').value = tag; page = 0; action(refresh); };
-    article.append(badge);
+  const article=node('article',''); article.className='video-card';
+  const header=node('div',''); header.className='video-badges';
+  const status=node('span',v.used?'Đã dùng':'Chưa dùng');
+  status.className=v.used?'used':'available'; header.append(status);
+  if (v.similar_title) header.append(node('span','Nghi trùng tiêu đề'));
+  const link=node('a',v.title || v.video_url); link.href=v.video_url; link.target='_blank'; link.rel='noopener';
+  const heading=node('h3',''); heading.append(link);
+  const meta=node('dl','');
+  function field(label,value) {
+    const group=node('div',''); group.append(node('dt',label),node('dd',value)); meta.append(group);
   }
-  if (v.next_attempt_at && !v.used) article.append(node('p','Xét lại lúc '+new Date(v.next_attempt_at).toLocaleString('vi-VN')));
-  if (v.assignment_job) article.append(node('p','Job tự động: '+v.assignment_job+' · '+v.assignment_state));
+  function date(value) { return new Date(value).toLocaleString('vi-VN'); }
+  field('Chủ đề',v.type_topic || '—'); field('Nguồn',v.source_name || '—');
+  field('Thời điểm đo',date(v.measured_at)); field('Tiếp nhận',date(v.received_at));
+  field('Job',v.job_ids.join(', ') || 'Chưa có');
+  if (v.next_attempt_at && !v.used) field('Xét lại lúc',date(v.next_attempt_at));
+  if (v.assignment_job) field('Job tự động',[v.assignment_job,v.assignment_state].filter(Boolean).join(' · '));
+  article.append(header,heading,meta);
+  const tags=node('div',''); tags.className='video-tags';
+  for (const tag of v.tags) {
+    const badge=node('button',tag);
+    badge.onclick=()=>{ $('query').value=tag; page=0; action(refresh); };
+    tags.append(badge);
+  }
+  if (tags.childElementCount) article.append(tags);
   const details=node('details',''); details.append(node('summary','Kết quả kiểm tra'));
   for (const [key,check] of Object.entries(v.checks)) details.append(node('p',key+' · '+check.status+' · '+check.reason));
   article.append(details);
+  const actions=node('div',''); actions.className='video-actions'; article.append(actions);
   function copy(label,get) {
     const btn=node('button',label);
     btn.onclick=()=>action(async()=>{ const text=await get(); await navigator.clipboard.writeText(text); $('feedback').textContent='Đã sao chép.'; });
-    article.append(btn);
+    actions.append(btn);
   }
   copy('Copy URL',()=>v.video_url);
   copy('Copy JSON bản ghi',()=>JSON.stringify(v,null,2));
@@ -51,9 +64,12 @@ function row(v) {
   return article;
 }
 async function refresh() {
-  const n=++generation, params=new URLSearchParams({q:$('query').value,used:$('used').value,page});
+  const pageSize=Number($('pageSize').value);
+  const n=++generation, params=new URLSearchParams({q:$('query').value,used:$('used').value,page,pageSize});
   const [library, list]=await Promise.all([api('/api/scanner/videos?'+params),api('/api/devices')]);
   if(n!==generation) return;
+  const pages=Math.ceil(library.total/pageSize);
+  if (page >= Math.max(1,pages)) { page=Math.max(0,pages-1); return refresh(); }
   devices=list.devices.filter(d=>!d.revoked);
   options($('device'),devices.map(d=>[d.id,d.name])); targets();
   $('videos').replaceChildren(...library.videos.map(row));
@@ -61,12 +77,27 @@ async function refresh() {
     $('videos').append(node('p', $('query').value || $('used').value
       ? 'Không có video khớp bộ lọc.' : 'Chưa nhận video nào từ scanner.'));
   }
-  $('page').textContent='Trang '+(page+1)+' · '+library.total+' video';
-  $('prev').disabled=page===0; $('next').disabled=(page+1)*50>=library.total;
+  $('page').textContent=pages
+    ? `Trang ${page+1}/${pages} · Video ${page*pageSize+1}–${page*pageSize+library.videos.length} trong ${library.total}`
+    : '0 video';
+  $('prev').disabled=page===0; $('next').disabled=page+1>=pages;
+  const numbers=$('pageNumbers'); numbers.replaceChildren();
+  const visible=[...new Set([0,page-1,page,page+1,pages-1])].filter(i=>i>=0 && i<pages).sort((a,b)=>a-b);
+  visible.forEach((i,index)=>{
+    if (index && i-visible[index-1]>1) numbers.append(node('span','…'));
+    const button=node('button',String(i+1)); button.setAttribute('aria-label','Trang '+(i+1));
+    if (i===page) button.setAttribute('aria-current','page');
+    button.onclick=()=>goTo(i); numbers.append(button);
+  });
+}
+function goTo(index) {
+  page=index;
+  action(async()=>{ await refresh(); $('page').scrollIntoView({block:'start'}); });
 }
 $('refresh').onclick=()=>action(refresh);
 $('device').onchange=targets;
-$('prev').onclick=()=>{page--;action(refresh);}; $('next').onclick=()=>{page++;action(refresh);};
+$('prev').onclick=()=>goTo(Math.max(0,page-1)); $('next').onclick=()=>goTo(page+1);
+$('pageSize').onchange=()=>{page=0;action(refresh);};
 $('used').onchange=()=>{page=0;action(refresh);};
 $('query').oninput=()=>{page=0;clearTimeout(debounce);debounce=setTimeout(()=>action(refresh),200);};
 $('assignment').onsubmit = event => {

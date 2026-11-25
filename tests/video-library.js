@@ -55,6 +55,9 @@ const c = require('../control-server/shared/remote-protocol');
     await client('/api/login',{email:'alice@example.test',password:'long-password-alice'});
     await bob('/api/login',{email:'bob@example.test',password:'long-password-bob'});
     const rows=(await client('/api/scanner/videos')).videos;
+    const secondPage = await client('/api/scanner/videos?pageSize=1&page=1');
+    assert.equal(secondPage.total, rows.length);
+    assert.deepEqual(secondPage.videos, rows.slice(1,2));
     const tags = [first,second].map(d => '#Máy_' + d.id.slice(0,4));
     assert.deepEqual(rows.find(v => v.id === record_id).tags.sort(), [...new Set(tags)].sort());
     assert((await client('/api/scanner/videos?q=' + encodeURIComponent(tags[1]))).videos.some(v => v.id === record_id));
@@ -118,6 +121,19 @@ const c = require('../control-server/shared/remote-protocol');
     await page.getByRole('button',{name:'Copy biến scenario'}).click();
     await page.getByText('Đã sao chép.').waitFor();
     assert.deepEqual(JSON.parse(await page.evaluate(()=>navigator.clipboard.readText())),pasted);
+    for (let i=0;i<11;i++) {
+      const videoId=String(i).padStart(11,'0');
+      await push(first,{...otherVideo(videoId),content_hash:undefined});
+    }
+    await page.locator('#query').fill('');
+    await page.waitForFunction(()=>document.querySelectorAll('.video-card').length===12);
+    await page.getByRole('button',{name:'Trang 2',exact:true}).click();
+    await page.waitForFunction(()=>document.querySelector('#next').disabled);
+    assert.equal(await page.locator('.video-card').count(),1);
+    await page.setViewportSize({width:360,height:800});
+    await page.locator('#pageSize').selectOption('24');
+    await page.waitForFunction(()=>document.querySelectorAll('.video-card').length===13);
+    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));
     console.log('Video library: authenticated concurrency, replay, duplicate aliases, isolated owners, heartbeat/reconnect and scenario clipboard passed');
   } finally { remote?.close(); await browser?.close(); await f.close(); fs.rmSync(dir,{recursive:true,force:true}); }
 })().catch(e=>{console.error(e);process.exitCode=1;});
