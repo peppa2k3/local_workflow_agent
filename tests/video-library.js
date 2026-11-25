@@ -105,7 +105,10 @@ const c = require('../control-server/shared/remote-protocol');
     const ctx=await browser.newContext({permissions:['clipboard-read','clipboard-write']});
     const page=await ctx.newPage(); await page.goto(f.origin);
     await page.locator('[name=email]').fill('alice@example.test'); await page.locator('[name=password]').fill('long-password-alice');
-    await page.locator('#login-form button').click(); await page.getByRole('link',{name:'Kho video'}).click();
+    // Wait for the login response to establish the session before leaving this page.
+    await page.locator('#login-form button').click();
+    await page.locator('#account').waitFor({state:'visible'});
+    await page.getByRole('link',{name:'Kho video'}).click();
     await page.getByLabel('Tự tạo và giao job từ kho video').check();
     await page.getByLabel('Chờ khi hết slot (giờ)').fill('2.5');
     await page.getByRole('button',{name:'Lưu cài đặt'}).click();
