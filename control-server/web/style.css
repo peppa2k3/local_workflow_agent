@@ -1393,3 +1393,79 @@ footer {
   .video-facts { font-size: .82rem; }
   .video-badges span { font-size: .78rem; }
 }
+
+/* Show two balanced video cards per desktop row and one per mobile row. */
+#videos {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
+}
+#videos .video-card {
+  grid-template-columns: 26px minmax(90px, 132px) minmax(0, 1fr) 38px;
+  grid-template-rows: auto auto auto;
+  align-content: start;
+  align-items: center;
+  column-gap: 11px;
+  row-gap: 7px;
+  height: 100%;
+  padding: 12px;
+}
+#videos .video-card > .video-select {
+  grid-column: 1;
+  grid-row: 1 / span 3;
+  justify-self: center;
+}
+#videos .video-card > .video-thumb {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+#videos .video-card > .video-title {
+  grid-column: 3;
+  grid-row: 1;
+}
+#videos .video-card > .video-facts {
+  grid-column: 3;
+  grid-row: 2;
+}
+#videos .video-card > .video-source {
+  grid-column: 2;
+  grid-row: 3;
+  display: block;
+  justify-self: start;
+}
+#videos .video-card > .video-badges {
+  grid-column: 3 / 5;
+  grid-row: 3;
+}
+#videos .video-card > .video-options,
+#videos .video-card > .video-options[open] {
+  grid-column: 4;
+  grid-row: 1;
+  justify-self: end;
+  align-self: start;
+}
+.video-options > summary { width: 36px; height: 36px; }
+.video-expanded { width: min(440px, calc(100vw - 40px)); }
+@media (max-width: 760px) {
+  #videos { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  #videos .video-card {
+    grid-template-columns: 24px minmax(88px, 120px) minmax(0, 1fr) 38px;
+    height: auto;
+    column-gap: 9px;
+    row-gap: 8px;
+  }
+  #videos .video-card > .video-select { grid-column: 1; grid-row: 1 / span 2; }
+  #videos .video-card > .video-thumb { grid-column: 2; grid-row: 1 / span 2; }
+  #videos .video-card > .video-title { grid-column: 3; grid-row: 1; }
+  #videos .video-card > .video-facts { grid-column: 3; grid-row: 2; }
+  #videos .video-card > .video-source { display: none; }
+  #videos .video-card > .video-badges { grid-column: 2 / 4; grid-row: 3; }
+  #videos .video-card > .video-options,
+  #videos .video-card > .video-options[open] { grid-column: 4; grid-row: 1; }
+}
+@media (max-width: 420px) {
+  #videos .video-card { grid-template-columns: 22px minmax(72px, 96px) minmax(0, 1fr) 34px; gap: 7px; padding: 10px; }
+  #videos .video-card > .video-select { width: 20px; height: 20px; }
+  .video-options > summary { width: 34px; height: 34px; }
+}
