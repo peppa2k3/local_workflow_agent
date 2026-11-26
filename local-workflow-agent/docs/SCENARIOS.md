@@ -329,6 +329,8 @@ Trong **Chi tiết và chỉnh sửa**, chọn đánh giá thủ công hoặc qu
 
 ### Giao job từ thẻ video
 
+Trong Kho video, mỗi dòng hiển thị ảnh đại diện, thời lượng, tuổi tính từ ngày đăng và lượt xem. Chọn từng video hoặc chọn toàn bộ trang hiện tại để đánh dấu đã dùng, đánh dấu chưa dùng hoặc xóa hàng loạt. Mỗi video được cập nhật qua API hiện có. Khi một yêu cầu lỗi, giao diện báo số video đã cập nhật và tải lại danh sách.
+
 Chọn máy và kịch bản trong Kho video, sau đó bấm **Giao job cho máy đã chọn**. Máy phải online và có profile rảnh phù hợp. Server lấy URL từ video và đích tải/đăng từ kịch bản. Server chỉ gửi các biến trùng key được local cho phép. Ví dụ, chỉ cấp quyền video_url để giữ các giá trị còn lại của kịch bản trên máy. Giao thủ công dùng được khi tắt chế độ tự động và không tính vào hạn mức.
 
 Đặt `scenario_id` (ví dụ `downup-giangloi`) giống nhau trên các máy đồng bộ. Nếu bỏ trống, hệ thống dùng tên file bỏ đuôi JSON. Trong Kho video, chọn kịch bản và lưu hạn mức hằng ngày. Hạn mức dùng chung theo tài khoản và ID, số 0 dừng giao tự động, ô trống cho phép không giới hạn. Server tính một lượt khi tạo job tự động, kể cả job sau đó chạy lỗi. Giao lại cùng job không tăng số lượt. Ngày mới bắt đầu lúc 00:00 UTC+7.
