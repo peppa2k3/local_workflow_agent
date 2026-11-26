@@ -1,0 +1,23 @@
+.toast-stack {
+  position: fixed;
+  top: max(16px, env(safe-area-inset-top));
+  right: max(16px, env(safe-area-inset-right));
+  z-index: 1000;
+  display: grid;
+  gap: 8px;
+  width: min(360px, calc(100vw - 32px));
+  pointer-events: none;
+}
+.toast {
+  border-radius: 10px;
+  padding: 12px 16px;
+  color: white;
+  box-shadow: var(--shadow);
+  overflow-wrap: anywhere;
+}
+.toast-success {
+  background: #13663c;
+}
+.toast-error {
+  background: #982b36;
+}

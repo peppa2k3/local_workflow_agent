@@ -49,7 +49,7 @@ function createControlServer({ store, publicUrl, allowHttp = false, trustProxy =
       if (req.headers.host !== new URL(publicUrl).host) c.fail('Host not allowed', 403);
       const url = new URL(req.url, publicUrl), route = url.pathname;
       if (route === '/health' && req.method === 'GET') return json(200, { ok: true });
-      if (req.method === 'GET' && ['/', '/devices', '/library', '/toast.js', '/library.js', '/app.js', '/style.css'].includes(route)) {
+      if (req.method === 'GET' && ['/', '/devices', '/library', '/toast.js', '/library.js', '/app.js', '/runtime.js', '/style.css', '/library.css'].includes(route)) {
         const file = path.resolve(__dirname, '../web', ['/', '/devices'].includes(route) ? 'index.html' : route === '/library' ? 'library.html' : route.slice(1));
         if (!fs.existsSync(file)) { res.writeHead(200, { ...headers, 'content-type': 'text/plain; charset=utf-8' }); return res.end('Control core ready. Web UI follows in feature 04.'); }
         res.writeHead(200, { ...headers, 'content-type': ['/', '/devices', '/library'].includes(route) ? 'text/html; charset=utf-8' : route.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'text/css; charset=utf-8' });

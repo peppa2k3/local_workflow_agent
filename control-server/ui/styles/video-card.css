@@ -1,0 +1,219 @@
+#videos {
+  display: grid;
+  margin-top: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.video-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 26px minmax(90px, 132px) minmax(0, 1fr) 38px;
+  grid-template-areas: 'select thumb title options' 'select thumb facts .' 'select source badges badges';
+  align-items: center;
+  align-content: start;
+  gap: 7px 11px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: #101f30;
+  overflow-wrap: anywhere;
+}
+.video-card:hover {
+  border-color: #40637c;
+  background: #152a3d;
+}
+.video-card.is-selected {
+  border-color: #36cdb3;
+  background: #103236;
+}
+.video-select {
+  grid-area: select;
+  justify-self: center;
+}
+.video-thumb {
+  grid-area: thumb;
+  position: relative;
+  aspect-ratio: 16/9;
+  border-radius: 7px;
+  overflow: hidden;
+  background: #24374a;
+}
+.video-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.video-thumb small {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  padding: 1px 4px;
+  background: #06101de6;
+  color: white;
+  border-radius: 3px;
+}
+.video-title {
+  grid-area: title;
+  min-width: 0;
+}
+.video-title h3 {
+  margin: 0 0 4px;
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+.video-title a {
+  color: var(--text);
+  text-decoration: none;
+}
+.video-title a:hover {
+  color: var(--accent);
+}
+.video-tags,
+.video-actions,
+.video-badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.video-tags button {
+  color: var(--muted);
+  background: transparent;
+  padding: 2px;
+  min-height: 28px;
+  border: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.video-facts {
+  grid-area: facts;
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+.video-facts span:first-child::before {
+  content: '\25F7';
+  margin-right: 8px;
+  color: var(--accent);
+}
+.video-facts span:last-child::before {
+  content: '\25CE';
+  margin-right: 8px;
+  color: var(--accent);
+}
+.video-source {
+  grid-area: source;
+  max-width: 100%;
+  width: fit-content;
+  padding: 6px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: #20364a;
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
+}
+
+.video-badges {
+  grid-area: badges;
+}
+.video-badges span {
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: #483519;
+  color: #ffdb92;
+  font-size: 0.85rem;
+}
+.video-badges .available {
+  background: #143f38;
+  color: #a3f3d9;
+}
+.video-badges .used {
+  background: #233752;
+  color: #b9d5ff;
+}
+.video-options {
+  grid-area: options;
+  place-self: start end;
+}
+.video-options > summary {
+  display: grid;
+  place-items: center;
+  list-style: none;
+  width: 36px;
+  height: 36px;
+  font-size: 0;
+  cursor: pointer;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+}
+.video-options > summary::after {
+  content: '\22EE' / '';
+  font-size: 20px;
+}
+.video-options[open] > summary {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.video-expanded {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 10;
+  width: min(440px, 100%);
+  max-height: 60vh;
+  overflow: auto;
+  background: var(--surface-inset);
+  padding: 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+.video-expanded dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
+  gap: 12px;
+}
+.video-expanded dt {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.video-expanded dd {
+  margin: 0;
+}
+.video-actions button {
+  color: #c1ddff;
+}
+.video-actions .remove-video {
+  color: var(--danger);
+}
+@media (max-width: 760px) {
+  #videos {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+  .video-card {
+    grid-template-columns: 24px minmax(88px, 120px) minmax(0, 1fr) 38px;
+    grid-template-areas: 'select thumb title options' 'select thumb facts .' '. badges badges .';
+    gap: 8px 9px;
+  }
+  .video-source {
+    display: none;
+  }
+}
+@media (max-width: 420px) {
+  .video-card {
+    grid-template-columns: 22px minmax(72px, 96px) minmax(0, 1fr) 34px;
+    gap: 7px;
+    padding: 10px;
+  }
+  .video-card .video-select {
+    width: 20px;
+    height: 20px;
+  }
+  .video-options > summary {
+    width: 34px;
+    height: 34px;
+  }
+}

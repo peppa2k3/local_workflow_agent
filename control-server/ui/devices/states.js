@@ -1,0 +1,16 @@
+export const stateName = {
+  scheduled: 'Đã lên lịch',
+  confirming: 'Chờ xác nhận',
+  approved: 'Đã xác nhận',
+  pending: 'Chờ thực hiện',
+  queued: 'Đang đợi',
+  dispatched: 'Đã gửi tới máy',
+  running: 'Đang chạy',
+  succeeded: 'Thành công',
+  failed: 'Thất bại',
+  cancelled: 'Đã dừng',
+  interrupted: 'Bị gián đoạn',
+  unknown: 'Chưa rõ kết quả — kiểm tra máy local',
+  expired: 'Hết hạn',
+  rejected: 'Máy local từ chối',
+};

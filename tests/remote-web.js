@@ -37,7 +37,7 @@ const { chromium } = require('playwright');
     let loggedIn = false, online = true, downloadConfirmation, scheduledRun;
     await page.route('https://control.test/**', async route => {
       const req = route.request(), url = new URL(req.url());
-      if (['/', '/toast.js', '/app.js', '/style.css'].includes(url.pathname)) return route.fulfill({ contentType: url.pathname === '/' ? 'text/html' : url.pathname.endsWith('.js') ? 'text/javascript' : 'text/css',
+      if (['/', '/toast.js', '/app.js', '/runtime.js', '/style.css'].includes(url.pathname)) return route.fulfill({ contentType: url.pathname === '/' ? 'text/html' : url.pathname.endsWith('.js') ? 'text/javascript' : 'text/css',
         body: fs.readFileSync(path.join(__dirname, '../control-server/web', url.pathname === '/' ? 'index.html' : url.pathname.slice(1)), 'utf8') });
       if (req.method() === 'POST') { assert.equal(req.headers()['x-csrf-token'], url.pathname === '/api/login' ? '' : 'fixture-csrf'); posted.push({ path: url.pathname, data: req.postDataJSON() }); }
       if (url.pathname === '/api/login') { loggedIn = true; return route.fulfill({ json: { email: 'user@example.test', csrf: 'fixture-csrf' } }); }

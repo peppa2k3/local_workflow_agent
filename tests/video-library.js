@@ -147,7 +147,15 @@ const c = require('../control-server/shared/remote-protocol');
     await page.setViewportSize({width:360,height:800});
     await page.locator('#pageSize').selectOption('24');
     await page.waitForFunction(()=>document.querySelectorAll('.video-card').length===13);
-    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));
+    for (const [width, columns] of [[360,1],[760,1],[761,2],[1280,2]]) {
+      await page.setViewportSize({width,height:800});
+      const layout = await page.locator('#videos').evaluate(grid => ({
+        columns:getComputedStyle(grid).gridTemplateColumns.split(' ').length,
+        overflows:document.documentElement.scrollWidth > innerWidth
+      }));
+      assert.deepEqual(layout,{columns,overflows:false},'video grid at '+width+'px');
+    }
+    await page.setViewportSize({width:360,height:800});
     const selectAll=page.locator('#selectAll');
     assert.equal(await selectAll.isChecked(),false);
     assert.equal(await selectAll.evaluate(input=>input.indeterminate),false);

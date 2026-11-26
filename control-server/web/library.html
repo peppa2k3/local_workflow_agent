@@ -1,15 +1,18 @@
 <!doctype html>
-<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kho video · Control Server</title>
-<link rel="stylesheet" href="/style.css"><script src="/toast.js" defer></script><script defer src="/library.js"></script></head><body><main class="shell library-shell">
-  <nav class="main-nav" aria-label="Điều hướng chính"><a href="/devices">Thiết bị</a><a href="/library" aria-current="page">Kho video</a></nav>
-<h1 class="visually-hidden">Kho video</h1>
-<div id="library" hidden>
-<section class="panel"><h2>Giao việc tự động</h2><form id="assignment"><label><input id="autoEnabled" type="checkbox"> Tự tạo và giao job từ kho video</label><label>Chờ khi hết slot (giờ)<input id="retryHours" type="number" min="0.016666666666666666" max="720" step="any" required></label><button class="primary">Lưu cài đặt</button></form></section>
-<section class="panel"><h2>Danh sách video</h2><div class="library-filters"><label>Tìm video<input id="query" type="search" placeholder="Tiêu đề, chủ đề, ID, máy gửi hoặc #tag"></label>
-<label>Trạng thái sử dụng<select id="used"><option value="">Tất cả</option><option value="false">Chưa dùng</option><option value="true">Đã dùng</option></select></label>
-<label>Máy đích<select id="device"></select></label><label>Kịch bản đích<select id="scenario"></select></label></div>
-<div class="library-tools"><form id="quotaForm" class="video-toolbar"><label>Hạn mức job/ngày<input placeholder="Vô hạn" id="dailyLimit" type="number" min="0" step="1"></label><button id="saveLimit">Lưu hạn mức</button><span id="quotaStatus"></span></form>
-<div class="video-toolbar"><label>Video mỗi trang<select id="pageSize"><option>12</option><option>24</option><option>48</option></select></label>
-<button id="refresh">Làm mới</button></div></div>
-<div class="library-selection"><label><input id="selectAll" type="checkbox"> Chọn tất cả</label><span id="selectedCount" role="status">Đã chọn 0 video</span><details id="bulkMenu"><summary>⋮ &nbsp; Thao tác hàng loạt</summary><div class="bulk-actions"><button type="button" data-bulk="used">Đánh dấu đã dùng</button><button type="button" data-bulk="unused">Đánh dấu chưa dùng</button><button type="button" data-bulk="delete">Xóa video đã chọn</button></div></details></div>
-<div id="videos"></div><nav class="video-pages" aria-label="Phân trang video"><span id="page" role="status"></span><button id="prev" disabled>Trang trước</button><span id="pageNumbers"></span><button id="next" disabled>Trang sau</button></nav></section></div></main></body></html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#08111e" />
+    <title>Kho video · Control Server</title>
+    <script defer src="/toast.js"></script>
+    <script type="module" crossorigin src="/library.js"></script>
+    <link rel="stylesheet" crossorigin href="/library.css">
+  </head>
+  <body>
+    <main class="shell library-shell">
+      <nav class="main-nav" aria-label="Điều hướng chính"><a href="/devices">Thiết bị</a> <a href="/library" aria-current="page">Kho video</a></nav>
+      <div id="root"></div>
+    </main>
+  </body>
+</html>
