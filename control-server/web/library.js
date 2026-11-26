@@ -32,7 +32,7 @@ function targets() {
   options($('scenario'),(device?.metadata.scenarios || []).filter(s=>s.libraryTarget || s.assignment).map(s=>[s.name,s.name]));
   showQuota();
 }
-function row(v) {
+function row(v,index) {
   const article=node('article',''); article.className='video-card';
   const header=node('div',''); header.className='video-badges';
   const status=node('span',v.used?'Đã dùng':'Chưa dùng');
@@ -50,18 +50,31 @@ function row(v) {
   field('Job',v.job_ids.join(', ') || 'Chưa có');
   if (v.next_attempt_at && !v.used) field('Xét lại lúc',date(v.next_attempt_at));
   if (v.assignment_job) field('Job tự động',[v.assignment_job,v.assignment_state].filter(Boolean).join(' · '));
-  article.append(header,heading,meta);
+  const number=node('span',String(page*Number($('pageSize').value)+index+1)); number.className='video-number';
+  const thumb=node('div',''); thumb.className='video-thumb';
+  const image=document.createElement('img'); image.alt=''; image.loading='lazy'; image.referrerPolicy='no-referrer';
+  image.onerror=()=>image.remove();
+  image.src='https://i.ytimg.com/vi/'+encodeURIComponent(v.video_id)+'/mqdefault.jpg';
+  const seconds=Math.floor(v.duration_seconds);
+  thumb.append(image,node('small',Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0')));
+  const title=node('div',''); title.className='video-title'; title.append(heading);
+  article.append(number,thumb,title);
+  for (const [label,value] of [['Chủ đề',v.type_topic],['ID video',v.video_id],['Máy gửi',v.source_name]]) {
+    const cell=node('div',value); cell.className='video-cell'; cell.dataset.label=label; article.append(cell);
+  }
+  const received=node('time',date(v.received_at)); received.className='video-cell'; received.dataset.label='Ngày thêm';
+  article.append(header,received);
   const tags=node('div',''); tags.className='video-tags';
   for (const tag of v.tags) {
     const badge=node('button',tag);
     badge.onclick=()=>{ $('query').value=tag; page=0; action(refresh); };
     tags.append(badge);
   }
-  if (tags.childElementCount) article.append(tags);
+  if (tags.childElementCount) title.append(tags);
   const details=node('details',''); details.append(node('summary','Kết quả kiểm tra'));
   for (const [key,check] of Object.entries(v.checks)) details.append(node('p',key+' · '+check.status+' · '+check.reason));
-  article.append(details);
-  const actions=node('div',''); actions.className='video-actions'; article.append(actions);
+
+  const actions=node('div',''); actions.className='video-actions';
   function copy(label,get) {
     const btn=node('button',label);
     btn.onclick=()=>action(async()=>{ const text=await get(); await navigator.clipboard.writeText(text); toast.success('Đã sao chép.'); });
@@ -102,7 +115,9 @@ function row(v) {
   }
   toggle.onclick=()=>submit('status');
   remove.onclick=()=>{ if (confirm('Xóa video “'+v.title+'” khỏi kho?')) submit('delete'); };
-  menu.append(toggle,remove); header.append(menu);
+  actions.append(toggle,remove);
+  const expanded=node('div',''); expanded.className='video-expanded'; expanded.append(actions,meta,details);
+  menu.append(expanded); article.append(menu);
   return article;
 }
 async function refresh() {

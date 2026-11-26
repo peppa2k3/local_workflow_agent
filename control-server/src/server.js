@@ -42,7 +42,7 @@ function createControlServer({ store, publicUrl, allowHttp = false, trustProxy =
   }
   const server = http.createServer(async (req, res) => {
     const headers = { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff',
-      'content-security-policy': "default-src 'self'; script-src 'self'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+      'content-security-policy': "default-src 'self'; img-src 'self' https://i.ytimg.com; script-src 'self'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
       'referrer-policy': 'no-referrer', ...(secure ? { 'strict-transport-security': 'max-age=31536000' } : {}) };
     function json(status, value, extra = {}) { res.writeHead(status, { ...headers, 'content-type': 'application/json; charset=utf-8', ...extra }); res.end(JSON.stringify(value)); }
     try {

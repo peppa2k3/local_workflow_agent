@@ -131,6 +131,7 @@ const c = require('../control-server/shared/remote-protocol');
       return card;
     }
     const originalCard = await filterToVideo(id);
+    await originalCard.getByText('Tùy chọn',{exact:true}).click();
     await originalCard.getByRole('button',{name:'Copy biến scenario'}).click();
     await page.getByText('Đã sao chép.').waitFor();
     assert.deepEqual(JSON.parse(await page.evaluate(()=>navigator.clipboard.readText())),pasted);
@@ -154,6 +155,7 @@ const c = require('../control-server/shared/remote-protocol');
     await page.getByText('Đã lưu hạn mức.').waitFor();
     assert.equal((await client('/api/scanner/quotas')).quotas[0].limit,2);
     const manualCard = await filterToVideo('00000000000');
+    await manualCard.getByText('Tùy chọn',{exact:true}).click();
     await manualCard.getByRole('button',{name:'Giao job cho máy đã chọn'}).click();
     await page.locator('.toast-success').filter({hasText:'Đã giao job'}).waitFor();
     const assignedId=(await client('/api/scanner/videos?q=00000000000')).videos[0].job_ids[0];
