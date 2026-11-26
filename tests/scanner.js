@@ -58,6 +58,8 @@ const protocol = require('../local-workflow-agent/shared/remote-protocol');
   assert.equal(youtubeId('https://youtu.be/'+ids[0]+'?si=x'),youtubeId('https://www.youtube.com/watch?v='+ids[0]+'&pp=x'));
   assert.equal(youtubeId('https://example.org/watch?v='+ids[0]),null);
   assert.equal(groups[0].phrases.length,2);
+  const pasted = topicsFrom('[gia-dinh]\nBé con\n' + 'BÉ CON!'.normalize('NFD') + '\nBé con gặp lại gia đình');
+  assert.deepEqual(pasted[0].queries, ['Bé con', 'Bé con gặp lại gia đình', 'con gặp', 'gặp lại', 'lại gia', 'gia đình']);
   const opts = { directory:dir, key:'fixture', submit:payload=>protocol.post(origin,'/api/scanner/videos',{...payload,id:'local-fixture'},'fixture-token',{allowHttp:true}),
     inspect:async()=>info, request:async url=>({ok:true,json:async()=>({items:url.pathname.endsWith('/search') ? ids.map(videoId=>({id:{videoId}}))
       : ids.map((id,i)=>({id,snippet:{title:i===2?'Ngoài chủ đề':title,publishedAt:published}, statistics:{viewCount:'1000'},

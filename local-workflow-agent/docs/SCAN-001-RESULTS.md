@@ -1,15 +1,13 @@
-# Nghiệm thu SCAN-001 ngày 24/11/2026 (Asia/Bangkok)
+# Nghiệm thu SCAN-001 ngày 26/11/2026 (Asia/Bangkok)
 
-Đã chạy lệnh audit với cả bốn URL gốc. Thiếu `YOUTUBE_API_KEY`, `minViews`, `minDays` và `maxDays`. Số đo dưới đây lấy từ yt-dlp lúc 01:46 giờ Bangkok, dùng các nhóm từ mẫu `gia-dinh` và `xuyen-khong`. Ký hiệu **?** là đã đo được giá trị nhưng chưa có ngưỡng để kết luận.
+Audit đã dùng yt-dlp cho cả bốn URL vì scanner đã hết ngân sách request Data API trong ngày. Ngưỡng local tại thời điểm đo là từ 200.000 lượt xem, tuổi 0–4 ngày, thời lượng từ 1.800 đến dưới 10.000 giây, cạnh ngắn từ 720 px. Cả bốn ID đều hợp lệ, có track tiếng Việt và đạt ngưỡng độ phân giải.
 
-| URL / kiểm tra ID | Khớp tiêu đề | View | Tuổi ngày | Thời lượng giây | Độ phân giải tải được | Audio vi | Sub vi thủ công hoặc tự động | Kết luận |
-| --- | --- | ---: | ---: | --- | --- | --- | --- | --- |
-| [JXfrtQlJGHM](https://www.youtube.com/watch?v=JXfrtQlJGHM&pp=ugUEEgJ2aQ%3D%3D) đạt | Loại | 1.728.990 (?) | 14,64 (?) | 5.097 đạt | 1080×1440 đạt | Đạt | Loại | Loại do tiêu đề và sub |
-| [SBmmznojJ_s](https://www.youtube.com/watch?v=SBmmznojJ_s) đạt | Loại | 459.453 (?) | 11,50 (?) | 10.446 đạt | 1080×1440 đạt | Đạt | Đạt | Loại do tiêu đề |
-| [zBEVoz3lKqI](https://www.youtube.com/watch?v=zBEVoz3lKqI) đạt | Loại | 429.143 (?) | 12,41 (?) | 9.528 đạt | 1080×1920 đạt | Đạt | Đạt | Loại do tiêu đề |
-| [B1fAkGWQ8KE](https://youtu.be/B1fAkGWQ8KE?si=q2hpBBh3PkJbIM7y) đạt | Loại | 153.693 (?) | 0,72 (?) | 2.421 đạt | 1080×1920 đạt | Đạt | Loại | Loại do tiêu đề và sub |
-
-Hai tiêu đề tiếng Việt có cụm “bé gái”. File mẫu dùng “bé con”, nên cả hai trượt kiểm tra khớp cụm. Hai video còn lại có tựa tiếng Anh và tiếng Thái. Âm thanh được đánh giá theo nhãn track tải được của YouTube.
+| URL | Chủ đề | Lượt xem | Tuổi (ngày) | Giây | Độ phân giải | Sub vi | Kết luận và lý do |
+| --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| [JXfrtQlJGHM](https://www.youtube.com/watch?v=JXfrtQlJGHM&pp=ugUEEgJ2aQ%3D%3D) | Trượt | 1.873.603 đạt | 17,54 trượt | 5.097 đạt | 1080×1440 | Trượt | Loại do chủ đề, tuổi và phụ đề |
+| [SBmmznojJ_s](https://www.youtube.com/watch?v=SBmmznojJ_s) | Trượt | 513.902 đạt | 14,41 trượt | 10.446 trượt | 1080×1440 | Đạt | Loại do chủ đề, tuổi và thời lượng |
+| [zBEVoz3lKqI](https://www.youtube.com/watch?v=zBEVoz3lKqI) | Khớp “xuống núi” trong nhóm bi-coi-thuong | 642.918 đạt | 15,32 trượt | 9.528 đạt | 1080×1920 | Đạt | Loại do tuổi |
+| [B1fAkGWQ8KE](https://youtu.be/B1fAkGWQ8KE?si=q2hpBBh3PkJbIM7y) | Trượt | 631.262 đạt | 3,62 đạt | 2.421 đạt | 1080×1920 | Trượt | Loại do chủ đề và phụ đề |
 
 ## Ca kiểm soát
 

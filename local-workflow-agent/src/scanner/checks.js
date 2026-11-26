@@ -9,7 +9,7 @@ function topicsFrom(text) {
     if (!line || line.startsWith('#')) continue;
     const header = /^\[([a-z0-9_-]{1,64})\]$/.exec(line);
     if (header) {
-      if (!topics.has(header[1])) topics.set(header[1], { phrases: new Set(), queries: new Set() });
+      if (!topics.has(header[1])) topics.set(header[1], { phrases: new Set(), queries: new Map() });
       topic = topics.get(header[1]);
       continue;
     }
@@ -24,12 +24,18 @@ function topicsFrom(text) {
       }
     }
     if (phrases.size) {
-      topic.queries.add(line);
+      const key = normalize(line);
+      if (!topic.queries.has(key)) topic.queries.set(key, line.normalize('NFC'));
       for (const phrase of phrases) topic.phrases.add(phrase);
     }
   }
   return [...topics].filter(([, topic]) => topic.phrases.size)
-    .map(([code, { phrases, queries }]) => ({ code, phrases: [...phrases], queries: [...queries] }));
+    .map(([code, { phrases, queries }]) => {
+      for (const phrase of phrases) {
+        if (!queries.has(phrase)) queries.set(phrase, phrase);
+      }
+      return { code, phrases: [...phrases], queries: [...queries.values()] };
+    });
 }
 function youtubeId(value) {
   if (typeof value !== 'string') return null;
