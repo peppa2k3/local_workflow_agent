@@ -9,49 +9,45 @@ export default function Remote() {
           description="Ghép nối tài khoản và cấp quyền chạy kịch bản cho từng profile."
         />
         <div id="message" role="status" className="notice" hidden></div>
-        <div className="two">
-          <section>
-            <div className="panel">
-              <h2>Kết nối VPS</h2>
-              <div id="connection" className="muted">
-                Đang đọc trạng thái…
-              </div>
-              <PairDevice />
-              <div id="pending" hidden>
-                <p>Đăng nhập web VPS và nhập mã sau:</p>
-                <code id="code" className="code"></code>
-                <small id="expires"></small>
-                <p id="claim"></p>
-                <button id="approve" className="primary" hidden>
-                  Đồng ý cho tài khoản này kết nối
-                </button>
-              </div>
-              <p>
-                <button id="disconnect" className="danger" hidden>
-                  Ngắt kết nối / hủy ghép nối
-                </button>
-              </p>
+        <div className="two remote-connection">
+          <div className="panel">
+            <h2>Kết nối VPS</h2>
+            <div id="connection" className="muted">
+              Đang đọc trạng thái…
             </div>
-            <div className="panel subtle">
-              <h2>Máy local giữ quyền kiểm soát</h2>
-              <p className="muted">
-                Chỉ cấp quyền cho profile và kịch bản cần dùng. Tài khoản ghép
-                nối có thể xem và quản lý tác vụ local của các profile và kịch
-                bản đã cấp quyền. Mặc định tài khoản remote không được thay giá
-                trị biến. Không gửi file video, mật khẩu hay cấu hình MongoDB
-                lên VPS.
-              </p>
-              <small>
-                Để chạy bước trên website, Chrome profile và extension phải hoạt
-                động. Sau khi lưu quyền, VPS nhận thay đổi ở lần kết nối kế
-                tiếp. Khi ngắt kết nối, các lượt chạy remote sẽ được dừng.
-              </small>
+            <PairDevice />
+            <div id="pending" hidden>
+              <p>Đăng nhập web VPS và nhập mã sau:</p>
+              <code id="code" className="code"></code>
+              <small id="expires"></small>
+              <p id="claim"></p>
+              <button id="approve" className="primary" hidden>
+                Đồng ý cho tài khoản này kết nối
+              </button>
             </div>
-          </section>
-          <section>
-            <Permissions />
-          </section>
+            <p>
+              <button id="disconnect" className="danger" hidden>
+                Ngắt kết nối / hủy ghép nối
+              </button>
+            </p>
+          </div>
+          <div className="panel subtle">
+            <h2>Máy local giữ quyền kiểm soát</h2>
+            <p className="muted">
+              Chỉ cấp quyền cho profile và kịch bản cần dùng. Tài khoản ghép
+              nối có thể xem và quản lý tác vụ local của các profile và kịch
+              bản đã cấp quyền. Mặc định tài khoản remote không được thay giá
+              trị biến. Không gửi file video, mật khẩu hay cấu hình MongoDB
+              lên VPS.
+            </p>
+            <small>
+              Để chạy bước trên website, Chrome profile và extension phải hoạt
+              động. Sau khi lưu quyền, VPS nhận thay đổi ở lần kết nối kế
+              tiếp. Khi ngắt kết nối, các lượt chạy remote sẽ được dừng.
+            </small>
+          </div>
         </div>
+        <Permissions />
         <footer>
           Kết nối chủ động ra VPS · Không mở cổng 34719 ra Internet
         </footer>
@@ -63,11 +59,14 @@ export default function Remote() {
 function Permissions() {
   return (
     <>
-      <form id="policy-form" className="panel">
+      <form id="policy-form" className="remote-policy">
+        <section className="panel">
         <h2>Quyền điều khiển trên máy này</h2>
         <h3>Chrome profiles</h3>
         <div id="profiles" className="choice-list"></div>
-        <h3>Kịch bản được phép chạy</h3>
+        </section>
+        <section className="panel">
+        <h2>Kịch bản được phép chạy</h2>
         <div id="scenarios" className="choice-list"></div>
         <p>
           <button className="primary" type="submit">
@@ -78,6 +77,7 @@ function Permissions() {
           Thay đổi nội dung JSON local sẽ áp dụng cho lần chạy kế tiếp của kịch
           bản được cấp quyền.
         </small>
+        </section>
       </form>
     </>
   );

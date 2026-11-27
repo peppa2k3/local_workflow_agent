@@ -26,11 +26,12 @@
         const box = el('div'); box.className = 'choice'; const check = checkbox(s.name, state.policy.scenarios.includes(s.name), s.name); check.querySelector('input').dataset.scenario = s.name; box.append(check);
         const clips = checkbox(s.name, !!state.policy.clipScenarios?.includes(s.name), 'Cho phép xem tên và chọn clip đã lưu từ control-server');
         clips.querySelector('input').dataset.clipScenario = s.name;
-        box.append(clips);
+        const details = el('div'); details.className = 'scenario-details'; details.append(clips);
         const variables = el('div'); variables.className = 'variables';
         if (s.variables.length) variables.append(el('small', 'Cho phép thay giá trị biến (tùy chọn):'));
-        for (const name of s.variables) { const row = checkbox(name, !!state.policy.variables[s.name]?.includes(name), name); row.querySelector('input').dataset.variable = name; variables.append(row); }
-        box.append(variables); return box;
+        const variableGrid = el('div'); variableGrid.className = 'variable-grid';
+        for (const name of s.variables) { const row = checkbox(name, !!state.policy.variables[s.name]?.includes(name), name); row.querySelector('input').dataset.variable = name; variableGrid.append(row); }
+        variables.append(variableGrid); details.append(variables); box.append(details); return box;
       }));
     }
   }

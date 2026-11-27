@@ -56,3 +56,31 @@ button.danger:hover{background:#bd3947;border-color:#ed6974}
 .scanner-row-select{margin:3px 0 0}
 .scanner-review{margin-left:6px}
 .scanner-review-editor{align-items:end}
+
+/* Remote permissions */
+.remote-connection { align-items: start; }
+.remote-connection > .panel { min-width: 0; }
+.remote-policy .choice-list { max-height: none; overflow: visible; padding: 0; }
+.remote-policy #profiles, .remote-policy .variable-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 4px 18px;
+}
+.remote-policy .check { min-width: 0; align-items: flex-start; margin: 8px 0; }
+.remote-policy .check input { flex: 0 0 18px; margin: 2px 0; }
+.remote-policy .check span { min-width: 0; overflow-wrap: anywhere; }
+.remote-policy .choice {
+  padding: 14px;
+  margin: 0 0 12px;
+  border: 1px solid #506789;
+  border-radius: 10px;
+}
+.remote-policy .choice > .check { font-weight: 700; }
+.remote-policy .scenario-details {
+  padding: 6px 14px;
+  border: 1px solid #30465f;
+  border-radius: 9px;
+}
+.remote-policy .variables { padding: 8px 0; border-top: 1px solid #30465f; }
+.remote-policy .variables:has(.variable-grid:empty) { display: none; }
+.remote-policy small { overflow-wrap: anywhere; }

@@ -215,7 +215,7 @@ const { chromium } = require('playwright');
 
     // Local approval UI uses its session header and explicit claim, with fake state only.
     const state = { configured: false, url: 'https://control.test', policy: { profiles: [], scenarios: [], variables: {} }, pending: { id, code: 'FIXTURECODE1', expires: Date.now() + 60000, email: 'user@example.test', claim: 'fixture-claim' },
-      available: { profiles: [{ directory: 'Default', name: 'Fixture' }], scenarios: [{ name: 'sample', variables: ['caption'] }] } };
+      available: { profiles: [{ directory: 'Default', name: 'Fixture' }], scenarios: [{ name: 'sample', variables: ['caption'] }, { name: 'another', variables: ['video_url'] }] } };
     await page.route('https://local.test/**', async route => {
       const req = route.request(), endpoint = new URL(req.url()).pathname;
       if (endpoint === '/remote') return route.fulfill({ contentType: 'text/html', body: fs.readFileSync(path.join(__dirname, '../local-workflow-agent/dashboard/remote.html'), 'utf8').replaceAll('__LOCAL_AGENT_DASHBOARD_TOKEN__', 'local-fixture') });
@@ -230,9 +230,19 @@ const { chromium } = require('playwright');
     });
     await page.goto('https://local.test/remote'); await page.locator('#approve').waitFor({ state: 'visible' });
     assert.match(await page.locator('#claim').textContent(), /user@example.test/);
-    await page.locator('#profiles input').check(); await page.locator('input[data-scenario]').check(); await page.locator('input[data-variable]').check();
-    await page.locator('input[data-clip-scenario]').check();
+    for (const width of [320, 768, 1280]) {
+      await page.setViewportSize({ width, height: 844 });
+      assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      assert.equal(await page.locator('#scenarios').evaluate(el => getComputedStyle(el).maxHeight), 'none');
+    }
+    await page.locator('#profiles input').check();
+    await page.locator('input[data-scenario="sample"]').check();
+    await page.locator('input[data-variable="caption"]').check();
+    await page.locator('input[data-variable="video_url"]').check();
+    await page.locator('input[data-clip-scenario="sample"]').check();
     await page.locator('#policy-form button').click(); await page.waitForFunction(() => document.getElementById('message').textContent === 'Đã lưu quyền điều khiển.');
+    assert.deepEqual(posted.find(p => p.path.endsWith('/policy')).data.profiles, ['Default']);
+    assert.deepEqual(posted.find(p => p.path.endsWith('/policy')).data.scenarios, ['sample']);
     assert.deepEqual(posted.find(p => p.path.endsWith('/policy')).data.variables, { sample: ['caption'] });
     assert.deepEqual(posted.find(p => p.path.endsWith('/policy')).data.clipScenarios, ['sample']);
     await page.locator('#approve').click(); await page.waitForFunction(() => document.getElementById('pending').hidden);
