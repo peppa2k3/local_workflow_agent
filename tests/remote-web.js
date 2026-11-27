@@ -46,8 +46,8 @@ const { chromium } = require('playwright');
           { id: uploadTarget, profile: 'Default', scenario: 'sample', state: 'running', index: 0, total: 2 },
           { id: target, profile: 'Default', scenario: 'sample', state: 'scheduled', scheduledAt: Date.now() + 600000 }
         ] }, metadata: { network: { downloadMbps: 8.25, uploadMbps: 1.75 },
-        profiles: [{ directory: 'Default', name: 'Test', extensionConnected: true }], scenarios: [{ name: 'sample', variables: ['caption'], steps: 2,
-          clipTargets: [{ id: target, index: 0, action: 'downloadVideo', variable: 'caption' }, { id: uploadTarget, index: 1, action: 'upload' }] }] } },
+        profiles: [{ directory: 'Default', name: 'Test', extensionConnected: true }], scenarios: [{ name: 'sample', variables: ['video_url'], steps: 2,
+          clipTargets: [{ id: target, index: 0, action: 'downloadVideo', variable: 'video_url' }, { id: uploadTarget, index: 1, action: 'upload' }] }] } },
         ...(historyFixtures.has(otherId) ? [{ id: otherId, name: 'Máy còn lại', online, metadata: {} }] : [])] } });
       if (url.pathname === '/api/commands' && url.searchParams.has('request')) return route.fulfill({ json: { commands: [{ state: 'succeeded', result: { clips: { names: [clip], more: false } } }] } });
       if (url.pathname === '/api/schedule-decision') {
@@ -85,15 +85,28 @@ const { chromium } = require('playwright');
     assert.equal(await taskNotice.count(), 0);
     assert.equal(await page.locator('#device-name').textContent(), '<img src=x onerror=alert(1)>'); assert.equal(await page.locator('#device-name img').count(), 0);
     await page.locator('#variables input[type=checkbox]').check(); await page.locator('#variables input:not([type=checkbox])').fill('Tiếng Việt');
-    await page.getByRole('button', { name: 'Chọn clip cho caption…' }).click();
+    const paste = page.getByRole('button', { name: 'Dán', exact: true });
+    const override = page.locator('#variables input[type=checkbox]');
+    await override.uncheck();
+    assert(await paste.isDisabled());
+    await override.check();
+    await page.context().grantPermissions(['clipboard-write']);
+    await paste.click();
+    await page.getByText('Không đọc được clipboard. Hãy dán thủ công vào ô video_url.', { exact: true }).waitFor();
+    assert.equal(await page.getByRole('textbox', { name: 'Giá trị video_url' }).inputValue(), 'Tiếng Việt');
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.evaluate(() => navigator.clipboard.writeText('https://example.test/video'));
+    await paste.click();
+    await page.waitForFunction(() => document.querySelector('.variable-field input').value === 'https://example.test/video');
+    await page.getByRole('button', { name: 'Chọn clip cho video_url…' }).click();
     await page.getByRole('button', { name: 'Dùng clip' }).click();
-    assert.equal(await page.getByRole('textbox', { name: 'Giá trị caption' }).inputValue(), 'clip:' + clip);
+    assert.equal(await page.getByRole('textbox', { name: 'Giá trị video_url' }).inputValue(), 'clip:' + clip);
     await page.getByRole('button', { name: 'Chọn clip · Bước 2 (Upload)' }).click();
     await page.getByRole('button', { name: 'Dùng clip' }).click();
     await page.locator('#run').click(); await page.locator('.toast').filter({hasText:'Đã gửi lệnh chạy'}).waitFor();
     assert.deepEqual(posted.filter(p => p.data.type === 'browseClips').map(p => p.data.target), [target, uploadTarget]);
     const request = posted.find(p => p.path === '/api/commands' && p.data.type === 'run').data;
-    assert.equal(request.variables.caption, 'clip:' + clip); assert.match(request.requestId, /^[0-9a-f-]{36}$/);
+    assert.equal(request.variables.video_url, 'clip:' + clip); assert.match(request.requestId, /^[0-9a-f-]{36}$/);
     assert.deepEqual(request.clips, { [uploadTarget]: clip });
     await taskNotice.waitFor({ state: 'visible' });
     await taskNotice.getByRole('button', { name: 'Đã hiểu' }).click();
@@ -167,9 +180,12 @@ const { chromium } = require('playwright');
     await page.locator('.device').first().click();
     await history.getByRole('heading', { name: 'Scenario 9', exact: true }).waitFor();
     assert.equal(await page.locator('#history-page').textContent(), 'Trang 2/3 · 9–16/19 lệnh');
-    for (const width of [320, 390, 1280]) {
+    for (const width of [320, 390, 768, 1024, 1280]) {
       await page.setViewportSize({ width, height: 844 });
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      const field = await page.locator('.variable-field input').boundingBox();
+      const button = await paste.boundingBox();
+      assert(button.x >= field.x + field.width && Math.abs(button.y - field.y) < 8);
     }
     historyFixtures.set(id, commands.slice(0, 5));
     await page.locator('.device').first().click();

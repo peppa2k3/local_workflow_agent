@@ -116,13 +116,35 @@ export function start() {
       check.type = 'checkbox';
       check.dataset.variable = name;
       label.prepend(check);
-      input.disabled = true;
+      const field = el('fieldset', undefined, 'variable-field');
+      field.disabled = true;
+      field.append(input);
+      if (name === 'video_url') {
+        const paste = el('button');
+        paste.type = 'button';
+        const icon = el('span', '📋');
+        icon.setAttribute('aria-hidden', 'true');
+        paste.append(icon, ' Dán');
+        paste.onclick = async () => {
+          try {
+            const value = await navigator.clipboard.readText();
+            if (!field.isConnected || field.disabled) return;
+            input.value = value.slice(0, input.maxLength);
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+          } catch {
+            if (!field.isConnected || field.disabled) return;
+            message('Không đọc được clipboard. Hãy dán thủ công vào ô video_url.', true);
+            input.focus();
+          }
+        };
+        field.append(paste);
+      }
       input.maxLength = 4000;
       input.setAttribute('aria-label', `Giá trị ${name}`);
       check.addEventListener('change', () => {
-        input.disabled = !check.checked;
+        field.disabled = !check.checked;
       });
-      row.append(label, input);
+      row.append(label, field);
       const target = s.clipTargets?.find((target) => target.variable === name);
       if (target) {
         const choose = el('button', `Chọn clip cho ${name}…`);
@@ -131,7 +153,7 @@ export function start() {
           clipPicker(s.name, target.id, (file) => {
             input.value = 'clip:' + file;
             check.checked = true;
-            input.disabled = false;
+            field.disabled = false;
             runIntent = null;
           });
         row.append(choose);
@@ -264,6 +286,8 @@ export function start() {
     busy = true;
     clearTimeout(timer);
     let deviceId = selected;
+    const taskStatus = $('local-task-operation');
+    taskStatus.textContent = 'Đang cập nhật tác vụ…';
     try {
       devices = (await api('/api/devices')).devices;
       if (selected && !devices.some((d) => d.id === selected)) {
@@ -274,6 +298,7 @@ export function start() {
         runIntent = null;
         resetHistory();
       }
+      taskStatus.textContent = '';
       renderDevices();
       renderDetail();
       deviceId = selected;
@@ -285,6 +310,8 @@ export function start() {
         }
       }
     } catch (e) {
+      if (taskStatus.textContent && selected === deviceId)
+        taskStatus.textContent = 'Không cập nhật được tác vụ: ' + e.message;
       message(e.message, true);
     } finally {
       busy = false;

@@ -16,7 +16,7 @@ export function RunScenarioForm() {
         <button id="run" className="primary" type="submit">
           Chạy trên thiết bị
         </button>
-        <div className="two">
+        <div className="schedule-controls">
           <label>
             Ngày và giờ chạy
             <input id="schedule-at" type="datetime-local" step="60" />

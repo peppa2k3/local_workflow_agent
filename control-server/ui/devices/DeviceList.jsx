@@ -4,6 +4,7 @@ export function DeviceList({ devices, selected, onSelect }) {
     <button
       key={device.id}
       className={'device' + (device.id === selected ? ' selected' : '')}
+      aria-pressed={device.id === selected}
       onClick={() => onSelect(device.id)}
     >
       <strong>{device.name}</strong>

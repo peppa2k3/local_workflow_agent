@@ -6,8 +6,7 @@ export default function DevicesPage() {
     <>
       <header>
         <div>
-          <span className="eyebrow">Local Agent / Control Center</span>
-          <h1>Quản lý thiết bị</h1>
+          <h1>Điều khiển thiết bị</h1>
         </div>
         <div id="account" className="account" hidden>
           <span id="email"></span>
@@ -48,13 +47,13 @@ export default function DevicesPage() {
             </div>
             <section id="detail" hidden>
               <div className="panel">
-                <div className="row">
+                <div className="device-summary">
                   <h2 id="device-name"></h2>
                   <span id="device-status" className="badge"></span>
+                  <p id="device-seen" className="muted"></p>
+                  <p id="activity" className="muted"></p>
                 </div>
-                <p id="device-seen" className="muted"></p>
-                <p id="activity" className="muted"></p>
-                <div id="metrics" className="row"></div>
+                <div id="metrics" className="device-summary"></div>
                 <p id="profiles" className="muted"></p>
                 <button id="revoke" className="danger">
                   Thu hồi kết nối thiết bị
@@ -66,11 +65,18 @@ export default function DevicesPage() {
               <RunScenarioForm />
               <section id="local-tasks" className="panel" hidden>
                 <h2>Tác vụ từ máy local</h2>
+                <p id="local-task-operation" role="status"></p>
                 <p id="local-tasks-notice" className="muted"></p>
-                <h3>Đang chạy</h3>
-                <div id="local-running"></div>
-                <h3>Đã lên lịch</h3>
-                <div id="local-schedules"></div>
+                <div className="task-columns">
+                  <section>
+                    <h3>Đang chạy</h3>
+                    <div id="local-running"></div>
+                  </section>
+                  <section>
+                    <h3>Đã lên lịch</h3>
+                    <div id="local-schedules"></div>
+                  </section>
+                </div>
               </section>
               <section className="panel history-panel" aria-labelledby="history-title">
                 <div className="history-heading">

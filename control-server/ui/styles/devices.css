@@ -842,3 +842,95 @@ footer {
   padding: 24px;
   overflow-wrap: anywhere;
 }
+
+.device-summary, .schedule-controls, .variable-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.device-summary {
+  margin-bottom: 16px;
+  overflow-wrap: anywhere;
+}
+.device-summary #device-name { flex: 0 1 auto; }
+.device-summary #device-seen, .device-summary #activity {
+  margin: 0;
+  padding-inline-start: 12px;
+  border-inline-start: 1px solid var(--line);
+  font-size: 13px;
+}
+.device-summary #activity { flex: 1 1 18rem; }
+#metrics {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr));
+}
+.variable-field {
+  min-width: 0;
+  flex-wrap: nowrap;
+  padding: 0;
+  border: 0;
+  margin: 6px 0;
+}
+.variable-field input { min-width: 0; flex: 1; }
+.variable-field button { white-space: nowrap; }
+#variables > .two { align-items: center; }
+#variables {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+#variables > .two { flex: 1 1 100%; }
+#variables > .row { min-width: 0; max-width: 100%; }
+#variables > .row small:empty { display: none; }
+.schedule-controls {
+  align-items: end;
+  padding-top: 16px;
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+}
+.schedule-controls label { flex: 2 1 15rem; min-width: 0; margin: 0; }
+.schedule-controls button { flex: 1 1 auto; }
+.task-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 12px;
+}
+.task-columns > section {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-inset);
+  overflow-wrap: anywhere;
+}
+.task-columns h3 { margin: 0; }
+.task-columns p:last-child { margin-bottom: 0; }
+#local-tasks-notice:empty { display: none; }
+#local-task-operation:empty { display: none; }
+
+.device {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  justify-items: start;
+  column-gap: 14px;
+}
+.device::before {
+  content: '';
+  grid-row: span 2;
+  width: 22px;
+  height: 15px;
+  border: 2px solid currentColor;
+  border-radius: 3px;
+  box-shadow: 0 5px 0 -3px currentColor;
+  color: var(--muted);
+}
+.device.selected::before { color: var(--accent); }
+@media (min-width: 821px) {
+  .shell { padding: 24px clamp(18px, 2vw, 32px); }
+  .grid { grid-template-columns: clamp(220px, 20vw, 292px) minmax(0, 1fr); }
+  .grid > aside {
+    padding-inline-end: 16px;
+    border-inline-end: 1px solid var(--line);
+  }
+}
