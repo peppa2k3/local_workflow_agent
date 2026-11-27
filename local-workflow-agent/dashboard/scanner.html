@@ -70,4 +70,104 @@
   .workspace .run-actions { justify-content:flex-start }
 }
 .workspace.scanner :is(#config,#keywordForm) fieldset.editor-fields { display:grid; gap:10px; min-width:0; padding:0; margin:0 0 12px; border:0 }
-</style><script defer="" src="/scanner.js"></script></head><body class="workspace scanner"><nav class="site-nav" aria-label="Điều hướng chính"><div class="nav-inner"><a class="site-brand" href="/"><i aria-hidden="true"></i>Workflow Studio</a><div class="site-links"><a href="/">Kịch bản</a><a href="/content">Quản lý nội dung</a><a href="/remote">Remote Control</a><a href="/scanner" aria-current="page">Scan YouTube</a></div></div></nav><main class="shell"><header class="page-heading"><div><h1>Quét YouTube</h1></div><button id="toggle" class="primary" disabled="">Bật quét</button></header><p id="state" class="muted"></p><div id="scanner-settings"><div class="scanner-editor"><form id="config" class="panel"><h2>Điều kiện lọc</h2><fieldset class="editor-fields" disabled=""><div class="scanner-thresholds"><label class="dashboard-field">Lượt xem tối thiểu<input id="minViews" type="number" min="0" max="9007199254740991" required="" name="minViews" value=""/></label><label class="dashboard-field">Cạnh ngắn tối thiểu (px)<input id="minResolution" type="number" min="1" max="8192" required="" name="minResolution" value=""/></label><label class="dashboard-field">Rộng tối thiểu (px)<input id="minWidth" type="number" min="1" max="8192" placeholder="Tùy chọn" name="minWidth" value=""/></label><label class="dashboard-field">Cao tối thiểu (px)<input id="minHeight" type="number" min="1" max="8192" placeholder="Tùy chọn" name="minHeight" value=""/></label><label class="dashboard-field">Thời lượng từ (giây)<input id="minDurationSeconds" type="number" min="0" max="14399" required="" name="minDurationSeconds" value=""/></label><label class="dashboard-field">Thời lượng dưới (giây)<input id="maxDurationSeconds" type="number" min="1" max="14400" required="" name="maxDurationSeconds" value=""/></label><label class="dashboard-field">Tuổi video từ (ngày)<input id="minDays" type="number" min="0" max="36500" required="" name="minDays" value=""/></label><label class="dashboard-field">Tuổi video đến (ngày)<input id="maxDays" type="number" min="0" max="36500" required="" name="maxDays" value=""/></label><label class="dashboard-field">Chu kỳ quét (phút)<input id="minutes" type="number" min="1" max="1440" required="" name="minutes" value=""/></label><label class="dashboard-field">Yêu cầu API mỗi ngày<input id="requestsPerDay" type="number" min="1" max="100" required="" name="requestsPerDay" value=""/></label></div><label class="dashboard-field">Ngôn ngữ phụ đề (cách nhau bằng dấu phẩy)<input id="subtitleLanguages" required="" placeholder="vi, en" name="subtitleLanguages" value=""/></label><fieldset><legend>Loại phụ đề</legend><label class="check"><input type="checkbox" id="subtitles" name="subtitles"/>Thủ công</label><label class="check"><input type="checkbox" id="automatic_captions" name="automatic_captions"/>Tự động</label></fieldset></fieldset><button class="primary" disabled="">Lưu bộ lọc</button><p role="status" id="configNote"></p></form><form id="keywordForm" class="panel"><h2>Nhóm từ khóa</h2><fieldset class="editor-fields" disabled=""><label>Nội dung keywords.txt<!-- --> <small>Mỗi nhóm bắt đầu bằng [ma-nhom]. Nhập một cụm từ trên mỗi dòng.</small><textarea id="keywords" name="keywords" rows="9" required="" spellCheck="false"></textarea></label></fieldset><button class="primary" disabled="">Lưu từ khóa</button><p role="status" id="keywordNote"></p></form></div></div><section class="panel"><div class="row"><h2>Kết quả gần nhất</h2><button id="export">Xuất kho JSON</button></div><div class="scanner-filters"><label class="dashboard-field">Tìm video<input id="resultQuery" type="search" placeholder="Tiêu đề, chủ đề hoặc ID"/></label><label class="dashboard-field">Trạng thái<select id="filter"><option value="all">Mọi kết quả</option><option value="pass">Đạt điều kiện</option><option value="pending">Đang chờ gửi</option><option value="synced">Đã đồng bộ</option><option value="reject">Không đạt</option><option value="unknown">Chưa đủ dữ liệu</option></select></label><label class="dashboard-field">Kết quả mỗi trang<select id="pageSize"><option value="5">5</option><option value="10">10</option></select></label></div><details class="scanner-check-filters"><summary>Lọc theo từng điều kiện<!-- --> <span id="activeChecks" class="badge" hidden=""></span></summary><div id="checkFilters" class="scanner-check-grid"></div><button id="clearChecks" type="button" disabled="">Xóa lọc điều kiện</button></details><p id="feedback" role="status"></p><div class="row scanner-selection"><label><input id="selectPage" type="checkbox" disabled=""/> Chọn cả trang</label><span id="selectionCount" role="status">Đã chọn 0</span><label class="dashboard-field">Thao tác với mục đã chọn<select id="bulkOperation"><option value="">Chọn thao tác</option></select></label><button id="applyBulk" type="button" disabled="">Áp dụng</button><button id="clearSelection" type="button" disabled="">Bỏ chọn</button></div><div id="rows"></div><nav class="row scanner-pages" aria-label="Phân trang kết quả"><button id="prevPage" disabled="">Trang trước</button><span id="pageInfo" role="status"></span><button id="nextPage" disabled="">Trang sau</button></nav></section></main></body></html>
+</style><style>.toast-stack {
+  position: fixed;
+  top: max(16px, env(safe-area-inset-top));
+  right: max(16px, env(safe-area-inset-right));
+  z-index: 1000;
+  display: grid;
+  gap: 8px;
+  width: min(360px, calc(100vw - 32px));
+  pointer-events: none;
+}
+.toast {
+  border-radius: 10px;
+  padding: 12px 16px;
+  color: white;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 35%);
+  overflow-wrap: anywhere;
+}
+.toast-success {
+  background: #13663c;
+}
+.toast-error {
+  background: #982b36;
+}
+</style><script defer="" src="/scanner.js"></script></head><body class="workspace scanner"><script>(() => {
+  const key = 'local-dashboard.toasts.v1';
+  const stack = document.createElement('div');
+  stack.className = 'toast-stack';
+  stack.setAttribute('aria-live', 'polite');
+  stack.setAttribute('aria-relevant', 'additions');
+  document.body.append(stack);
+  const active = new Map();
+
+  function save() {
+    try {
+      sessionStorage.setItem(key, JSON.stringify([...active.keys()]));
+    } catch {
+      /* Toasts still work when session storage is unavailable. */
+    }
+  }
+
+  function mount(item) {
+    const remaining = item.expires - Date.now();
+    if (remaining <= 0) return;
+    const element = document.createElement('div');
+    element.className = 'toast toast-' + item.type;
+    element.textContent = item.message;
+    stack.append(element);
+    const timer = setTimeout(() => {
+      const positions = [...stack.children].map((el) => [el, el.getBoundingClientRect().top]);
+      element.remove();
+      active.delete(item);
+      save();
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      for (const [el, top] of positions) {
+        if (!el.isConnected) continue;
+        el.getAnimations().forEach((animation) => animation.cancel());
+        const offset = top - el.getBoundingClientRect().top;
+        if (offset)
+          el.animate([{ transform: 'translateY(' + offset + 'px)' }, { transform: 'none' }], {
+            duration: 180,
+            easing: 'ease-out',
+          });
+      }
+    }, remaining);
+    active.set(item, timer);
+  }
+
+  function restore() {
+    for (const timer of active.values()) clearTimeout(timer);
+    active.clear();
+    stack.replaceChildren();
+    try {
+      for (const item of JSON.parse(sessionStorage.getItem(key) || '[]')) {
+        if (
+          item &&
+          ['success', 'error'].includes(item.type) &&
+          typeof item.message === 'string' &&
+          Number.isFinite(item.expires)
+        )
+          mount(item);
+      }
+    } catch {
+      /* Ignore invalid saved state. */
+    }
+    save();
+  }
+  function show(type, message) {
+    if (!message) return;
+    mount({ type, message: String(message), expires: Date.now() + 5000 });
+    save();
+  }
+  window.toast = Object.freeze({
+    success: (message) => show('success', message),
+    error: (message) => show('error', message),
+  });
+  restore();
+  addEventListener('pageshow', (event) => {
+    if (event.persisted) restore();
+  });
+})();
+</script><nav class="site-nav" aria-label="Điều hướng chính"><div class="nav-inner"><a class="site-brand" href="/"><i aria-hidden="true"></i>Workflow Studio</a><div class="site-links"><a href="/">Kịch bản</a><a href="/content">Quản lý nội dung</a><a href="/remote">Remote Control</a><a href="/scanner" aria-current="page">Scan YouTube</a></div></div></nav><main class="shell"><header class="page-heading"><div><h1>Quét YouTube</h1></div><button id="toggle" class="primary" disabled="">Bật quét</button></header><p id="state" class="muted"></p><div id="scanner-settings"><div class="scanner-editor"><form id="config" class="panel"><h2>Điều kiện lọc</h2><fieldset class="editor-fields" disabled=""><div class="scanner-thresholds"><label class="dashboard-field">Lượt xem tối thiểu<input id="minViews" type="number" min="0" max="9007199254740991" required="" name="minViews" value=""/></label><label class="dashboard-field">Cạnh ngắn tối thiểu (px)<input id="minResolution" type="number" min="1" max="8192" required="" name="minResolution" value=""/></label><label class="dashboard-field">Rộng tối thiểu (px)<input id="minWidth" type="number" min="1" max="8192" placeholder="Tùy chọn" name="minWidth" value=""/></label><label class="dashboard-field">Cao tối thiểu (px)<input id="minHeight" type="number" min="1" max="8192" placeholder="Tùy chọn" name="minHeight" value=""/></label><label class="dashboard-field">Thời lượng từ (giây)<input id="minDurationSeconds" type="number" min="0" max="14399" required="" name="minDurationSeconds" value=""/></label><label class="dashboard-field">Thời lượng dưới (giây)<input id="maxDurationSeconds" type="number" min="1" max="14400" required="" name="maxDurationSeconds" value=""/></label><label class="dashboard-field">Tuổi video từ (ngày)<input id="minDays" type="number" min="0" max="36500" required="" name="minDays" value=""/></label><label class="dashboard-field">Tuổi video đến (ngày)<input id="maxDays" type="number" min="0" max="36500" required="" name="maxDays" value=""/></label><label class="dashboard-field">Chu kỳ quét (phút)<input id="minutes" type="number" min="1" max="1440" required="" name="minutes" value=""/></label><label class="dashboard-field">Yêu cầu API mỗi ngày<input id="requestsPerDay" type="number" min="1" max="100" required="" name="requestsPerDay" value=""/></label></div><label class="dashboard-field">Ngôn ngữ phụ đề (cách nhau bằng dấu phẩy)<input id="subtitleLanguages" required="" placeholder="vi, en" name="subtitleLanguages" value=""/></label><fieldset><legend>Loại phụ đề</legend><label class="check"><input type="checkbox" id="subtitles" name="subtitles"/>Thủ công</label><label class="check"><input type="checkbox" id="automatic_captions" name="automatic_captions"/>Tự động</label></fieldset></fieldset><button class="primary" disabled="">Lưu bộ lọc</button><p role="status" id="configNote"></p></form><form id="keywordForm" class="panel"><h2>Nhóm từ khóa</h2><fieldset class="editor-fields" disabled=""><label>Nội dung keywords.txt<!-- --> <small>Mỗi nhóm bắt đầu bằng [ma-nhom]. Nhập một cụm từ trên mỗi dòng.</small><textarea id="keywords" name="keywords" rows="9" required="" spellCheck="false"></textarea></label></fieldset><button class="primary" disabled="">Lưu từ khóa</button><p role="status" id="keywordNote"></p></form></div></div><section class="panel"><div class="row"><h2>Kết quả gần nhất</h2><button id="export">Xuất kho JSON</button></div><div class="scanner-filters"><label class="dashboard-field">Tìm video<input id="resultQuery" type="search" placeholder="Tiêu đề, chủ đề hoặc ID"/></label><label class="dashboard-field">Trạng thái<select id="filter"><option value="all">Mọi kết quả</option><option value="pass">Đạt điều kiện</option><option value="pending">Đang chờ gửi</option><option value="synced">Đã đồng bộ</option><option value="reject">Không đạt</option><option value="unknown">Chưa đủ dữ liệu</option></select></label><label class="dashboard-field">Kết quả mỗi trang<select id="pageSize"><option value="5">5</option><option value="10">10</option></select></label></div><details class="scanner-check-filters"><summary>Lọc theo từng điều kiện<!-- --> <span id="activeChecks" class="badge" hidden=""></span></summary><div id="checkFilters" class="scanner-check-grid"></div><button id="clearChecks" type="button" disabled="">Xóa lọc điều kiện</button></details><p id="feedback" role="status"></p><div class="row scanner-selection"><label><input id="selectPage" type="checkbox" disabled=""/> Chọn cả trang</label><span id="selectionCount" role="status">Đã chọn 0</span><label class="dashboard-field">Thao tác với mục đã chọn<select id="bulkOperation"><option value="">Chọn thao tác</option></select></label><button id="applyBulk" type="button" disabled="">Áp dụng</button><button id="clearSelection" type="button" disabled="">Bỏ chọn</button></div><div id="rows"></div><nav class="row scanner-pages" aria-label="Phân trang kết quả"><button id="prevPage" disabled="">Trang trước</button><span id="pageInfo" role="status"></span><button id="nextPage" disabled="">Trang sau</button></nav></section></main></body></html>

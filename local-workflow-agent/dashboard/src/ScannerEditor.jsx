@@ -27,8 +27,10 @@ function SaveForm({ id, title, part, ready, read, children, button, note }) {
         value: read(new FormData(event.currentTarget)),
       });
       setMessage("Đã lưu. Áp dụng từ lượt quét tiếp theo.");
+      window.toast.success("Đã lưu. Áp dụng từ lượt quét tiếp theo.");
     } catch (error) {
       setMessage(error.message);
+      window.toast.error(error.message);
     } finally {
       setSaving(false);
     }

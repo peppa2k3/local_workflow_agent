@@ -4,6 +4,8 @@ import Scenarios from "./pages/Scenarios.jsx";
 import Content from "./pages/Content.jsx";
 import Remote from "./pages/Remote.jsx";
 import Scanner from "./pages/Scanner.jsx";
+import toastScript from "./toast.js?raw";
+import toastCss from "./styles/toast.css?raw";
 import common from "./styles/workspace.css?raw";
 import scenariosCss from "./styles/index.css?raw";
 import contentCss from "./styles/content.css?raw";
@@ -63,11 +65,13 @@ export function renderDashboard() {
             <link rel="stylesheet" href="/remote.css" />
           )}
           <style>{common}</style>
+          <style>{toastCss}</style>
           {scripts.map((file) => (
             <script key={file} defer src={"/" + file + ".js"} />
           ))}
         </head>
         <body className={"workspace " + name}>
+          <script dangerouslySetInnerHTML={{ __html: toastScript }} />
           <Navigation current={path} />
           <Page />
           {controller && (

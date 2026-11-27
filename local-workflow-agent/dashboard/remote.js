@@ -2,7 +2,7 @@
   const $ = id => document.getElementById(id), session = document.querySelector('meta[name=local-agent-session]').content;
   let state, signature = '', claim = '', busy = false, mutation = false, timer;
   function el(tag, text) { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; return n; }
-  function message(text, error = false) { $('message').textContent = text; $('message').className = error ? 'notice error' : 'notice'; $('message').hidden = !text; }
+  function message(text, error = false, notify = true) { $('message').textContent = text; $('message').className = error ? 'notice error' : 'notice'; $('message').hidden = !text; if (text && notify) window.toast[error ? 'error' : 'success'](text); }
   async function api(route, data) {
     const response = await fetch('/api/remote/' + route, { method: data === undefined ? 'GET' : 'POST', redirect: 'error',
       headers: { 'content-type': 'application/json', 'x-local-agent-session': session }, body: data === undefined ? undefined : JSON.stringify(data), signal: AbortSignal.timeout(20000) });
@@ -37,7 +37,7 @@
   }
   async function refresh() {
     if (busy || mutation || document.hidden) return; busy = true; clearTimeout(timer);
-    try { render(await api('status')); } catch (e) { message(e.message, true); }
+    try { render(await api('status')); } catch (e) { message(e.message, true, false); }
     finally { busy = false; timer = setTimeout(refresh, 3000); }
   }
   async function change(button, route, data, success) {

@@ -16,7 +16,7 @@ const types = {
   workflow_runs: { title: 'Lượt chạy', columns: [['Kịch bản', row => row.scenario], ['Profile', row => row.profile], ['Kết quả', row => states[row.state] || row.state], ['Tiến độ', row => row.stoppedAtStep ? 'Dừng tại bước ' + row.stoppedAtStep + '/' + row.total : row.index + '/' + row.total], ['Bắt đầu', row => date(row.startedAt)]] }
 };
 let selected = 'downloads', offset = 0, total = 0, rows = [], requestVersion = 0, editingPage = null, editingPublication = null, originalPublishedInput = '', detailId = '';
-function message(value, failed = false) { $('message').textContent = value; $('message').classList.toggle('error', failed); }
+function message(value, failed = false, notify = true) { $('message').textContent = value; $('message').classList.toggle('error', failed); if (value && notify) window.toast[failed ? 'error' : 'success'](value); }
 async function api(route, method = 'GET', body) {
   const response = await fetch('/api/content' + route, { method, headers: { 'Content-Type': 'application/json', 'X-Local-Agent-Session': token },
     body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(30000) });
@@ -54,7 +54,7 @@ function renderRows() {
 }
 async function load() {
   const version = ++requestVersion;
-  message('Đang đọc dữ liệu…');
+  message('Đang đọc dữ liệu…', false, false);
   const params = new URLSearchParams({ offset, limit: 25, q: $('search').value.trim() });
   if (selected === 'pages' && $('activeFilter').value) params.set('active', $('activeFilter').value);
   try {
@@ -69,7 +69,7 @@ async function load() {
 async function refresh() {
   try {
     const state = await status();
-    if (!state.enabled) { rows = []; total = 0; renderRows(); message('Cấu hình .env để xem và quản lý dữ liệu trên Atlas.'); return; }
+    if (!state.enabled) { rows = []; total = 0; renderRows(); message('Cấu hình .env để xem và quản lý dữ liệu trên Atlas.', false, false); return; }
     const results = await Promise.allSettled([summary(), load()]);
     for (const result of results) if (result.status === 'rejected') message(result.reason.message, true);
   } catch (error) { message(error.message, true); }
@@ -135,7 +135,7 @@ $('next').onclick = () => { offset += 25; void load(); };
 $('refresh').onclick = () => { void refresh(); };
 for (const [id, route] of [['ping','/ping'],['reconnect','/reconnect'],['sync','/sync']]) $(id).onclick = async () => {
   for (const key of ['ping','reconnect','sync']) $(key).disabled = true;
-  message('Đang kết nối / đồng bộ…');
+  message('Đang kết nối / đồng bộ…', false, false);
   try { const state = await api(route, 'POST'); connection(state); await refresh(); if (state.error) message(state.error, true); }
   catch (error) { message(error.message, true); try { await status(); } catch {} }
   finally { for (const key of ['ping','reconnect','sync']) $(key).disabled = false; }

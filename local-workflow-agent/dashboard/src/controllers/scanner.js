@@ -1,8 +1,8 @@
 import { api } from "../scanner-api.js";
 const $ = id => document.getElementById(id);
 let enabled = false, refreshing = false, signature;
-async function action(fn) {
-  try { await fn(); } catch (e) { $('feedback').textContent = e.message; }
+async function action(fn, notify = true) {
+  try { await fn(); } catch (e) { $('feedback').textContent = e.message; if (notify) window.toast.error(e.message); }
 }
 const labels = { pass:'Đạt', pending:'Đang chờ gửi', synced:'Đã đồng bộ', reject:'Không đạt', unknown:'Chưa đủ dữ liệu', candidate:'Chờ xét lại' };
 const checkNames = { id:'ID video', keyword:'Từ khóa', views:'Lượt xem', age:'Tuổi video', duration:'Thời lượng',
@@ -53,6 +53,7 @@ async function manageResults(ids, operation) {
       checkbox.checked = selected.has(checkbox.value);
     }
     $('feedback').textContent = operation === 'delete' ? 'Đã xóa ' + changed + ' kết quả local.' : 'Đã cập nhật ' + changed + ' kết quả.';
+    window.toast.success($('feedback').textContent);
   } finally { editing = false; updateSelection(); }
 }
 async function refresh() {
@@ -143,7 +144,7 @@ function renderRows() {
     }
     button('Copy URL', () => navigator.clipboard.writeText(row.video_url));
     button('Copy JSON', () => navigator.clipboard.writeText(JSON.stringify(row,null,2)));
-    if (row.status === 'synced' && row.review !== 'reject') button('Tải clip', async () => { $('feedback').textContent = (await api('download',{video_id:row.video_id})).file; });
+    if (row.status === 'synced' && row.review !== 'reject') button('Tải clip', async () => { $('feedback').textContent = (await api('download',{video_id:row.video_id})).file; window.toast.success($('feedback').textContent); });
     const editor = document.createElement('div'), label = document.createElement('label'), review = document.createElement('select');
     editor.className = 'row scanner-actions scanner-review-editor';
     review.append(...reviewOptions.map(([value, text]) => new Option(text, value)));
@@ -196,5 +197,5 @@ $('export').onclick = () => action(async () => {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 $('toggle').onclick = () => action(async () => { await api('toggle',{enabled:!enabled}); await refresh(); });
-setInterval(() => action(refresh),5000);
-void action(refresh);
+setInterval(() => action(refresh, false),5000);
+void action(refresh, false);

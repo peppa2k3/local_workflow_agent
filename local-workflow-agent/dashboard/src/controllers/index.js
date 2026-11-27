@@ -156,7 +156,7 @@ async function api(route, method = 'GET', body) {
   if (!response.ok) throw new Error(data.error || 'Request failed');
   return data;
 }
-function notice(text, error = false) { $('message').textContent = text; $('message').classList.toggle('error', error); }
+function notice(text, error = false) { $('message').textContent = text; $('message').classList.toggle('error', error); if (text) window.toast[error ? 'error' : 'success'](text); }
 let clipPicker;
 async function loadClips() {
   const picker = clipPicker, search = $('clipSearch'), list = $('clipNames');
