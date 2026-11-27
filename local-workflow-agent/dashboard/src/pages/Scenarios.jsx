@@ -16,21 +16,6 @@ export default function Scenarios() {
         </PageHeader>
 
         <ScenarioToolbar />
-        <StepEditor />
-        <SchedulePanel />
-        <p>
-          Cài extension trong từng profile, mở Extension options và chọn đúng
-          thư mục profile. Mỗi profile có thể chạy một kịch bản riêng.
-        </p>
-        <p id="automationStatus">
-          CLI/API: node local-agent.js --help. Hướng dẫn cấu hình token trong
-          guides-local.md ở gốc repo.
-        </p>
-        <div
-          id="profilesSummary"
-          className="profiles-summary"
-          aria-live="polite"
-        ></div>
         <nav className="variables" aria-label="Biến kịch bản">
           <p>
             Kết quả tải: {"{{download_title}}"} = tiêu đề / tên phim;{" "}
@@ -48,6 +33,21 @@ export default function Scenarios() {
             ＋ Thêm biến
           </button>
         </nav>
+        <SchedulePanel />
+        <StepEditor />
+        <p>
+          Cài extension trong từng profile, mở Extension options và chọn đúng
+          thư mục profile. Mỗi profile có thể chạy một kịch bản riêng.
+        </p>
+        <p id="automationStatus">
+          CLI/API: node local-agent.js --help. Hướng dẫn cấu hình token trong
+          guides-local.md ở gốc repo.
+        </p>
+        <div
+          id="profilesSummary"
+          className="profiles-summary"
+          aria-live="polite"
+        ></div>
         <div
           id="performance"
           className="performance"
