@@ -14,8 +14,8 @@ export default function Scanner() {
         <div id="scanner-settings">
           <ScannerEditor />
         </div>
-        <section className="panel">
-          <div className="row">
+        <section className="panel scanner-results">
+          <div className="row scanner-results-heading">
             <h2>Kết quả gần nhất</h2>
             <button id="export">Xuất kho JSON</button>
           </div>

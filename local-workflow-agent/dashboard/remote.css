@@ -84,3 +84,80 @@ button.danger:hover{background:#bd3947;border-color:#ed6974}
 .remote-policy .variables { padding: 8px 0; border-top: 1px solid #30465f; }
 .remote-policy .variables:has(.variable-grid:empty) { display: none; }
 .remote-policy small { overflow-wrap: anywhere; }
+
+/* Scanner result cards */
+.scanner .scanner-results-heading { align-items: center; margin-bottom: 12px; }
+.scanner .scanner-results-heading h2 { margin: 0; }
+.scanner .scanner-filters { display: grid; grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
+.scanner .scanner-filters label:first-child { width: auto; }
+.scanner .scanner-check-filters { max-width: none; margin-block: 16px; padding: 12px; }
+.scanner .scanner-check-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); gap: 10px 16px; }
+.scanner #rows { display: grid; gap: 12px; }
+.scanner #rows .scanner-video-card {
+  display: grid;
+  grid-template-columns: 18px minmax(150px, 190px) minmax(0, 1fr);
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid #344e61;
+  border-radius: 12px;
+  background: #10202d;
+  overflow-wrap: anywhere;
+}
+.scanner #rows .scanner-video-card:has(details[open]) { border-color: #43c6c7; }
+.scanner-thumbnail {
+  position: relative;
+  display: grid;
+  place-items: center;
+  align-self: start;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid #344e61;
+  border-radius: 8px;
+  background: #0b1721;
+  color: #a8c0ce;
+}
+.scanner-thumbnail-placeholder { padding: 8px; font-size: 12px; text-align: center; }
+.scanner-thumbnail img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.scanner-duration { position: absolute; right: 5px; bottom: 5px; padding: 1px 5px; border-radius: 4px; background: #071018e8; color: white; font-size: 12px; font-weight: 700; }
+.scanner-card-body { min-width: 0; }
+.scanner-card-heading { display: flex; justify-content: space-between; align-items: start; gap: 10px 18px; }
+.scanner #rows .scanner-video-card h3 { display: block; margin: 0; overflow: visible; font-size: 16px; line-height: 1.4; }
+.scanner-open-video {
+  flex: 0 0 auto;
+  padding: 7px 11px;
+  border: 1px solid #2f9fad;
+  border-radius: 8px;
+  color: #8cebf1;
+  font-weight: 650;
+  text-decoration: none;
+}
+.scanner-open-video:hover { background: #174452; text-decoration: none; }
+.scanner-missing-url { color: #9bb0c9; font-size: 13px; }
+.scanner #rows .scanner-card-topic { margin: 5px 0 9px; color: #b7cbd7; }
+.scanner-card-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 9px; }
+.scanner .scanner-status-pass { background: #153e37; color: #89f4d7; }
+.scanner-card-badges .scanner-review { margin-left: 0; }
+.scanner-card-metadata { display: flex; flex-wrap: wrap; gap: 6px 0; color: #d8e7ee; font-size: 13px; }
+.scanner-card-metadata span { padding: 0 11px; border-left: 1px solid #405c6a; }
+.scanner-card-metadata span:first-child { padding-left: 0; border-left: 0; }
+.scanner #rows .scanner-video-card details { margin-top: 10px; color: #a5d7ff; }
+.scanner-card-checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: 4px 18px; padding: 12px; margin-top: 10px; border: 1px solid #345867; border-radius: 8px; color: #d9e9f0; }
+.scanner-card-checks h4 { grid-column: 1 / -1; margin: 0 0 5px; font-size: 14px; }
+.scanner #rows .scanner-card-checks p { margin: 0; }
+.scanner-card-body .scanner-review-editor { padding-top: 10px; border-top: 1px solid #34505d; }
+.scanner-card-body .scanner-review-editor label { flex: 1 1 210px; max-width: 320px; }
+.scanner-card-body small { display: block; margin-top: 8px; }
+@media (max-width: 700px) {
+  .scanner .scanner-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .scanner .scanner-filters label:first-child { grid-column: 1 / -1; }
+  .scanner #rows .scanner-video-card { grid-template-columns: 18px minmax(0, 1fr); gap: 10px; }
+  .scanner-thumbnail { max-width: 300px; }
+  .scanner-card-body { grid-column: 1 / -1; }
+  .scanner-card-heading { flex-wrap: wrap; }
+}
+@media (max-width: 400px) {
+  .scanner .scanner-filters { grid-template-columns: minmax(0, 1fr); }
+  .scanner .scanner-filters label:first-child { grid-column: auto; }
+  .scanner-card-metadata span { width: 100%; padding: 0; border: 0; }
+}

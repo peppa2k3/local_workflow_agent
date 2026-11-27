@@ -21,6 +21,79 @@ const selected = new Set();
 const reviewOptions = [['pass','Đánh dấu đạt'], ['reject','Đánh dấu không đạt'], ['auto','Dùng kết quả tự động']];
 $('bulkOperation').append(...[...reviewOptions, ['delete','Xóa kết quả local']].map(([value, text]) => new Option(text, value)));
 
+const dayMs = 86400000;
+const numberFormat = new Intl.NumberFormat('vi-VN');
+const dateParts = { day: '2-digit', month: '2-digit', year: 'numeric' };
+const dateFormat = new Intl.DateTimeFormat('vi-VN', dateParts);
+const dateTimeFormat = new Intl.DateTimeFormat('vi-VN', { ...dateParts, hour: '2-digit', minute: '2-digit' });
+
+function timestamp(value) {
+  if (typeof value !== 'string') return NaN;
+  const zone = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.\d+)?(Z|([+-])(\d{2}):(\d{2}))$/.exec(value);
+  if (!zone) return NaN;
+  const time = Date.parse(value);
+  if (!Number.isFinite(time)) return NaN;
+  const offset = zone[2] === 'Z' ? 0 : (Number(zone[4]) * 60 + Number(zone[5])) * (zone[3] === '+' ? 1 : -1);
+  const localTime = new Date(time + offset * 60000);
+  return Number.isFinite(localTime.getTime()) && localTime.toISOString().slice(0, 19) === zone[1] ? time : NaN;
+}
+
+function elapsedLabel(milliseconds) {
+  if (milliseconds < 1000) return 'dưới 1 giây';
+  const seconds = Math.floor(milliseconds / 1000);
+  if (seconds < 60) return seconds + ' giây';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return minutes + ' phút' + (seconds % 60 ? ' ' + seconds % 60 + ' giây' : '');
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return hours + ' giờ' + (minutes % 60 ? ' ' + minutes % 60 + ' phút' : '') + (seconds % 60 ? ' ' + seconds % 60 + ' giây' : '');
+  return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 1 }).format(milliseconds / dayMs) + ' ngày';
+}
+
+function videoFacts(row) {
+  const published = timestamp(row.published_at), measured = timestamp(row.measured_at);
+  const elapsed = measured - published;
+  const validElapsed = Number.isFinite(elapsed) && elapsed > 0;
+  const views = Number.isSafeInteger(row.view_count) && row.view_count >= 0 ? row.view_count : null;
+  const rate = views !== null && validElapsed ? views * dayMs / elapsed : NaN;
+  let rateText = '—';
+  if (Number.isFinite(rate)) {
+    rateText = rate > 0 && rate < 0.01 ? '< 0,01' : rate < 1
+      ? new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(rate)
+      : numberFormat.format(Math.round(rate));
+  }
+  const duration = row.duration_seconds;
+  let durationText = '—';
+  if (Number.isFinite(duration) && duration >= 0) {
+    const seconds = Math.floor(duration), hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor(seconds / 60) % 60, remaining = seconds % 60;
+    durationText = (hours ? hours + ':' + String(minutes).padStart(2, '0') : String(minutes)) + ':' + String(remaining).padStart(2, '0');
+  }
+  return {
+    duration: durationText,
+    views: views === null ? '—' : numberFormat.format(views),
+    age: validElapsed ? elapsedLabel(elapsed) : '—',
+    published: Number.isFinite(published) ? dateFormat.format(published) : '—',
+    measured: Number.isFinite(measured) ? dateTimeFormat.format(measured) : '—',
+    rate: rateText,
+    rateBasis: validElapsed && elapsed < dayMs ? ' (theo ' + elapsedLabel(elapsed) + ' thực tế)' : '',
+  };
+}
+
+function sourceUrl(value) {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  try {
+    const url = new URL(value);
+    return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : null;
+  } catch { return null; }
+}
+
+function textElement(tag, text, className) {
+  const element = document.createElement(tag);
+  element.textContent = text;
+  if (className) element.className = className;
+  return element;
+}
+
 function updateSelection() {
   const count = visibleIds.filter(id => selected.has(id)).length;
   $('selectPage').checked = visibleIds.length > 0 && count === visibleIds.length;
@@ -86,7 +159,7 @@ function renderRows() {
       if (['pending','synced'].includes(mode)) return r.status === mode && (mode === 'synced' || r.review !== 'reject');
       return mode === 'all' || verdict === mode;
     })
-    .filter(r => activeChecks.every(({ key, select }) => r.checks[key]?.status === select.value));
+    .filter(r => activeChecks.every(({ key, select }) => r.checks?.[key]?.status === select.value));
   const pages = Math.max(1, Math.ceil(matching.length / size));
   page = Math.min(page, pages);
   $('pageInfo').textContent = 'Trang ' + page + '/' + pages + ' · ' + matching.length + ' kết quả';
@@ -95,26 +168,24 @@ function renderRows() {
   const rows = matching.slice((page - 1) * size, page * size);
   visibleIds = rows.map(row => row.video_id);
   $('rows').replaceChildren(...rows.map(row => {
-    const article = document.createElement('article'), title = document.createElement('h3'), detail = document.createElement('details');
-    article.className = 'run';
-    title.textContent = row.title || row.video_id;
-    title.title = title.textContent;
-    const summary = document.createElement('summary'), badge = document.createElement('span');
-    summary.textContent = 'Chi tiết và chỉnh sửa';
+    const article = document.createElement('article'), detail = document.createElement('details');
+    const title = textElement('h3', row.title || row.video_id || '—');
+    const summary = textElement('summary', 'Chi tiết và chỉnh sửa');
+    const facts = videoFacts(row), url = sourceUrl(row.video_url);
+    article.className = 'run scanner-video-card';
     detail.dataset.video = row.video_id;
     detail.open = openDetails.has(row.video_id);
     detail.append(summary);
-    for (const [key, check] of Object.entries(row.checks)) {
+    const checks = document.createElement('div');
+    checks.className = 'scanner-card-checks';
+    checks.append(textElement('h4', 'Kết quả theo từng điều kiện'));
+    for (const [key, check] of Object.entries(row.checks || {})) {
       const line = document.createElement('p');
-      line.textContent = (checkNames[key] || key) + ' · ' + (labels[check.status] || check.status) + ' · ' + check.reason;
-      detail.append(line);
+      line.textContent = (checkNames[key] || key) + ' · ' + (labels[check?.status] || check?.status || '—') + ' · ' + (check?.reason || '—');
+      checks.append(line);
     }
-    badge.className = 'badge scanner-status-' + row.status;
-    badge.textContent = labels[row.status] || row.status;
-    const metadata = document.createElement('p');
-    metadata.className = 'muted';
-    metadata.textContent = [row.type_topic, row.view_count != null && row.view_count.toLocaleString('vi-VN') + ' lượt xem',
-      new Date(row.measured_at).toLocaleString('vi-VN')].filter(Boolean).join(' · ');
+    if (!Object.keys(row.checks || {}).length) checks.append(textElement('p', 'Chưa có chi tiết điều kiện.'));
+    detail.append(checks);
     const select = document.createElement('input'), content = document.createElement('div');
     select.type = 'checkbox';
     select.className = 'scanner-row-select';
@@ -125,24 +196,72 @@ function renderRows() {
       if (select.checked) selected.add(row.video_id); else selected.delete(row.video_id);
       updateSelection();
     };
-    if (row.status === 'pending' && row.review === 'reject') badge.textContent = 'Tạm giữ gửi';
-    content.append(badge);
+    const thumbnail = document.createElement(url ? 'a' : 'div');
+    thumbnail.className = 'scanner-thumbnail';
+    if (url) {
+      thumbnail.href = url;
+      thumbnail.target = '_blank';
+      thumbnail.rel = 'noopener noreferrer';
+      thumbnail.setAttribute('aria-label', 'Mở video ' + title.textContent + ' trong tab mới');
+    }
+    const placeholder = textElement('span', 'Không có ảnh thu nhỏ', 'scanner-thumbnail-placeholder');
+    thumbnail.append(placeholder);
+    if (typeof row.video_id === 'string' && /^[\w-]{11}$/.test(row.video_id)) {
+      const image = document.createElement('img');
+      image.alt = '';
+      image.loading = 'lazy';
+      image.referrerPolicy = 'no-referrer';
+      image.onload = () => { placeholder.hidden = true; };
+      image.onerror = () => { image.hidden = true; placeholder.hidden = false; };
+      image.src = 'https://i.ytimg.com/vi/' + encodeURIComponent(row.video_id) + '/mqdefault.jpg';
+      thumbnail.append(image);
+    }
+    thumbnail.append(textElement('span', facts.duration, 'scanner-duration'));
+    content.className = 'scanner-card-body';
+    const heading = document.createElement('div'), badges = document.createElement('div');
+    heading.className = 'scanner-card-heading';
+    badges.className = 'scanner-card-badges';
+    heading.append(title);
+    if (url) {
+      const open = textElement('a', 'Mở video', 'scanner-open-video');
+      open.href = url;
+      open.target = '_blank';
+      open.rel = 'noopener noreferrer';
+      heading.append(open);
+    } else heading.append(textElement('span', 'Không có URL video', 'scanner-missing-url'));
+    const evaluation = ['pending', 'synced'].includes(row.status) ? 'pass' : row.status;
+    badges.append(textElement('span', labels[evaluation] || evaluation || '—', 'badge scanner-status-' + evaluation));
+    if (['pending', 'synced'].includes(row.status)) {
+      const state = row.status === 'pending' && row.review === 'reject' ? 'Tạm giữ gửi' : labels[row.status];
+      badges.append(textElement('span', state, 'badge scanner-status-' + row.status));
+    }
     if (row.review) {
       const review = document.createElement('span');
       review.className = 'badge scanner-review scanner-status-' + (row.review === 'pass' ? 'synced' : 'reject');
       review.textContent = 'Thủ công · ' + labels[row.review];
-      content.append(review);
+      badges.append(review);
     }
-    content.append(title, metadata, detail);
-    article.append(select, content);
+    const metadata = document.createElement('div');
+    metadata.className = 'scanner-card-metadata';
+    for (const text of [
+      'Thời lượng: ' + facts.duration,
+      'Lượt xem: ' + facts.views,
+      'Tuổi khi quét: ' + facts.age,
+      'Ngày đăng: ' + facts.published,
+      'Lượt xem/ngày ước tính tại lần quét: ' + facts.rate + (facts.rate !== '—' ? facts.rateBasis : ''),
+      'Thời điểm quét: ' + facts.measured,
+    ]) metadata.append(textElement('span', text));
+    content.append(heading, textElement('p', 'Chủ đề: ' + (row.type_topic || '—'), 'scanner-card-topic'), badges, metadata, detail);
+    article.append(select, thumbnail, content);
     const actions = document.createElement('div');
     actions.className = 'row scanner-actions';
     detail.append(actions);
     function button(label, fn) {
       const b = document.createElement('button'); b.textContent = label;
       b.onclick = () => action(async () => { b.disabled = true; try { await fn(); } finally { b.disabled = false; } }); actions.append(b);
+      return b;
     }
-    button('Copy URL', () => navigator.clipboard.writeText(row.video_url));
+    button('Copy URL', () => navigator.clipboard.writeText(row.video_url)).disabled = !url;
     button('Copy JSON', () => navigator.clipboard.writeText(JSON.stringify(row,null,2)));
     if (row.status === 'synced' && row.review !== 'reject') button('Tải clip', async () => { $('feedback').textContent = (await api('download',{video_id:row.video_id})).file; window.toast.success($('feedback').textContent); });
     const editor = document.createElement('div'), label = document.createElement('label'), review = document.createElement('select');
