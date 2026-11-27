@@ -334,3 +334,22 @@ Trong Kho video, mỗi dòng hiển thị ảnh đại diện, thời lượng, 
 Chọn máy và kịch bản trong Kho video, sau đó bấm **Giao job cho máy đã chọn**. Máy phải online và có profile rảnh phù hợp. Server lấy URL từ video và đích tải/đăng từ kịch bản. Server chỉ gửi các biến trùng key được local cho phép. Ví dụ, chỉ cấp quyền video_url để giữ các giá trị còn lại của kịch bản trên máy. Giao thủ công dùng được khi tắt chế độ tự động và không tính vào hạn mức.
 
 Đặt `scenario_id` (ví dụ `downup-giangloi`) giống nhau trên các máy đồng bộ. Nếu bỏ trống, hệ thống dùng tên file bỏ đuôi JSON. Trong Kho video, chọn kịch bản và lưu hạn mức hằng ngày. Hạn mức dùng chung theo tài khoản và ID, số 0 dừng giao tự động, ô trống cho phép không giới hạn. Server tính một lượt khi tạo job tự động, kể cả job sau đó chạy lỗi. Giao lại cùng job không tăng số lượt. Ngày mới bắt đầu lúc 00:00 UTC+7.
+
+### Retry, timeout và xác nhận upload (extension 4.3)
+
+Khởi động lại agent, Reload extension và tải lại trang đích. Các trường nâng cao là tùy chọn. Kịch bản cũ vẫn nhận CSS `selector`. Agent cấp ngân sách thời gian cho từng step và dùng token để nhận đúng kết quả. Hết hạn step hoặc lượt chạy khi chưa rõ kết quả click/upload sẽ dừng ở `unverified`. Kiểm tra trang trước khi chạy lại.
+
+- `retry.attempts` là số lần thử thêm (0–5, mặc định 0). `retry.delayMs` là khoảng chờ (0–60000 ms). Click/upload đã gửi không được tự động lặp lại.
+- `onError: "continue"` chỉ bỏ qua khi thiếu phần tử và extension xác định chưa gửi input. Step lưu lý do trong lịch sử.
+- `completion.timeoutMs` nhận 1000–3600000 ms, mặc định theo thời gian chờ điều hướng. `hidden` vẫn đạt khi phần tử vắng mặt. Riêng upload có thể dùng `appearedThenHidden` để đợi thanh tiến trình xuất hiện rồi biến mất trong cùng tài liệu. Nên dùng thông báo thành công cụ thể nếu trang cũng ẩn thanh tiến trình khi upload lỗi.
+- Upload chỉ ghi `file_selected` cho tới khi có điều kiện xác nhận với `stage` là `uploaded`, `processed` hoặc `published`. Publication được tạo khi xác nhận đăng và có trang đích. Thời điểm xác nhận nằm ở `confirmed_at`. `published_at` là thời điểm đăng do website cung cấp.
+- Bước xác nhận đăng sau một upload sẽ liên kết với lần upload đó. Nếu có nhiều lần upload, đặt `uploadStep` bằng số thứ tự bước upload, tính từ 1.
+
+```json
+{
+  "action": "click",
+  "selector": "#publish",
+  "uploadStep": 2,
+  "completion": { "selector": ".post-success", "state": "visible", "stage": "published", "timeoutMs": 90000 }
+}
+```

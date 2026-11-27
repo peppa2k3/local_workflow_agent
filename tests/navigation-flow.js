@@ -95,13 +95,13 @@ const { createScenarioStore } = require('../local-workflow-agent/src/workflow/sc
       }
     };
     const context = vm.createContext({
-      chrome, console: { warn() {} }, URL, AbortSignal, crypto: require('node:crypto').webcrypto,
+      StepPolicy: require('../chrome-reels-extension/step-policy'), importScripts() {}, AbortController, chrome, console: { warn() {} }, URL, AbortSignal, crypto: require('node:crypto').webcrypto,
       setTimeout, clearTimeout, setInterval: () => 1, clearInterval() {},
       fetch: async () => ({ ok: true, json: async () => ({ running, runId: 'test-run' }) })
     });
     vm.runInContext(fs.readFileSync(path.join(__dirname, '../chrome-reels-extension/background.js'), 'utf8'), context);
     await new Promise(resolve => setImmediate(resolve));
-    const job = { client: { profile: 'Profile 1', clientId: 'test' }, runId: 'test-run', tabId: null };
+    const job = { abort: new AbortController(), client: { profile: 'Profile 1', clientId: 'test' }, runId: 'test-run', tabId: null };
     context.job = job;
     vm.runInContext('activeJob = job', context);
     const execute = vm.runInContext('execute', context);
@@ -267,7 +267,23 @@ const { createScenarioStore } = require('../local-workflow-agent/src/workflow/sc
     // Return to the original page for the remaining existing checks.
     job.tabId = [...tabs.values()].find(tab => tab.page === targetPage).id;
 
-    await execute(job, { action: 'upload', selector: '#file', filePath: uploadFile, waitAfterMs: 0 });
+    await targetPage.evaluate(() => {
+      const input = document.querySelector('#file');
+      input.value = '';
+      input.addEventListener('change', () => setTimeout(() => {
+        const bar = document.createElement('progress');
+        bar.id = 'upload-progress';
+        document.body.append(bar);
+        setTimeout(() => { bar.remove(); window.uploadFinished = true; }, 200);
+      }, 600), { once: true });
+    });
+    const uploadResult = await execute(job, { action: 'upload', selector: '#file', filePath: uploadFile, waitAfterMs: 0,
+      token: 'upload-test', completion: { selector: '#upload-progress', state: 'appearedThenHidden', timeoutMs: 5000, stage: 'uploaded' } });
+    assert.equal(uploadResult.confirmed, true);
+    assert.equal(await targetPage.evaluate(() => window.uploadFinished), true);
+    await assert.rejects(execute(job, { action: 'upload', selector: '#file', filePath: uploadFile, waitAfterMs: 0,
+      token: 'upload-no-progress', completion: { selector: '#never-shown', state: 'appearedThenHidden', timeoutMs: 1000, stage: 'uploaded' } }),
+      error => error.details.unverified && error.details.dispatched);
     await execute(job, { action: 'click', selector: '#noop', completion: { locator: '#spinner', state: 'hidden' }, navigationTimeoutMs: 1000 });
     await assert.rejects(execute(job, { action: 'click', selector: '#noop', completion: { locator: '#missing' }, navigationTimeoutMs: 250 }), /Completion condition timed out/);
     await execute(job, { action: 'click', selector: '#delayed', completion: { locator: '#arrived' }, navigationTimeoutMs: 5000 });
@@ -350,7 +366,7 @@ const { createScenarioStore } = require('../local-workflow-agent/src/workflow/sc
     ]);
     assert.equal(savedScenario.steps[0].text, '{{tenphimn}}');
     assert.equal(store.prepare(savedScenario).steps[0].text, 'Giá trị navbar đã sửa trước khi chạy');
-    running = true; job.tabId = 1;
+    running = true; job.abort = new AbortController(); delete job.abortReason; job.tabId = 1;
     await execute(job, store.prepare(savedScenario).steps[0]);
     assert.equal(await typingPage.locator('#rich').innerText(), 'Giá trị navbar đã sửa trước khi chạy', 'select navbar variable -> save template -> resolve at run -> type its value');
     await dashboard.locator('#scenarioSelect').selectOption('schedule');

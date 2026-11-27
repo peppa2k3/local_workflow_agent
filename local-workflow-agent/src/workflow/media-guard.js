@@ -24,6 +24,11 @@ function createMediaGuard({ activity, mongo }) {
   }
   const fold = value => casefold(String(value || '').replaceAll('\\', '/').normalize('NFC'));
   const exact = value => ({ $regex: `^${String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' });
+  function historicalState(row) {
+    if (row.published_at || row.confirmed_at) return 'published';
+    if (row.state === 'uploaded' && !row.selected_at) return 'legacy_unverified';
+    return row.state || 'legacy_unverified';
+  }
   async function duplicates(step, file) {
     const download = step.action === 'downloadVideo';
     const key = download ? canonicalUrl(step.url) : fold(step.filePath);
@@ -34,8 +39,8 @@ function createMediaGuard({ activity, mongo }) {
     } else {
       const files = Object.values(activity.data.file_instances).filter(row => fold(row.path) === key || fold(row.name) === name || row.sha256 === file.asset_id);
       const ids = new Set([file.asset_id, ...files.map(row => row.sha256)]);
-      for (const row of Object.values(activity.data.upload_events)) if (ids.has(row.asset_id) || fold(row.file_path) === key || fold(row.file_name) === name) matches.push({ source: 'local', page: row.page_url, time: row.uploaded_at || row.attempted_at, state: row.state });
-      for (const row of Object.values(activity.data.publications)) if (ids.has(row.asset_id)) matches.push({ source: 'local', pageId: row.page_id });
+      for (const row of Object.values(activity.data.upload_events)) if (ids.has(row.asset_id) || fold(row.file_path) === key || fold(row.file_name) === name) matches.push({ source: 'local', page: row.page_url, time: row.uploaded_at || row.selected_at || row.attempted_at, state: historicalState(row) });
+      for (const row of Object.values(activity.data.publications)) if (ids.has(row.asset_id)) matches.push({ source: 'local', pageId: row.page_id, state: historicalState(row) });
     }
     if (mongo.status().enabled) await mongo.request(async db => {
       if (download) {
@@ -45,8 +50,8 @@ function createMediaGuard({ activity, mongo }) {
         const rows = await db.collection('file_instances').find({ $or: [{ path: exact(step.filePath) }, { name: exact(path.basename(step.filePath)) }, { sha256: file.asset_id }] }, { projection: { sha256: 1 }, maxTimeMS: 5000 }).toArray();
         const ids = [...new Set([file.asset_id, ...rows.map(row => row.sha256).filter(Boolean)])];
         for (const collection of ['upload_events', 'publications']) {
-          const row = await db.collection(collection).findOne({ $or: [{ asset_id: { $in: ids } }, { file_path: exact(step.filePath) }, { file_name: exact(path.basename(step.filePath)) }] }, { projection: { page_id: 1, page_url: 1, uploaded_at: 1, state: 1 }, maxTimeMS: 5000 });
-          if (row) matches.push({ source: 'mongodb', page: row.page_url, pageId: row.page_id, time: row.uploaded_at });
+          const row = await db.collection(collection).findOne({ $or: [{ asset_id: { $in: ids } }, { file_path: exact(step.filePath) }, { file_name: exact(path.basename(step.filePath)) }] }, { projection: { page_id: 1, page_url: 1, uploaded_at: 1, selected_at: 1, published_at: 1, confirmed_at: 1, state: 1 }, maxTimeMS: 5000 });
+          if (row) matches.push({ source: 'mongodb', page: row.page_url, pageId: row.page_id, time: row.published_at || row.uploaded_at || row.selected_at, state: historicalState(row) });
         }
       }
     });
@@ -59,7 +64,7 @@ function createMediaGuard({ activity, mongo }) {
       context.signal.throwIfAborted();
       if (matches.length) await context.confirm({ kind: 'duplicate', message: step.action === 'downloadVideo'
         ? `URL đã được tải: ${step.url}\nTiếp tục để dùng file cache đã xác minh; nếu file không còn hợp lệ, tác vụ sẽ tải lại.`
-        : `File đã được upload hoặc đã có lần thử chưa rõ kết quả (trùng đường dẫn, tên hoặc SHA-256): ${step.filePath}\nBạn có chắc muốn upload thêm lần nữa?`, matches });
+        : `Lịch sử file (${[...new Set(matches.map(match => match.state || 'chưa xác minh'))].join(', ')}) (trùng đường dẫn, tên hoặc SHA-256): ${step.filePath}\nBạn có chắc muốn upload thêm lần nữa?`, matches });
       context.signal.throwIfAborted();
       return release;
     } catch (error) { release(); throw error; }

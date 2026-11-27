@@ -5,7 +5,10 @@
   let picking = false;
   let cancelPicker = null;
   let currentRunId = null;
+  let currentToken;
   let cancelled = false;
+  // True once an input that may have a side effect has been sent to the page; lets the worker decide if a retry is safe.
+  let dispatched = false;
   let actionAbort = new AbortController();
   const checkCancelled = () => { if (cancelled) throw new Error('Stopped'); };
   let lastMutation = Date.now();
@@ -18,7 +21,7 @@
     signal.addEventListener('abort', abort, { once: true });
   });
   const send = message => new Promise(resolve => {
-    chrome.runtime.sendMessage({ ...message, runId: currentRunId }, response => {
+    chrome.runtime.sendMessage({ ...message, runId: currentRunId, token: currentToken }, response => {
       resolve(chrome.runtime.lastError ? { ok: false, error: chrome.runtime.lastError.message } : response);
     });
   });
@@ -102,18 +105,25 @@
 
   async function find(step, includeHidden = false, actionable = false, typing = false) {
     const deadline = Date.now() + (step.timeoutMs || 10000);
-    let matchCount = 0;
+    let matchCount = 0, ambiguity = null;
     while (Date.now() < deadline) {
       checkCancelled();
       const found = matches(step, includeHidden); matchCount = found.length;
       // An explicit index refers to the same visible match before and after
       // scrolling; filtering obscured elements must not silently shift it.
       const candidates = step.index === undefined ? found.filter(element => !actionable || receivesPointer(element)) : found;
-      const target = selectMatch(step, candidates, typing);
+      let target = null;
+      try { target = selectMatch(step, candidates, typing); ambiguity = null; }
+      catch (error) {
+        // A list can briefly hold two matches while the page renders; keep polling until the timeout.
+        if (!/^Locator matches/.test(error.message)) throw error;
+        ambiguity = error;
+      }
       if (target && (!actionable || receivesPointer(target))) return target;
       await sleep(200);
     }
-    throw new Error(`Element not actionable or not found: ${step.locator || step.selector}${step.index === undefined ? '' : ` (index ${step.index}; ${matchCount} visible matches)`}`);
+    if (ambiguity) throw ambiguity;
+    throw Object.assign(new Error(`Element not actionable or not found: ${step.locator || step.selector}${step.index === undefined ? '' : ` (index ${step.index}; ${matchCount} visible matches)`}`), { type: matchCount ? 'element_not_actionable' : 'element_not_found' });
   }
 
   function describe(element) {
@@ -173,6 +183,7 @@
 
   async function clickElement(step) {
     const point = await clickPoint(step);
+    dispatched = true;
     const response = await send({ type: 'input', kind: 'click', ...point, runId: currentRunId });
     if (!response?.ok) throw new Error(response?.error || 'Click failed');
   }
@@ -303,6 +314,7 @@
         if (replacement) { target = replacement; element = editableFor(target); }
       }
       if (element?.isConnected && visible(element) && positionCaret(element, step.clear !== false)) {
+        dispatched = true;
         const response = await send({ type: 'input', kind: 'text', text: String(step.text ?? ''), clear: step.clear !== false });
         if (!response?.ok) throw new Error(response?.error || 'Typing failed');
         return;
@@ -355,6 +367,8 @@
         marker = `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         input.setAttribute('data-local-agent-upload-id', marker);
       }
+      if (step.completion?.state === 'appearedThenHidden') watchUpload(step.completion, step.token);
+      dispatched = true;
       const response = await send({
         type: 'input', kind: 'upload', filePath: step.filePath,
         selector: marker ? `[data-local-agent-upload-id="${marker}"]` : undefined
@@ -396,6 +410,7 @@
         for (let i = 0; i < (step.times || 1); i++) {
           const state = await send({ type: 'state' });
           if (!state?.running || state.runId !== runId) throw new Error('Stopped');
+          dispatched = true;
           const response = await send({
             type: 'input', kind: 'wheel',
             x: Math.floor(innerWidth / 2), y: Math.floor(innerHeight / 2),
@@ -410,22 +425,49 @@
     }
   }
 
-  function conditionSatisfied(condition) {
+  // Same decision rules as before, plus a reason so a timeout can say what was actually seen.
+  let progressWatch;
+  function watchUpload(condition, token) {
+    progressWatch?.observer.disconnect();
+    const watch = { token, seen: false, finished: false };
+    const observe = () => {
+      const elements = matches(condition);
+      const visible = condition.index === undefined ? elements.length > 0 : Boolean(elements[condition.index]);
+      if (visible) watch.seen = true;
+      else if (watch.seen) { watch.finished = true; watch.observer.disconnect(); }
+    };
+    watch.observer = new MutationObserver(observe);
+    progressWatch = watch;
+    observe();
+    watch.observer.observe(document.documentElement, { subtree: true, childList: true, attributes: true, characterData: true });
+  }
+  function conditionStatus(condition, token) {
+    if (condition.state === 'appearedThenHidden') return { satisfied: progressWatch?.token === token && progressWatch?.finished === true };
     const elements = matches(condition);
-    if (condition.state === 'hidden') return condition.index === undefined ? elements.length === 0 : !elements[condition.index];
+    if (condition.state === 'hidden') {
+      const satisfied = condition.index === undefined ? elements.length === 0 : !elements[condition.index];
+      return { satisfied, matched: elements.length, reason: satisfied ? '' : `còn ${elements.length} phần tử đang hiển thị` };
+    }
     const element = condition.index === undefined ? (elements.length === 1 ? elements[0] : null) : elements[condition.index];
-    return Boolean(element && (condition.state !== 'enabled' || receivesPointer(element)));
+    const satisfied = Boolean(element && (condition.state !== 'enabled' || receivesPointer(element)));
+    let reason = '';
+    if (!satisfied) reason = !elements.length ? 'chưa thấy phần tử' : !element ? `khớp ${elements.length} phần tử, hãy đặt index hoặc locator cụ thể hơn` : 'phần tử bị che hoặc disabled';
+    return { satisfied, matched: elements.length, reason };
   }
 
   chrome.runtime.onMessage.addListener((message, sender, respond) => {
     if (message.type === 'cancelPicker') { cancelPicker?.(); respond({ ok: true }); return; }
+    if (message.type === 'endWatch') {
+      if (progressWatch?.token === message.token) { progressWatch.observer.disconnect(); progressWatch = null; }
+      respond({ ok: true }); return;
+    }
     if (message.type === 'conditionStatus') {
-      try { respond({ ok: true, satisfied: conditionSatisfied(message.condition) }); }
+      try { respond({ ok: true, ...conditionStatus(message.condition, message.token) }); }
       catch (error) { respond({ ok: false, error: error.message }); }
       return;
     }
     if (message.type === 'cancel') {
-      if (message.runId === currentRunId) { cancelled = true; actionAbort.abort(); }
+      if (message.runId === currentRunId && message.token === currentToken) { cancelled = true; actionAbort.abort(); }
       respond({ ok: true }); return;
     }
     if (message.type === 'ready') {
@@ -437,14 +479,14 @@
       respond({ ok: true }); return;
     }
     if (!['execute', 'clickPoint'].includes(message.type)) return;
-    if (busy || picking) { respond({ ok: false, error: 'Page is busy' }); return; }
-    busy = true; currentRunId = message.runId; cancelled = false; actionAbort = new AbortController();
+    if (busy || picking) { respond({ ok: false, error: 'Page is busy', dispatched: false }); return; }
+    busy = true; currentRunId = message.runId; currentToken = message.step.token; cancelled = false; dispatched = false; actionAbort = new AbortController();
     (async () => {
       if (message.type === 'clickPoint') return { ok: true, ...await clickPoint(message.step) };
       await execute(message.step, message.runId);
       return { ok: true };
-    })().catch(error => ({ ok: false, error: String(error.message || error) }))
-      .then(respond).finally(() => { busy = false; currentRunId = null; });
+    })().catch(error => ({ ok: false, error: String(error.message || error), errorType: error.type, dispatched }))
+      .then(respond).finally(() => { busy = false; currentRunId = null; currentToken = undefined; });
     return true;
   });
   send({ type: 'wake' });

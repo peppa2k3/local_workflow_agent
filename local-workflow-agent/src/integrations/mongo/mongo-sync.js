@@ -89,7 +89,12 @@ function createMongoSync(store, options = {}) {
           if (item.collection === 'pages') continue;
           const collection = db.collection(item.collection), doc = bsonDates(item.doc);
           const insertOnly = ['assets', 'publications'].includes(item.collection);
-          if (insertOnly) await collection.updateOne({ _id: doc._id }, { $setOnInsert: doc }, { upsert: true });
+          if (insertOnly) {
+            await collection.updateOne({ _id: doc._id }, { $setOnInsert: doc }, { upsert: true });
+            if (item.collection === 'publications' && doc.confirmed_at) {
+              await collection.updateOne({ _id: doc._id, confirmed_at: { $exists: false } }, { $set: { confirmed_at: doc.confirmed_at } });
+            }
+          }
           else {
             const { _id, imported_at, ...fields } = doc;
             await collection.updateOne({ _id }, { $set: fields, ...(imported_at ? { $setOnInsert: { imported_at } } : {}) }, { upsert: true });

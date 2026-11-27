@@ -85,7 +85,7 @@ async function until(test) { for (let i = 0; i < 100 && !test(); i++) await tick
       { action: 'openUrl', url: '{{page_url}}' },
       { action: 'upload', selector: '#upload', filePath: '{{download_file_path}}', pageId: '{{page_id}}', pageName: '{{page_name}}', pageUrl: '{{page_url}}', platform: 'Facebook', publicationDesc: '{{download_title}}' },
       { action: 'type', selector: '#caption', text: '{{download_title}}' },
-      { action: 'click', selector: '#next' },
+      { action: 'click', selector: '#next', completion: { selector: '#posted', stage: 'published' } },
       { action: 'click', selector: '#missing', label: 'Bước bị lỗi' }
     ] };
     assert.throws(() => store.prepare({ steps: [{ action: 'upload', filePath: a.filePath, pageId: '6151234' }] }), /UUID/);
@@ -94,9 +94,10 @@ async function until(test) { for (let i = 0; i < 100 && !test(); i++) await tick
     const run = workflows.start('A', scenario);
     await until(() => !session.localPending);
     for (let index = 1; index < 6; index++) {
-      const job = workflows.next(session); assert.equal(job.step.id, index);
+      const job = workflows.next(session, 1); assert.equal(job.step.id, index);
       if (index === 2) assert.equal(job.step.filePath, activity.data.downloads[source.url].filePath);
-      workflows.result(session, { runId: run.runId, id: index, ok: index !== 5, error: 'Target not found', actionUrl: 'https://example.test/composer', pageUrl: 'https://example.test/composer' });
+      workflows.result(session, { runId: run.runId, id: index, token: job.step.token, confirmed: index === 4, stage: index === 4 ? 'published' : null, ok: index !== 5, error: 'Target not found', actionUrl: 'https://example.test/composer', pageUrl: 'https://example.test/composer' });
+      if (index === 2) { assert.equal(session.steps[index].upload.state, 'file_selected'); assert.equal(Object.keys(activity.data.publications).length, 0); }
       await until(() => !session.localPending);
     }
     const failed = workflows.getRun(run.runId);
@@ -109,12 +110,12 @@ async function until(test) { for (let i = 0; i < 100 && !test(); i++) await tick
     assert.equal(event.page_url, scenario.variables.page_url); assert.equal(event.actual_url, 'https://example.test/composer');
     assert(Number.isFinite(Date.parse(event.uploaded_at)));
     const publication = activity.data.publications[event.publication_id];
-    assert.equal(publication.published_at, null, 'selecting upload file does not prove publication');
+    assert(Number.isFinite(Date.parse(publication.confirmed_at)));
     assert.equal(publication.desc, 'Tên phim');
     workflows.result(session, { runId: run.runId, id: 2, ok: true });
     assert.equal(Object.keys(activity.data.upload_events).length, 1, 'stale result cannot duplicate uploads');
     activity.recordUpload({ pageId, pageName: 'Lili', pageUrl: scenario.variables.page_url, platform: 'Facebook', publicationDesc: 'Retry cannot overwrite' },
-      { asset_id: firstHash, file_instance_id: event.file_instance_id }, { runId: randomUUID(), index: 0 });
+      { asset_id: firstHash, file_instance_id: event.file_instance_id }, { runId: randomUUID(), index: 0, confirmed: true, stage: 'published' });
     assert.equal(activity.data.publications[event.publication_id].desc, 'Tên phim');
 
     const interrupted = workflows.start('A', { steps: [{ action: 'openUrl', url: 'https://example.test/' }] });
@@ -152,7 +153,7 @@ async function until(test) { for (let i = 0; i < 100 && !test(); i++) await tick
     offline = false; await sync.flush();
     assert.equal(restarted.pending().length, 0); assert.equal(restarted.syncStatus().error, '');
     assert(writes.find(write => write.name === 'assets').update.$setOnInsert.created_at instanceof Date);
-    assert.equal(writes.find(write => write.name === 'publications').update.$setOnInsert.published_at, null);
+    assert(writes.find(write => write.name === 'publications').update.$setOnInsert.confirmed_at instanceof Date);
     assert(writes.find(write => write.name === 'upload_events').update.$set.uploaded_at instanceof Date);
     // Attempt state must advance after acknowledgement even if the pending event synced first.
     const attemptId = randomUUID();
@@ -162,7 +163,7 @@ async function until(test) { for (let i = 0; i < 100 && !test(); i++) await tick
     assert(writes.some(write => write.name === 'upload_events' && write.update.$set?.state === 'pending'));
     restarted.recordUpload(attemptStep, { asset_id: firstHash, file_instance_id: event.file_instance_id }, { runId: attemptId, index: 0 });
     await sync.flush();
-    assert.equal(writes.filter(write => write.name === 'upload_events').at(-1).update.$set.state, 'uploaded');
+    assert.equal(writes.filter(write => write.name === 'upload_events').at(-1).update.$set.state, 'file_selected');
     assert(writes.find(write => write.name === 'workflow_runs').update.$set.startedAt instanceof Date);
     assert(bsonDates({ imported_at: '2026-10-22T03:00:00Z' }).imported_at instanceof Date);
     console.log('Durable per-step history, restart recovery, URL/hash reuse, concurrent downloads, blueprint IDs and Mongo retry: OK');

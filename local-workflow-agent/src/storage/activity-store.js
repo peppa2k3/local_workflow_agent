@@ -167,7 +167,7 @@ function createActivityStore(directory) {
       throw error;
     }
   }
-  function recordUpload(step, file, { runId, index, actualUrl = '' }) {
+  function recordUpload(step, file, { runId, index, actualUrl = '', stage, confirmed }) {
     const now = new Date().toISOString(), url = step.pageUrl || actualUrl;
     const target = url ? canonicalUrl(url) : '';
     const platform = step.platform?.trim() || (/(^|\.)facebook\.com$/i.test(target ? new URL(target).hostname : '') ? 'Facebook' : target ? new URL(target).hostname : 'Unknown');
@@ -180,16 +180,24 @@ function createActivityStore(directory) {
       put('pages', page);
     }
     let publicationId = null;
-    if (page) {
-      if (!page.active) throw new Error('Cannot record upload to an inactive page');
+    const eventId = uuid5(runId, String(index));
+    const previous = data.upload_events[eventId];
+    if (page && !page.active) throw new Error('Cannot record upload to an inactive page');
+    const state = confirmed && ['uploaded', 'processed', 'published'].includes(stage) ? stage : 'file_selected';
+    const stages = ['file_selected', 'uploaded', 'processed', 'published'];
+    if (previous && stages.indexOf(previous.state) >= stages.indexOf(state)) return structuredClone(previous);
+    if (page && state === 'published') {
       publicationId = uuid5(URL_NAMESPACE, pythonArray([file.asset_id, page._id, '', '']));
-      if (!data.publications[publicationId]) put('publications', { _id: publicationId, asset_id: file.asset_id,
-        page_id: page._id, published_at: null, post_url: '', desc: step.publicationDesc || '', created_at: now });
+      if (data.publications[publicationId] && !data.publications[publicationId].confirmed_at) {
+        put('publications', { ...data.publications[publicationId], confirmed_at: now });
+      } else if (!data.publications[publicationId]) put('publications', { _id: publicationId, asset_id: file.asset_id,
+        page_id: page._id, confirmed_at: now, published_at: null, post_url: '', desc: step.publicationDesc || '', created_at: now });
     }
-    const event = { _id: uuid5(runId, String(index)), run_id: runId, step_index: index,
+    const event = { ...previous, _id: eventId, run_id: runId, step_index: index,
       file_path: step.filePath || file.filePath || '', file_name: path.basename(step.filePath || file.filePath || ''),
       asset_id: file.asset_id, file_instance_id: file.file_instance_id, page_id: page?._id || null,
-      page_url: target, actual_url: actualUrl, publication_id: publicationId, uploaded_at: now, state: 'uploaded' };
+      page_url: target, actual_url: actualUrl, publication_id: publicationId, description: step.publicationDesc || '',
+      selected_at: previous?.selected_at || now, uploaded_at: state === 'file_selected' ? null : (previous?.uploaded_at || now), state };
     put('upload_events', event); save(); return structuredClone(event);
   }
   function recordUploadAttempt(step, file, runId, index) {

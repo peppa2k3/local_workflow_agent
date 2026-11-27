@@ -8,7 +8,30 @@ const { clipFile, isClip, prefix, uploadFolders } = require('./clip-library');
 
 const supportedActions = ['downloadVideo', 'openUrl', 'openFolder', 'wait', 'waitFor', 'click', 'type', 'setDate', 'setTime', 'scroll', 'upload', 'closeTab'];
 
+const completionStages = ['uploaded', 'processed', 'published'];
+
+// Timeouts for one step. Defaults match the values the extension and content script already used.
+function stepTimeouts(step) {
+  const findMs = step.timeoutMs || 10000, navigationMs = step.navigationTimeoutMs ?? 30000;
+  const completionMs = step.completion ? Number(step.completion.timeoutMs) || navigationMs : 0;
+  return { findMs, navigationMs, completionMs };
+}
+function stepRetry(step) {
+  const retry = step.retry && typeof step.retry === 'object' ? step.retry : {};
+  return { attempts: Math.min(5, Math.max(0, Math.trunc(Number(retry.attempts)) || 0)), delayMs: Math.min(60000, Math.max(0, Number(retry.delayMs ?? 1000) || 0)) };
+}
+// Single source of truth for how long the agent waits for the extension. The extension receives it as
+// `budgetMs` and stops itself 10 s earlier, so the two layers cannot disagree about the deadline.
+function stepBudget(step) {
+  const { findMs, navigationMs, completionMs } = stepTimeouts(step);
+  const { attempts, delayMs } = stepRetry(step);
+  const perAttempt = findMs * 3 + navigationMs * 2 + (step.waitAfterMs || 0) + 2500 +
+    (step.times || 1) * (step.intervalMs || 2500) + completionMs;
+  return perAttempt * (attempts + 1) + delayMs * attempts + 30000;
+}
+
 function validateStep(step, uploadPath = '') {
+  const warnings = [];
   if (!supportedActions.includes(step.action)) throw new Error(`Unsupported action: ${step.action}`);
   for (const key of ['url', 'path', 'text', 'locator', 'selector', 'role', 'filePath', 'folder', 'filename', 'value', 'format']) {
     if (step[key] !== undefined) step[key] = String(step[key]);
@@ -38,14 +61,39 @@ function validateStep(step, uploadPath = '') {
     const url = new URL(step.url);
     if (!['http:', 'https:'].includes(url.protocol)) throw new Error('openUrl requires http or https');
   }
-  if (step.completion?.state && !['visible', 'hidden', 'enabled'].includes(step.completion.state)) throw new Error('Invalid completion state');
-  // The dashboard may leave an unfinished condition with only type/state.
-  // It is not a result condition until a locator is provided.
-  if (step.completion && !String(step.completion.locator || '').trim() && !String(step.completion.selector || '').trim()) delete step.completion;
+  if (step.onError !== undefined && !['stop', 'continue'].includes(step.onError)) throw new Error('Invalid onError (stop | continue)');
+  if (step.retry !== undefined) {
+    if (!step.retry || typeof step.retry !== 'object' || Array.isArray(step.retry)) throw new Error('retry must be an object { attempts, delayMs }');
+    for (const [key, max] of [['attempts', 5], ['delayMs', 60000]]) {
+      if (typeof step.retry[key] === 'string' && step.retry[key].trim() !== '') step.retry[key] = Number(step.retry[key]);
+      const value = step.retry[key];
+      if (value !== undefined && (!Number.isFinite(value) || value < 0 || value > max || (key === 'attempts' && !Number.isInteger(value)))) throw new Error(`Invalid retry.${key} (0–${max})`);
+    }
+  }
+  if (step.completion !== undefined) {
+    if (!step.completion || typeof step.completion !== 'object' || Array.isArray(step.completion)) throw new Error('completion must be an object');
+    const completion = step.completion;
+    if (step.uploadStep !== undefined && (!Number.isInteger(step.uploadStep) || step.uploadStep < 1 || !completion.stage)) throw new Error('uploadStep requires a positive step number and completion.stage');
+    if (completion.state === 'appearedThenHidden' && step.action !== 'upload') throw new Error('appearedThenHidden requires upload');
+    if (completion.state && !['visible', 'hidden', 'enabled', 'appearedThenHidden'].includes(completion.state)) throw new Error('Invalid completion state');
+    if (typeof completion.timeoutMs === 'string' && completion.timeoutMs.trim() !== '') completion.timeoutMs = Number(completion.timeoutMs);
+    // Unlike other waits (max 5 min), a completion wait may cover a large upload: up to 1 hour.
+    if (completion.timeoutMs !== undefined && (!Number.isFinite(completion.timeoutMs) || completion.timeoutMs < 1000 || completion.timeoutMs > 3600000)) throw new Error('completion.timeoutMs must be 1000–3600000');
+    if (completion.stage !== undefined && !completionStages.includes(completion.stage)) throw new Error(`completion.stage must be one of: ${completionStages.join(', ')}`);
+    // The dashboard may leave an unfinished condition with only type/state. Old scenarios keep running
+    // without it, but the step now says so. A condition that uses the new fields must be complete.
+    if (!String(completion.locator || '').trim() && !String(completion.selector || '').trim()) {
+      if (completion.timeoutMs !== undefined || completion.stage !== undefined || completion.state === 'appearedThenHidden') throw new Error('completion có timeoutMs/stage nhưng thiếu locator');
+      warnings.push('completion chưa có locator nên bị bỏ qua: bước chỉ hoàn tất theo hành động, không chờ điều kiện.');
+      delete step.completion;
+    }
+  }
   // A click can succeed while its button remains and video/progress keeps the
   // page mutating. Navigation and explicit result conditions still wait below.
   if (step.action === 'click' && step.settleMs === undefined) step.settleMs = 0;
-  if (step.action !== 'upload') return step;
+  const finish = () => { if (warnings.length) step.warnings = warnings; else delete step.warnings; return step; };
+  if (step.action !== 'upload') return finish();
+  if (!step.completion) warnings.push('Upload chưa có completion: chỉ xác nhận đã chọn file, chưa xác nhận tải lên/xử lý/đăng. Thêm điều kiện chờ (ví dụ nút Đăng sẵn sàng) để bước chỉ hoàn tất khi website báo xong.');
   validateUploadMetadata(step);
   const inputPath = isClip(step.filePath) ? clipFile(step.folder, step.filePath.slice(prefix.length)) : uploadPath || step.filePath ||
     (step.folder && step.filename ? path.join(step.folder, step.filename) : '');
@@ -53,7 +101,7 @@ function validateStep(step, uploadPath = '') {
   const resolved = path.resolve(inputPath);
   if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) throw new Error(`Upload file does not exist: ${resolved}`);
   step.filePath = resolved;
-  return step;
+  return finish();
 }
 
 function scenarioProfile(scenario, fallback) {
@@ -83,6 +131,7 @@ function createScenarioStore(scenariosDir) {
 
   return {
     file,
+    stepBudget, stepTimeouts, stepRetry,
     rename(source, destination, updateReferences) {
       const oldFile = file(source), newFile = file(destination);
       if (source === destination) throw new Error('Nhập tên file khác tên hiện tại.');
@@ -149,4 +198,4 @@ function createScenarioStore(scenariosDir) {
   };
 }
 
-module.exports = { scenarioProfile, assignmentConfig, createScenarioStore };
+module.exports = { scenarioProfile, assignmentConfig, createScenarioStore, stepBudget, stepTimeouts, stepRetry, completionStages };

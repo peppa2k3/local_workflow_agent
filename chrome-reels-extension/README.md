@@ -6,12 +6,15 @@ Extension Chrome Manifest V3, chạy trong từng profile muốn kết nối v�
 | --- | --- |
 | `manifest.json` | Metadata, quyền và điểm vào extension. |
 | `background.js` | Poll agent, quản lý tab, điều hướng và Chrome Debugger. |
+| `step-policy.js` | Phân loại lỗi, xác nhận kết quả và quyết định retry. |
 | `content.js` | Locator, thao tác DOM, picker, tương thích CSS selector cũ. |
 | `options.html`, `options.js` | Chọn Chrome profile và cấu hình kết nối. |
 
 Load unpacked bằng chính thư mục này. Hướng dẫn: [SETUP](../guides-local.md).
 
-Thư mục này triển khai độc lập. Đóng ZIP ngay tại đây bằng `powershell -NoProfile -ExecutionPolicy Bypass -File package.ps1`; kết quả trong `dist/`. Chỉ năm file runtime được đóng gói, không chứa script/README/token. Script không tự publish Chrome Web Store. Khi chạy `npm run package:extension` ở gốc repo, wrapper vẫn xuất ZIP vào `dist/` ở gốc để tương thích.
+Thư mục này triển khai độc lập. Đóng ZIP ngay tại đây bằng `powershell -NoProfile -ExecutionPolicy Bypass -File package.ps1`; kết quả trong `dist/`. Chỉ sáu file runtime được đóng gói, không chứa script/README/token. Script không tự publish Chrome Web Store. Khi chạy `npm run package:extension` ở gốc repo, wrapper vẫn xuất ZIP vào `dist/` ở gốc để tương thích.
+
+Bản 4.3 bổ sung retry có giới hạn, token theo step và trạng thái chưa xác minh. Khởi động lại agent, reload extension và trang đích. Xem [cấu hình và ví dụ](../local-workflow-agent/docs/SCENARIOS.md).
 
 Bản 4.2.2 sửa timeout sau click trên trang có video/progress cập nhật DOM liên
 tục. Click mặc định không chờ DOM đứng yên (`settleMs: 0`), vẫn chờ tải trang và
@@ -43,7 +46,7 @@ Tại gốc repository trên Windows:
 npm run package:extension
 ```
 
-Kết quả: `dist/chrome-reels-extension-<version>.zip`, với `manifest.json` ngay ở gốc ZIP. Script chỉ đưa năm file runtime trong bảng vào gói; README, source agent, cấu hình máy và khóa ký không nằm trong gói. Có thể chỉ định thư mục kết quả: `npm run package:extension -- -OutputDirectory D:\releases\bridge`.
+Kết quả: `dist/chrome-reels-extension-<version>.zip`, với `manifest.json` ngay ở gốc ZIP. Script chỉ đưa sáu file runtime trong bảng vào gói; README, source agent, cấu hình máy và khóa ký không nằm trong gói. Có thể chỉ định thư mục kết quả: `npm run package:extension -- -OutputDirectory D:\releases\bridge`.
 
 Script không ghi đè bản ZIP đã có. Khi phát hành bản mới, cập nhật `version` trong manifest và kiểm tra extension. Nếu thêm asset mới, cập nhật danh sách file trong `scripts/package-extension.ps1` và test đóng gói. ZIP là artifact để upload thủ công; lệnh trên không tự gửi hoặc xuất bản lên Chrome Web Store.
 # Tùy chọn tải video

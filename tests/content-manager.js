@@ -25,11 +25,11 @@ async function until(test) { for (let i = 0; i < 100 && !test(); i++) await tick
     const workflows = createWorkflows({ scenarios: createScenarioStore(temp), defaultProfile: 'A', profiles: () => [{ directory: 'A' }], activity });
     const session = workflows.connect({ profile: 'A', clientId: 'fixture' });
     const run = workflows.start('A', { name: 'offline-upload', steps: [
-      { action: 'upload', filePath, selector: '#upload', pageName: page.name, pageUrl: page.url, platform: 'Facebook', publicationDesc: 'Original description' },
+      { action: 'upload', filePath, selector: '#upload', pageName: page.name, pageUrl: page.url, platform: 'Facebook', publicationDesc: 'Original description', completion: { selector: '#posted', stage: 'published' } },
       { action: 'wait', ms: 5000 }
     ] });
     await until(() => !session.localPending);
-    const job = workflows.next(session); workflows.result(session, { runId: run.runId, id: job.step.id, ok: true, actionUrl: 'https://example.test/composer' });
+    const job = workflows.next(session, 1); workflows.result(session, { token: job.step.token, confirmed: true, stage: 'published', runId: run.runId, id: job.step.id, ok: true, actionUrl: 'https://example.test/composer' });
     const oldPageId = session.steps[0].upload.page_id;
     assert.notEqual(oldPageId, pageId);
     const file = await activity.registerFile(filePath);
@@ -102,7 +102,7 @@ async function until(test) { for (let i = 0; i < 100 && !test(); i++) await tick
     const storedPublication = memory.db.collection('publications').all()[0];
     assert.equal(storedPublication._id, publication._id); assert(storedPublication.published_at instanceof Date);
     // A retry of the local original import must preserve the external publication edits.
-    activity.recordUpload({ pageId, pageName: page.name, platform: 'Facebook', pageUrl: page.url, publicationDesc: 'Should not overwrite' }, file, { runId: randomUUID(), index: 0 });
+    activity.recordUpload({ pageId, pageName: page.name, platform: 'Facebook', pageUrl: page.url, publicationDesc: 'Should not overwrite' }, file, { runId: randomUUID(), index: 0, confirmed: true, stage: 'published' });
     await mongo.flush(); assert.equal(memory.db.collection('publications').all()[0].desc, 'External description');
     for (let i = 0; i < 28; i++) memory.db.collection('downloads').seed({ _id: randomUUID(), title: 'Fixture ' + i, source_url: 'https://example.test/' + i, downloaded_at: new Date(1700000000000 + i) });
     memory.db.collection('downloads').seed({ _id: randomUUID(), title: '<img src=x onerror="window.attacked=true">', downloaded_at: new Date('2026-10-22T04:00:00Z') });

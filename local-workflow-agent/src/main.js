@@ -276,7 +276,7 @@ const server = http.createServer(async (request, response) => {
     }
     const body = await readBody(request);
     const s = workflows.connect(body);
-    if (route === '/next') return json(200, workflows.next(s));
+    if (route === '/next') return json(200, workflows.next(s, body.stepProtocol));
     if (route === '/result') workflows.result(s, body);
     if (route === '/pick/next') return json(200, s.picker);
     if (route === '/pick/result' && s.picker.active && body.id === s.picker.id) {

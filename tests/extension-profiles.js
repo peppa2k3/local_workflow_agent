@@ -74,6 +74,30 @@ const {chromium} = require('playwright');
     await page.waitForFunction(() => document.getElementById('message').textContent.includes('Dừng kịch bản'));
     assert.equal((await page.evaluate(() => chrome.storage.local.get('profile'))).profile, 'Profile 2', 'cannot switch a running profile');
     await api(`/api/v1/runs/${run.runId}/stop`, {});
+    const targetUrl = 'http://fixture.test/publish';
+    await context.route(targetUrl, route => route.fulfill({ contentType: 'text/html', body: '<button id="post" onclick="this.dataset.count=Number(this.dataset.count||0)+1">Post</button>' }));
+    fs.writeFileSync(path.join(scenarios, 'publish.json'), JSON.stringify({ steps: [
+      { action: 'openUrl', url: targetUrl },
+      { action: 'click', selector: '#post', completion: { selector: '#post[data-count="1"]', stage: 'published' } }
+    ] }));
+    await worker.evaluate(() => {
+      const original = self.fetch.bind(self);
+      self.resultPosts = 0;
+      self.fetch = async (url, init) => {
+        const response = await original(url, init);
+        if (String(url).endsWith('/result') && JSON.parse(init.body).id === 1 && ++self.resultPosts === 1) {
+          throw new TypeError('Fixture lost the acknowledgement after the agent accepted it');
+        }
+        return response;
+      };
+    });
+    const publish = await api('/api/v1/runs', { scenario: 'publish', profile: 'Profile 2' });
+    for (let n = 0; n < 100 && await worker.evaluate(() => self.resultPosts < 2); n++) await new Promise(resolve => setTimeout(resolve, 200));
+    assert.equal(await worker.evaluate(() => self.resultPosts), 2);
+    const published = await api('/api/v1/runs/' + publish.runId);
+    assert.equal(published.state, 'succeeded', published.error);
+    const posted = context.pages().find(tab => tab.url() === targetUrl);
+    assert.equal(await posted.locator('#post').getAttribute('data-count'), '1');
     fs.mkdirSync(path.join(root, 'test-results'), {recursive: true});
     await page.screenshot({path: path.join(root, 'test-results/extension-profile-options.png')});
     for (const status of [400, 401, 404]) {
@@ -82,7 +106,7 @@ const {chromium} = require('playwright');
       await page.reload();
       await page.waitForFunction(() => document.getElementById('message').textContent.includes('Khởi động lại node local-agent.js'));
     }
-    console.log('Real extension Options: reproduced GET/Origin 401, POST discovery, connect/switch, active-run guard, no token storage and old-agent guidance passed');
+    console.log('Real extension single click after lost ACK passed. Options: reproduced GET/Origin 401, POST discovery, connect/switch, active-run guard, no token storage and old-agent guidance passed');
   } finally {
     await context?.close();
     if (agent && agent.exitCode === null) { const closed = once(agent, 'close'); agent.kill(); await closed; }

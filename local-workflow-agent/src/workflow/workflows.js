@@ -52,7 +52,7 @@ function createWorkflows({ scenarios, defaultProfile, profiles, onChange = () =>
       executionId: s.executionId || null, state: s.running ? 'running' : s.outcome || 'idle', scenario: s.scenarioName || null,
       total: s.workflow?.steps.length || 0, action: s.workflow?.steps[s.index]?.action || null,
       stepLabel: s.currentStep?.label?.trim() || s.workflow?.steps[s.index]?.label?.trim() || `Bước ${s.index + 1}`,
-      extensionConnected: Date.now() - s.lastContact < 10000, waitingForProfile: s.running && Boolean(s.connectionDeadline), error: s.error,
+      errorType: s.errorType || null, extensionConnected: Date.now() - s.lastContact < 10000, waitingForProfile: s.running && Boolean(s.connectionDeadline), error: s.error,
       paused: Boolean(s.confirmation), confirmation: s.confirmation ? structuredClone(s.confirmation) : null,
       tabId: s.tabId, waiting: s.inFlight || s.localPending,
       elapsedMs: s.startedAt ? (s.endedAt || Date.now()) - s.startedAt : 0,
@@ -117,6 +117,15 @@ function createWorkflows({ scenarios, defaultProfile, profiles, onChange = () =>
         s.stepStartedAt = Date.now(); persist(s);
         const step = scenarios.prepareStep(s.workflow.steps[s.index], s.uploadPath, s.runtime);
         s.currentStep = step;
+        const warnings = [...new Set([...(s.workflow.steps[s.index].warnings || []), ...(step.warnings || [])])];
+        if (warnings.length) record.warnings = warnings;
+        if (step.action !== 'upload' && step.completion?.stage) {
+          const uploads = s.steps.slice(0, s.index).filter(item => item.upload);
+          if (uploads.length > 1 && step.uploadStep === undefined) throw new Error('Chọn uploadStep để xác định file khi có nhiều bước upload.');
+          const source = step.uploadStep === undefined ? uploads[0] : s.steps[step.uploadStep - 1];
+          if (step.uploadStep !== undefined && (source?.action !== 'upload' || !source.upload)) throw new Error('uploadStep phải trỏ tới bước upload đã hoàn tất.');
+          if (source) record.upload_step = source.number;
+        }
         if (step.url) record.url = step.url;
         if (step.action === 'upload') {
           if (prepareUpload) {
@@ -189,7 +198,7 @@ function createWorkflows({ scenarios, defaultProfile, profiles, onChange = () =>
     Object.assign(s, { workflow, remote, scenarioName: scenarioName || scenario.name || null, uploadPath, currentStep: null, currentUrl: '', uploadFile: null,
       steps: workflow.steps.map((step, index) => ({ index, number: index + 1, action: step.action, label: step.label?.trim() || `Bước ${index + 1}`,
         state: 'pending', started_at: null, ended_at: null, error: '' })),
-      awaitingFirstBrowserStep: true, connectionDeadline: 0, runtime: {}, index: 0, download: null, error: '', tabId: null, openedTabIds: [], running: true, startedAt: Date.now(), endedAt: null, lastStepMs: null });
+      awaitingFirstBrowserStep: true, connectionDeadline: 0, runtime: {}, index: 0, download: null, error: '', errorType: '', tabId: null, openedTabIds: [], running: true, startedAt: Date.now(), endedAt: null, lastStepMs: null });
     s.executionId = executionId || s.runId; s.outcome = 'running';
     s.runDeadline = Date.now() + timeoutMs;
     try { persist(s); } catch (error) { s.running = false; s.outcome = 'failed'; throw error; }
@@ -208,28 +217,71 @@ function createWorkflows({ scenarios, defaultProfile, profiles, onChange = () =>
     s.clientId = body.clientId; s.lastContact = Date.now();
     return s;
   }
-  function next(s) {
+  function next(s, protocol) {
     const answer = { running: s.running, paused: Boolean(s.confirmation), runId: s.runId, step: null, tabId: s.tabId };
     if (s.running && !s.confirmation && !s.localPending && !s.inFlight) {
+      s.requireToken = protocol === 1;
+      if (!s.requireToken) {
+        const warning = 'Reload extension 4.3.0+ để dùng giao thức xác nhận step.';
+        const step = s.currentStep;
+        if (step.retry || step.onError || step.completion?.stage || step.completion?.timeoutMs || step.completion?.state === 'appearedThenHidden') {
+          fail(s, warning);
+          return { ...answer, running: false };
+        }
+        (s.steps[s.index].warnings ||= []).push(warning);
+      }
       s.awaitingFirstBrowserStep = false;
       s.connectionDeadline = 0;
       s.inFlight = true;
       s.stepStartedAt = Date.now();
       s.steps[s.index].started_at = new Date(s.stepStartedAt).toISOString(); persist(s);
       const step = s.currentStep;
-      const budget = (step.timeoutMs || 10000) + (step.navigationTimeoutMs || 30000) +
+      const budget = scenarios.stepBudget ? scenarios.stepBudget(step) : (step.timeoutMs || 10000) + (step.navigationTimeoutMs || 30000) +
         (step.waitAfterMs || 0) + (step.times || 1) * (step.intervalMs || 2500) + 30000;
       s.deadline = Date.now() + budget;
-      answer.step = { ...step, id: s.index };
+      s.stepToken = randomUUID();
+      // The extension stops itself before this budget runs out; the token ties its result to this dispatch.
+      const record = s.steps[s.index];
+      if (scenarios.stepTimeouts) { record.timeouts = { ...scenarios.stepTimeouts(step), budgetMs: budget }; record.max_attempts = scenarios.stepRetry(step).attempts + 1; }
+      answer.step = { ...step, id: s.index, token: s.stepToken, budgetMs: budget };
       if (step.action === 'closeTab') answer.step.closeTabId = s.openedTabIds.at(-1) ?? null;
     }
     return answer;
   }
+  // A definite failure stops the run unless the step opted in with onError: 'continue'. An unverified
+  // outcome (the action was sent but success could not be confirmed) always stops: the page must be
+  // checked by a person, because repeating a post/upload could duplicate it.
+  function stepFailed(s, body, allowContinue) {
+    const record = s.steps[s.index];
+    const unverified = body.status === 'unverified';
+    const reason = body.error || 'Action failed';
+    const message = unverified
+      ? `Step ${s.index + 1}: ${reason}. Kết quả chưa xác định: chưa xác nhận được thao tác trên trang có thành công hay không. Hãy kiểm tra trang trước khi chạy lại để tránh đăng/upload trùng.`
+      : `Step ${s.index + 1}: ${reason}`;
+    Object.assign(record, { error_type: body.errorType || 'action_failed', verification: unverified ? 'unverified' : 'failed',
+      attempts: body.attempts ?? record.attempts ?? 1, dispatched: typeof body.dispatched === 'boolean' ? body.dispatched : null });
+    if (!unverified && allowContinue && body.errorType === 'element_not_found' && body.dispatched === false && s.currentStep?.onError === 'continue') {
+      Object.assign(record, { continued: true });
+      endStep(s, 'failed', message); persist(s);
+      s.releaseMedia?.(); s.releaseMedia = null;
+      s.index++;
+      void advance(s, s.runId);
+      return;
+    }
+    s.errorType = unverified ? 'unverified' : record.error_type;
+    if (unverified) Object.assign(record, { state: 'unverified', ended_at: new Date().toISOString(), error: message,
+      elapsed_ms: record.started_at ? Date.now() - Date.parse(record.started_at) : 0 });
+    fail(s, message);
+  }
   function result(s, body) {
     if (!s.running || !s.inFlight || body.runId !== s.runId || body.id !== s.index) return;
+    if ((s.requireToken || body.token !== undefined) && body.token !== s.stepToken) return; // Response to an earlier dispatch.
+    if (Date.now() > s.deadline || Date.now() > s.runDeadline) { expire(); return; }
     s.inFlight = false;
     if (typeof body.actionUrl === 'string') s.steps[s.index].action_url = body.actionUrl;
-    if (!body.ok) return fail(s, `Step ${s.index + 1}: ${body.error || 'Action failed'}`);
+    if (Number.isInteger(body.attempts)) s.steps[s.index].attempts = body.attempts;
+    if (!body.ok) return stepFailed(s, body, true);
+    Object.assign(s.steps[s.index], { stage: body.stage || null, verification: body.confirmed === true ? 'confirmed' : 'not_verified' });
     s.lastStepMs = Date.now() - s.stepStartedAt;
     if (s.currentStep.action === 'closeTab') {
       const closedTabId = s.openedTabIds.pop();
@@ -246,7 +298,14 @@ function createWorkflows({ scenarios, defaultProfile, profiles, onChange = () =>
     try {
       if (s.currentStep.action === 'upload' && activity) {
         s.steps[s.index].upload = activity.recordUpload(s.currentStep, s.uploadFile, { runId: s.executionId, index: s.index,
-          actualUrl: typeof body.actionUrl === 'string' ? body.actionUrl : s.currentUrl });
+          actualUrl: typeof body.actionUrl === 'string' ? body.actionUrl : s.currentUrl, stage: s.currentStep.completion?.stage || null, confirmed: body.confirmed === true && body.stage === s.currentStep.completion?.stage });
+      }
+      const sourceNumber = s.steps[s.index].upload_step;
+      if (sourceNumber && body.confirmed === true && body.stage === s.currentStep.completion?.stage) {
+        const source = s.steps[sourceNumber - 1];
+        const event = source.upload;
+        source.upload = activity.recordUpload({ filePath: event.file_path, pageId: event.page_id, pageUrl: event.page_url, publicationDesc: event.description },
+          event, { runId: s.executionId, index: event.step_index, actualUrl: event.actual_url, stage: body.stage, confirmed: true });
       }
       if (s.currentUrl) s.steps[s.index].result_url = s.currentUrl;
       endStep(s, 'succeeded'); persist(s);
@@ -257,7 +316,8 @@ function createWorkflows({ scenarios, defaultProfile, profiles, onChange = () =>
   }
   function expire() {
     for (const s of sessions.values()) {
-      if (s.running && Date.now() > s.runDeadline) { fail(s, 'Workflow execution timed out'); continue; }
+      const runExpired = Date.now() > s.runDeadline;
+      if (s.running && !s.inFlight && runExpired) { fail(s, 'Workflow execution timed out'); continue; }
       if (s.running && s.awaitingFirstBrowserStep && !s.localPending) {
         if (s.connectionDeadline && Date.now() >= s.connectionDeadline) {
           fail(s, `Extension chưa kết nối với ${s.profile} sau 60 giây. Kiểm tra extension và profile trong Extension options.`);
@@ -265,7 +325,12 @@ function createWorkflows({ scenarios, defaultProfile, profiles, onChange = () =>
         }
         ensureProfile(s);
       }
-      if (s.running && s.inFlight && Date.now() > s.deadline) fail(s, `Step ${s.index + 1}: extension action timed out`);
+      if (s.running && s.inFlight && (runExpired || Date.now() > s.deadline)) {
+        // The extension is silent: the action may or may not have run, so a click/upload is "unverified".
+        const risky = ['click', 'upload'].includes(s.currentStep?.action);
+        stepFailed(s, { ok: false, status: risky ? 'unverified' : 'failed', errorType: runExpired ? 'run_timeout' : 'agent_timeout', dispatched: null,
+          error: runExpired ? 'Workflow execution timed out' : `Step timed out: extension không phản hồi trong ${Math.round((s.steps[s.index].timeouts?.budgetMs || 0) / 1000)} giây` }, false);
+      }
     }
   }
   function usesScenario(name) {

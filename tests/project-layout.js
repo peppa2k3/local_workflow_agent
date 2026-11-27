@@ -158,7 +158,7 @@ async function checkControl(standalone = false) {
       `], { encoding: 'utf8', env: { ...process.env, PACKAGE_ARCHIVE: archive } });
       assert.equal(inspection.status, 0, inspection.stderr);
       const entries = JSON.parse(inspection.stdout);
-      assert.deepEqual(entries.map(e => e.name).sort(), ['background.js', 'content.js', 'manifest.json', 'options.html', 'options.js']);
+      assert.deepEqual(entries.map(e => e.name).sort(), ['background.js', 'content.js', 'manifest.json', 'options.html', 'options.js', 'step-policy.js']);
       for (const entry of entries) assert.deepEqual(Buffer.from(entry.bytes, 'base64'), fs.readFileSync(path.join(tree, 'chrome-reels-extension', entry.name)));
       assert.equal(spawnSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(tree, 'scripts/package-extension.ps1')]).status, 1, 'existing release must not be overwritten');
     }

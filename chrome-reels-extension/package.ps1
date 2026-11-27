@@ -6,7 +6,7 @@ $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 $manifest = Get-Content -LiteralPath (Join-Path $extensionDir 'manifest.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 if ($manifest.manifest_version -ne 3 -or $manifest.version -notmatch '^\d+(\.\d+){0,3}$') { throw 'Invalid extension manifest/version' }
 # Explicit release contents: files outside this list never enter the upload ZIP.
-$files = @('manifest.json', 'background.js', 'content.js', 'options.html', 'options.js')
+$files = @('manifest.json', 'background.js', 'content.js', 'step-policy.js', 'options.html', 'options.js')
 $references = @($manifest.background.service_worker, $manifest.options_page)
 foreach ($script in $manifest.content_scripts) { $references += $script.js }
 foreach ($reference in $references) {

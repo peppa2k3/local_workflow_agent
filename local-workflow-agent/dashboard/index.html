@@ -267,7 +267,7 @@
   upload: { label: 'Upload file', fields: [['locatorType', 'Cách tìm nút / input file', 'locatorType'], ['locator', 'Nút mở chọn file (click trước), hoặc input[type=file]', 'text'], ['role', 'Role (khi tìm theo role)', 'text'], ['index', 'Vị trí từ 0 (nếu trùng)', 'number'], ['filePath', 'Đường dẫn file đầy đủ', 'text'], ['folder', 'Thư mục lưu trữ (có thể dùng biến)', 'text'], ['filename', 'Tên file trong thư mục', 'text'], ['timeoutMs', 'Timeout chờ ô file (ms)', 'number'], ['waitAfterMs', 'Chờ sau khi chọn file (ms)', 'number']] },
   scroll: { label: 'Cuộn trang', fields: [['pixels', 'Số pixel', 'number'], ['times', 'Số lần', 'number'], ['intervalMs', 'Khoảng cách (ms)', 'number']] }
 };
-for (const action of ['openUrl', 'click', 'type', 'setDate', 'setTime', 'upload']) {
+for (const action of ['openUrl', 'click', 'type', 'setDate', 'setTime', 'upload', 'waitFor']) {
   actions[action].fields.push(
     ['navigationTimeoutMs', 'Timeout tải trang / kết quả (ms, mặc định 30000)', 'number'],
     ['completion.locatorType', 'Điều kiện hoàn tất: cách tìm', 'locatorType'],
@@ -301,10 +301,10 @@ const defaults = {
 const $ = id => document.getElementById(id);
 function setProperty(node, key, value) { if (node[key] !== value) node[key] = value; }
 function setText(id, value) { setProperty($(id), 'textContent', value); }
-const stepStates = { pending: 'Chưa chạy', running: 'Đang chạy', succeeded: 'Thành công', failed: 'Thất bại', cancelled: 'Đã dừng', interrupted: 'Gián đoạn' };
+const stepStates = { unverified: 'Chưa xác minh', pending: 'Chưa chạy', running: 'Đang chạy', succeeded: 'Thành công', failed: 'Thất bại', cancelled: 'Đã dừng', interrupted: 'Gián đoạn' };
 function stepSummary(step) {
   const upload = step.upload;
-  return `${step.number}. ${step.label} · ${stepStates[step.state] || step.state}${step.reused ? ' · Đã tải trước đó, dùng file đã lưu' : ''}${step.file_path ? ' · ' + step.file_path : ''}${upload ? ' · Upload: ' + (upload.page_url || 'chưa rõ page') + ' · ' + new Date(upload.uploaded_at).toLocaleString('vi-VN') : ''}${step.error ? ' · ' + step.error : ''}`;
+  return `${step.number}. ${step.label} · ${stepStates[step.state] || step.state}${step.reused ? ' · Đã tải trước đó, dùng file đã lưu' : ''}${step.file_path ? ' · ' + step.file_path : ''}${upload ? ' · Upload: ' + (upload.page_url || 'chưa rõ page') + ' · ' + (upload.state || '') : ''}${step.attempts ? ' · Số lần thử: ' + step.attempts : ''}${step.warnings?.length ? ' · ' + step.warnings.join(' · ') : ''}${step.error ? ' · ' + step.error : ''}`;
 }
 $('historyBtn').onclick = () => handle(async () => {
   const profile = executionProfile();
@@ -463,11 +463,11 @@ async function chooseFile(input) {
 function field(labelText, value, type, update) {
   const label = document.createElement('label');
   label.textContent = labelText;
-  const isSelect = ['locatorType', 'conditionState', 'dateFormat', 'videoQuality', 'audioLanguage'].includes(type);
+  const isSelect = ['errorPolicy', 'stage', 'locatorType', 'conditionState', 'dateFormat', 'videoQuality', 'audioLanguage'].includes(type);
   const input = document.createElement(isSelect ? 'select' : 'input');
   input.setAttribute('aria-label', labelText);
   if (isSelect) {
-    const options = type === 'videoQuality' ? { 360: '360p', 480: '480p', 720: 'HD (720p)', 1080: 'Full HD (1080p)', 1440: '2K (1440p)', 2160: '4K (2160p)', best: 'Cao nhất' } : type === 'audioLanguage' ? { vi: 'Tiếng Việt', en: 'Tiếng Anh', zh: 'Tiếng Trung', ja: 'Tiếng Nhật', ko: 'Tiếng Hàn', auto: 'Theo nguồn' } : type === 'dateFormat' ? { 'DD/MM/YYYY': 'Ngày/tháng/năm', 'MM/DD/YYYY': 'Tháng/ngày/năm', 'YYYY-MM-DD': 'Năm-tháng-ngày' } : type === 'conditionState' ? { visible: 'Xuất hiện', hidden: 'Biến mất', enabled: 'Có thể tương tác' } : { role: 'Role + tên', text: 'Chữ hiển thị', label: 'Label', placeholder: 'Placeholder', testid: 'Test ID', xpath: 'XPath', css: 'CSS' };
+    const options = type === 'stage' ? { '': 'Chưa chỉ định', uploaded: 'Đã tải lên', processed: 'Đã xử lý', published: 'Đã đăng' } : type === 'errorPolicy' ? { '': 'Dừng', continue: 'Bỏ qua nếu chưa gửi input' } : type === 'videoQuality' ? { 360: '360p', 480: '480p', 720: 'HD (720p)', 1080: 'Full HD (1080p)', 1440: '2K (1440p)', 2160: '4K (2160p)', best: 'Cao nhất' } : type === 'audioLanguage' ? { vi: 'Tiếng Việt', en: 'Tiếng Anh', zh: 'Tiếng Trung', ja: 'Tiếng Nhật', ko: 'Tiếng Hàn', auto: 'Theo nguồn' } : type === 'dateFormat' ? { 'DD/MM/YYYY': 'Ngày/tháng/năm', 'MM/DD/YYYY': 'Tháng/ngày/năm', 'YYYY-MM-DD': 'Năm-tháng-ngày' } : type === 'conditionState' ? { visible: 'Xuất hiện', hidden: 'Biến mất', appearedThenHidden: 'Xuất hiện rồi biến mất (upload)', enabled: 'Có thể tương tác' } : { role: 'Role + tên', text: 'Chữ hiển thị', label: 'Label', placeholder: 'Placeholder', testid: 'Test ID', xpath: 'XPath', css: 'CSS' };
     if (['videoQuality', 'audioLanguage'].includes(type) && value != null && !(value in options)) options[value] = String(value);
     for (const [key, text] of Object.entries(options)) {
       const option = document.createElement('option'); option.value = key; option.textContent = text; input.append(option);
@@ -636,15 +636,26 @@ function render() {
       help.textContent = 'Đóng tab gần nhất được tạo bởi bước Mở URL trong lượt chạy này.';
       body.append(help);
     }
-    for (const [key, label, type] of actions[step.action].fields) {
+    const advanced = document.createElement('details');
+    const summary = document.createElement('summary');
+    summary.textContent = 'Nâng cao';
+    advanced.append(summary);
+    const optionalFields = ['click', 'type', 'waitFor', 'setTime', 'setDate', 'upload'].includes(step.action) ? [
+      ['retry.attempts', 'Số lần thử lại (0–5)', 'number'], ['retry.delayMs', 'Chờ giữa hai lần thử (ms)', 'number'],
+      ['onError', 'Khi thiếu phần tử', 'errorPolicy'], ['completion.timeoutMs', 'Timeout điều kiện hoàn tất (ms)', 'number'],
+      ['completion.stage', 'Giai đoạn đã xác nhận', 'stage'], ['uploadStep', 'Bước upload liên quan (tính từ 1)', 'number']
+    ] : [];
+    for (const [key, label, type] of [...actions[step.action].fields, ...optionalFields]) {
       const [parent, child] = key.split('.');
       const value = child ? step[parent]?.[child] : step[parent];
-      fields.append(field(label, value ?? (type === 'locatorType' ? 'css' : type === 'conditionState' ? 'visible' : type === 'dateFormat' ? 'DD/MM/YYYY' : ''), type, value => {
+      const container = optionalFields.some(([name]) => name === key) ? advanced : fields;
+      container.append(field(label, value ?? (type === 'locatorType' ? 'css' : type === 'conditionState' ? 'visible' : type === 'dateFormat' ? 'DD/MM/YYYY' : ''), type, value => {
         const target = child ? (step[parent] ||= {}) : step;
-        if (value === undefined) delete target[child || parent]; else target[child || parent] = value;
+        if (value === undefined || value === '') delete target[child || parent]; else target[child || parent] = value;
         if (['url', 'filePath'].includes(key)) syncVariableClipButtons();
       }));
     }
+    if (optionalFields.length) fields.append(advanced);
     body.append(nameField, fields); card.append(head, body); list.append(card);
   });
   syncVariableClipButtons();
