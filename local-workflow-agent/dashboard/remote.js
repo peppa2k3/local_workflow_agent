@@ -47,7 +47,7 @@
   }
   $('pair-form').addEventListener('submit', event => { event.preventDefault(); void change(event.submitter, 'pair-start', Object.fromEntries(new FormData(event.target)), 'Nhập mã tại web VPS rồi xác nhận tài khoản tại đây.'); });
   $('approve').addEventListener('click', () => change($('approve'), 'pair-approve', { claim }, 'Đã xác nhận tài khoản. Thiết bị sẽ chủ động kết nối VPS.'));
-  $('disconnect').addEventListener('click', () => { if (confirm('Ngắt kết nối và dừng các lượt chạy remote trên máy này?')) void change($('disconnect'), 'disconnect', {}, 'Đã ngắt kết nối local.'); });
+  $('disconnect').addEventListener('click', async () => { if (await window.askConfirmation('Ngắt kết nối và dừng các lượt chạy remote trên máy này?')) void change($('disconnect'), 'disconnect', {}, 'Đã ngắt kết nối local.'); });
   $('policy-form').addEventListener('submit', event => {
     event.preventDefault(); const profiles = [...$('profiles').querySelectorAll('input:checked')].map(n => n.value), scenarios = [], variables = {}, clipScenarios = [];
     for (const box of $('scenarios').children) {

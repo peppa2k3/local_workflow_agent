@@ -353,3 +353,9 @@ Khởi động lại agent, Reload extension và tải lại trang đích. Các 
   "completion": { "selector": ".post-success", "state": "visible", "stage": "published", "timeoutMs": 90000 }
 }
 ```
+
+## Xác nhận từ local và Control Server
+
+Trên Control Server, chọn thiết bị đã ghép nối để trả lời Yes/No cho workflow đang chờ. Cả lượt chạy từ local và lượt chạy từ server đều dùng quyền chia sẻ theo profile và kịch bản. Local áp dụng câu trả lời cho đúng lượt chạy và đúng bước đang chờ. Tải video giữ thời hạn 30 giây. Cảnh báo upload trùng chờ quyết định hoặc đến khi lượt chạy kết thúc.
+
+Dashboard local dùng chung hộp thoại xác nhận cho xóa kịch bản, xóa kết quả Scanner và ngắt kết nối. Khi đã ghép nối, chủ thiết bị có thể trả lời từ server qua kỳ polling. Đóng trang hoặc để hộp thoại này hết hạn sau hai phút sẽ hủy thao tác.

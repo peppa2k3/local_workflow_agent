@@ -1,3 +1,4 @@
+const { collectPrompts, applyDecisions } = require('./confirmations');
 const path = require('node:path');
 const c = require('../../../shared/remote-protocol');
 const { randomUUID } = require('node:crypto');
@@ -10,6 +11,7 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, localTask
   let pendingBusy = false, actionBusy = false, closed = false, timer, error = '', lastContact = 0;
   const abort = new AbortController();
   const instanceId = randomUUID();
+  const dashboardPrompts = require('./dashboard-prompts').createDashboardPrompts();
   const executor = createRemoteExecutor({ dataDir, workflows, scenarios, getPolicy: () => config.policy, localTasks });
   let failures = 0, nextAttempt = 0;
   const save = () => c.atomicJson(file, config);
@@ -118,6 +120,9 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, localTask
           }) };
         const reports = executor.reports(config.device.id);
         const exchange = { id: config.device.id, instanceId, metadata, reports, ...(scanActivity && {activity:activitySnapshot()}) };
+        const pairedId = config.device.id;
+        const prompts = collectPrompts(dashboardPrompts.snapshot(pairedId), knownProfiles, workflows, policy, exchange);
+        exchange.prompts = prompts;
         if (localTasks) {
           const tasks = localTasks.snapshot({ profiles: knownProfiles.map(p => p.directory), scenarios: metadata.scenarios.map(s => s.name) });
           let budget = 127000 - Buffer.byteLength(JSON.stringify(exchange));
@@ -136,6 +141,7 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, localTask
         })));
         executor.acknowledge(response.ack);
         if (response.command) await executor.execute(response.command, config.device.id);
+        applyDecisions(response.promptDecisions, prompts, workflows, config.policy, dashboardPrompts);
         executor.confirmDownloads(response.downloadDecisions, config.device.id);
         lastContact = Date.now();
       }
@@ -164,7 +170,12 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, localTask
       clipScenarios: [...new Set(clipScenarios)] }; save();
     if (config.device) executor.stopOwned(config.device.id, config.policy);
   }
-  async function action(route, data) {
+  async function action(route, data, response) {
+    if (route === 'prompt-open') return dashboardPrompts.open(c.uuid(data.id), c.text(data.message, 2048), config.device?.id, response);
+    if (route === 'prompt-answer') {
+      if (!dashboardPrompts.decide(c.uuid(data.id), data.proceed)) c.fail('Confirmation unavailable', 409);
+      return { ok: true };
+    }
     if (route === 'policy') setPolicy(data);
     else if (route === 'pair-start') {
       if (config.device || config.pending) c.fail('Disconnect/cancel the existing connection first', 409);
@@ -188,10 +199,13 @@ function createRemoteClient({ dataDir, profiles, scenarios, workflows, localTask
     return status();
   }
   timer = setInterval(() => { void tick(); }, 3000); timer.unref();
-  return { status, activityChanged, submitScanner(payload) {
+  return { status, activityChanged, sharesConfirmations(profile, scenario) {
+    return Boolean(config.device && config.policy.profiles.includes(profile) && config.policy.scenarios.includes(scenario));
+  }, submitScanner(payload) {
     if (!config.device) throw Error('Chưa ghép nối Control Server.');
     return request('/api/scanner/videos', { ...payload, id: config.device.id }, config.token);
-  }, async action(route, data) {
+  }, async action(route, data, response) {
+    if (route === 'prompt-open' || route === 'prompt-answer') return action(route, data, response);
     if (closed || pendingBusy || actionBusy) c.fail('Connection update in progress; retry shortly', 409);
     actionBusy = true;
     try { return await action(route, data); } finally { actionBusy = false; }

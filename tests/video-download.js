@@ -146,6 +146,7 @@ const { createCachedDownloader } = require('../local-workflow-agent/src/storage/
           steps: [{ number: 1, label: 'Tải clip', state: 'succeeded', reused: true, file_path: 'D:/Videos/sample.mp4' }, { number: 6, label: 'Bước cuối', state: 'failed', error: 'Target not found' }] }] };
         return route.fulfill({ json: data });
       });
+      await require('./helpers/dashboard-prompts').routeDashboardPrompts(page);
       await page.goto('http://127.0.0.1:34719');
       const saveScenario = async () => {
         await page.locator('#saveBtn').click();
@@ -194,12 +195,12 @@ const { createCachedDownloader } = require('../local-workflow-agent/src/storage/
       assert.equal(await page.locator('.step-title').textContent(), 'Bước 1');
       const reference = page.getByLabel('Chèn biến: URL', { exact: true });
       assert(await reference.locator('option[value="download_title"]').count());
-      page.once('dialog', dialog => dialog.dismiss());
       await page.locator('#deleteBtn').click();
+      await page.getByRole('dialog').getByRole('button', { name: 'No', exact: true }).click();
       await page.waitForFunction(() => !document.getElementById('deleteBtn').disabled);
       assert(!deleted);
-      page.once('dialog', dialog => dialog.accept());
       await page.locator('#deleteBtn').click();
+      await page.getByRole('dialog').getByRole('button', { name: 'Yes', exact: true }).click();
       await page.waitForFunction(() => document.getElementById('message').textContent.includes('Đã xóa'));
       assert(deleted);
       assert.equal(await page.locator('#scenarioSelect option').count(), 0);

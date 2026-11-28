@@ -2,7 +2,7 @@ const { randomUUID } = require('crypto');
 const { setTimeout: delay } = require('timers/promises');
 const { overrideVariables } = require('./variables');
 
-function createWorkflows({ scenarios, defaultProfile, profiles, onChange = () => {}, openProfile, openFolder, downloadVideo, activity, prepareUpload, mediaGuard }) {
+function createWorkflows({ scenarios, defaultProfile, profiles, sharesConfirmations = () => false, onChange = () => {}, openProfile, openFolder, downloadVideo, activity, prepareUpload, mediaGuard }) {
   const sessions = new Map();
   const completed = new Map();
   activity?.onPageRemap?.(remap => {
@@ -92,7 +92,7 @@ function createWorkflows({ scenarios, defaultProfile, profiles, onChange = () =>
           timer = setTimeout(() => {
             try { resolveConfirmation(s.profile, s.executionId, id, true, 'timeout'); }
             catch (error) { clean(); reject(error); }
-          }, Math.max(0, expiresAt - Date.now()) + (s.remote ? 4000 : 0));
+          }, Math.max(0, expiresAt - Date.now()) + (s.remote || sharesConfirmations(s.profile, s.scenarioName) ? 4000 : 0));
         }
       } catch (error) { clean(); reject(error); }
     });

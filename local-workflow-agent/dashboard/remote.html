@@ -170,4 +170,33 @@
     if (event.persisted) restore();
   });
 })();
+</script><script>window.askConfirmation = async function askConfirmation(message) {
+  const id = crypto.randomUUID();
+  const post = async (route, body) => {
+    const response = await fetch('/api/remote/' + route, { method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Local-Agent-Session': document.querySelector('meta[name=local-agent-session]').content },
+      body: JSON.stringify({ id, ...body }) });
+    if (!response.ok) throw Error('Không gửi được yêu cầu xác nhận.');
+    return response.json();
+  };
+  const dialog = document.createElement('dialog');
+  const question = document.createElement('p');
+  question.id = 'confirmation-' + id;
+  dialog.setAttribute('aria-labelledby', question.id);
+  question.textContent = message;
+  dialog.append(question);
+  const answer = proceed => post('prompt-answer', { proceed }).catch(error => window.toast.error(error.message));
+  for (const [label, proceed] of [['Yes', true], ['No', false]]) {
+    const button = document.createElement('button');
+    button.textContent = label;
+    button.onclick = () => answer(proceed);
+    dialog.append(button);
+  }
+  dialog.oncancel = event => { event.preventDefault(); answer(false); };
+  document.body.append(dialog);
+  dialog.showModal();
+  try { return (await post('prompt-open', { message })).proceed; }
+  catch (error) { window.toast.error(error.message); return false; }
+  finally { dialog.remove(); }
+};
 </script><nav class="site-nav" aria-label="Điều hướng chính"><div class="nav-inner"><a class="site-brand" href="/"><i aria-hidden="true"></i>Workflow Studio</a><div class="site-links"><a href="/">Kịch bản</a><a href="/content">Quản lý nội dung</a><a href="/remote" aria-current="page">Remote Control</a><a href="/scanner">Scan YouTube</a></div></div></nav><main class="shell"><header class="page-heading"><div><h1>Điều khiển từ xa</h1><p>Ghép nối tài khoản và cấp quyền chạy kịch bản cho từng profile.</p></div></header><div id="message" role="status" class="notice" hidden=""></div><div class="two remote-connection"><div class="panel"><h2>Kết nối VPS</h2><div id="connection" class="muted">Đang đọc trạng thái…</div><form id="pair-form"><label class="dashboard-field">Địa chỉ web điều khiển<input type="url" placeholder="https://control.example.com" required="" name="url"/></label><label class="dashboard-field">Tên máy hiển thị<input required="" maxLength="80" placeholder="Máy đăng Reels văn phòng" name="name"/></label><button type="submit" class="primary">Tạo mã ghép nối</button></form><div id="pending" hidden=""><p>Đăng nhập web VPS và nhập mã sau:</p><code id="code" class="code"></code><small id="expires"></small><p id="claim"></p><button id="approve" class="primary" hidden="">Đồng ý cho tài khoản này kết nối</button></div><p><button id="disconnect" class="danger" hidden="">Ngắt kết nối / hủy ghép nối</button></p></div><div class="panel subtle"><h2>Máy local giữ quyền kiểm soát</h2><p class="muted">Chỉ cấp quyền cho profile và kịch bản cần dùng. Tài khoản ghép nối có thể xem và quản lý tác vụ local của các profile và kịch bản đã cấp quyền. Mặc định tài khoản remote không được thay giá trị biến. Không gửi file video, mật khẩu hay cấu hình MongoDB lên VPS.</p><small>Để chạy bước trên website, Chrome profile và extension phải hoạt động. Sau khi lưu quyền, VPS nhận thay đổi ở lần kết nối kế tiếp. Khi ngắt kết nối, các lượt chạy remote sẽ được dừng.</small></div></div><form id="policy-form" class="remote-policy"><section class="panel"><h2>Quyền điều khiển trên máy này</h2><h3>Chrome profiles</h3><div id="profiles" class="choice-list"></div></section><section class="panel"><h2>Kịch bản được phép chạy</h2><div id="scenarios" class="choice-list"></div><p><button class="primary" type="submit">Lưu quyền điều khiển</button></p><small>Thay đổi nội dung JSON local sẽ áp dụng cho lần chạy kế tiếp của kịch bản được cấp quyền.</small></section></form><footer>Kết nối chủ động ra VPS · Không mở cổng 34719 ra Internet</footer></main></body></html>

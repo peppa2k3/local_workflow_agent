@@ -36,7 +36,7 @@ const mongoSync = createMongoSync(activity, { settings: mongoSettings });
 const content = createContentApi({ mongo: mongoSync, activity, readBody });
 const mediaGuard = createMediaGuard({ activity, mongo: mongoSync });
 const cachedDownloader = createCachedDownloader(activity, downloadVideo);
-const workflows = createWorkflows({ onChange: () => remote.activityChanged(), scenarios, defaultProfile: profile, profiles, activity, mediaGuard, openProfile, prepareUpload: content.prepareUpload, async downloadVideo(step, signal, context) {
+const workflows = createWorkflows({ sharesConfirmations: (profile, scenario) => remote.sharesConfirmations(profile, scenario), onChange: () => remote.activityChanged(), scenarios, defaultProfile: profile, profiles, activity, mediaGuard, openProfile, prepareUpload: content.prepareUpload, async downloadVideo(step, signal, context) {
   if (isClip(step.url)) {
     const clip = await downloadVideo(step, signal);
     const file = await activity.registerFile(clip.filePath, { duration: clip.duration, tag: step.folderTag || 'automation', signal });
@@ -153,7 +153,7 @@ const server = http.createServer(async (request, response) => {
     if (route.startsWith('/api/remote/')) {
       if (!dashboardAuthorized(request) || (origin && origin !== `http://127.0.0.1:${port}`)) return json(403, { error: 'Local dashboard approval required' });
       if (request.method === 'GET' && route === '/api/remote/status') return json(200, remote.status());
-      if (request.method === 'POST') return json(200, await remote.action(route.slice('/api/remote/'.length), await readBody(request)));
+      if (request.method === 'POST') return json(200, await remote.action(route.slice('/api/remote/'.length), await readBody(request), response));
       return json(405, { error: 'Method not allowed' });
     }
     if (route.startsWith('/api/v1/')) return await automation.handle(request, url, json);

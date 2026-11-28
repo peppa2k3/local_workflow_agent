@@ -114,7 +114,7 @@ function updateResults(rows) {
 }
 async function manageResults(ids, operation) {
   if (editing || !ids.length) return;
-  if (operation === 'delete' && !window.confirm('Xóa ' + ids.length + ' kết quả khỏi Scanner local?')) return;
+  if (operation === 'delete' && !await window.askConfirmation('Xóa ' + ids.length + ' kết quả khỏi Scanner local?')) return;
   editing = true;
   updateSelection();
   try {

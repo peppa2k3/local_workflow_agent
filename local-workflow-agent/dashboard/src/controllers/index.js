@@ -460,7 +460,7 @@ $('renameBtn').onclick = () => handle(() => editTask(async () => {
 }));
 $('deleteBtn').onclick = () => handle(() => editTask(async () => {
   const target = fileName;
-  if (!window.confirm(`Xóa kịch bản "${target}"? File JSON này sẽ bị xóa.`)) return;
+  if (!await window.askConfirmation(`Xóa kịch bản "${target}"? File JSON này sẽ bị xóa.`)) return;
   await api(`/api/scenarios/${encodeURIComponent(target)}`, 'DELETE');
   await refreshNames();
   const next = $('scenarioSelect').options[0]?.value;

@@ -4,6 +4,7 @@ import Scenarios from "./pages/Scenarios.jsx";
 import Content from "./pages/Content.jsx";
 import Remote from "./pages/Remote.jsx";
 import Scanner from "./pages/Scanner.jsx";
+import confirmationScript from './confirmation.js?raw';
 import toastScript from "./toast.js?raw";
 import toastCss from "./styles/toast.css?raw";
 import common from "./styles/workspace.css?raw";
@@ -72,6 +73,7 @@ export function renderDashboard() {
         </head>
         <body className={"workspace " + name}>
           <script dangerouslySetInnerHTML={{ __html: toastScript }} />
+          <script dangerouslySetInnerHTML={{ __html: confirmationScript }} />
           <Navigation current={path} />
           <Page />
           {controller && (

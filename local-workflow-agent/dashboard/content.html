@@ -247,6 +247,35 @@ code{font-family:Consolas,monospace;font-size:12px}
     if (event.persisted) restore();
   });
 })();
+</script><script>window.askConfirmation = async function askConfirmation(message) {
+  const id = crypto.randomUUID();
+  const post = async (route, body) => {
+    const response = await fetch('/api/remote/' + route, { method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Local-Agent-Session': document.querySelector('meta[name=local-agent-session]').content },
+      body: JSON.stringify({ id, ...body }) });
+    if (!response.ok) throw Error('Không gửi được yêu cầu xác nhận.');
+    return response.json();
+  };
+  const dialog = document.createElement('dialog');
+  const question = document.createElement('p');
+  question.id = 'confirmation-' + id;
+  dialog.setAttribute('aria-labelledby', question.id);
+  question.textContent = message;
+  dialog.append(question);
+  const answer = proceed => post('prompt-answer', { proceed }).catch(error => window.toast.error(error.message));
+  for (const [label, proceed] of [['Yes', true], ['No', false]]) {
+    const button = document.createElement('button');
+    button.textContent = label;
+    button.onclick = () => answer(proceed);
+    dialog.append(button);
+  }
+  dialog.oncancel = event => { event.preventDefault(); answer(false); };
+  document.body.append(dialog);
+  dialog.showModal();
+  try { return (await post('prompt-open', { message })).proceed; }
+  catch (error) { window.toast.error(error.message); return false; }
+  finally { dialog.remove(); }
+};
 </script><nav class="site-nav" aria-label="Điều hướng chính"><div class="nav-inner"><a class="site-brand" href="/"><i aria-hidden="true"></i>Workflow Studio</a><div class="site-links"><a href="/">Kịch bản</a><a href="/content" aria-current="page">Quản lý nội dung</a><a href="/remote">Remote Control</a><a href="/scanner">Scan YouTube</a></div></div></nav><div><main class="main"><header class="page-heading"><div><h1>Kho nội dung</h1><p>Theo dõi clip, trang đích và các lượt đăng.</p></div><button id="refresh">Làm mới dữ liệu</button></header><section class="connection" aria-label="Kết nối MongoDB Atlas"><div class="connection-head"><div><h2>MongoDB Atlas<!-- --> <span class="badge" id="connectionBadge">Đang kiểm tra</span></h2><p id="connectionInfo" class="muted">Database: team_content</p></div><div class="actions"><button id="ping">Kiểm tra kết nối</button><button id="reconnect">Đọc lại .env / kết nối</button><button id="sync" class="primary">Đồng bộ ngay</button></div></div><p id="connectionHelp" class="muted" style="margin-top:12px"></p></section><div class="metrics" aria-label="Tổng quan"><div class="metric"><span class="muted">Clip đã tải</span><strong id="countDownloads">—</strong></div><div class="metric"><span class="muted">Lượt upload</span><strong id="countUploads">—</strong></div><div class="metric"><span class="muted">Asset nội dung</span><strong id="countAssets">—</strong></div><div class="metric"><span class="muted">Publication</span><strong id="countPublications">—</strong></div></div><div class="tabs" id="tabs" role="tablist" aria-label="Loại dữ liệu"></div><form class="filters" id="searchForm"><label class="search">Tìm kiếm<input id="search" placeholder="Tiêu đề, URL hoặc mã nội dung…" maxLength="256"/></label><label id="activeFilterLabel" hidden="">Trạng thái page<select id="activeFilter"><option value="">Tất cả</option><option value="true">Đang hoạt động</option><option value="false">Đã ngừng</option></select></label><button type="submit">Tìm kiếm</button><button id="newPage" type="button" class="primary" hidden="">＋ Thêm page</button></form><div id="message" class="message" role="status"></div><div class="table-wrap"><table id="catalogTable"><thead id="tableHead"></thead><tbody id="tableBody"></tbody></table><div id="empty" class="empty" hidden="">Chưa có dữ liệu.</div></div><div class="footer"><span id="tableStatus"></span><div class="actions"><button id="previous">← Trước</button><button id="next">Sau →</button></div></div></main></div><dialog id="pageDialog"><form id="pageForm"><h2 id="pageTitle">Thêm page</h2><p class="muted">Page được lưu trong database dùng chung. Các lượt upload có thể chọn trực tiếp page này.</p><label class="dashboard-field">Tên page<input id="pageName" required="" maxLength="256"/></label><label class="dashboard-field">Nền tảng<input id="pagePlatform" required="" maxLength="64" value="Facebook"/></label><label class="dashboard-field">URL page<input id="pageUrl" type="url" placeholder="https://www.facebook.com/..."/></label><label class="dashboard-field">Trạng thái<select id="pageActive"><option value="true">Đang hoạt động</option><option value="false">Ngừng hoạt động</option></select></label><p id="pageError" class="message error" role="alert"></p><div class="actions"><button type="button" data-close="pageDialog">Hủy</button><button id="savePage" class="primary" type="submit">Lưu page</button></div></form></dialog><dialog id="publicationDialog"><form id="publicationForm"><h2>Sửa publication</h2><p class="muted">Cập nhật metadata của bản ghi hiện tại. Để trống ngày đăng nếu chưa xác nhận bài đã xuất bản.</p><label>Mô tả<textarea id="publicationDesc" maxLength="20000"></textarea></label><label class="dashboard-field">Link bài đã đăng<input id="postUrl" type="url"/></label><label class="dashboard-field">Ngày đăng (Asia/Bangkok, UTC+7)<input id="publishedAt" type="datetime-local"/></label><p id="publicationError" class="message error" role="alert"></p><div class="actions"><button type="button" data-close="publicationDialog">Hủy</button><button id="savePublication" class="primary" type="submit">Lưu publication</button></div></form></dialog><dialog id="detailDialog"><h2 id="detailTitle">Chi tiết</h2><div id="detailBody"></div><div class="actions" style="margin-top:18px"><button id="copyId">Sao chép ID</button><button data-close="detailDialog">Đóng</button></div></dialog><script>const $ = id => document.getElementById(id);
 const token = '__LOCAL_AGENT_DASHBOARD_TOKEN__';
 const dateFormat = new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Bangkok', dateStyle: 'short', timeStyle: 'medium' });

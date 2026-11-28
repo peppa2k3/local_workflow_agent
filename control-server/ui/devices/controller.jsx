@@ -52,7 +52,7 @@ export function start() {
     if (text) toast[error ? 'error' : 'success'](text);
   }
   const api = createApi(() => csrf, loginView);
-  const { popup, closeDownloadPrompt, showDownloadConfirmation, reset } = createConfirmations({
+  const { popup, closePrompt, showPendingConfirmation, reset } = createConfirmations({
     api,
     refresh,
     message,
@@ -195,7 +195,7 @@ export function start() {
         selected={selected}
         onSelect={(id) => {
           if (selected !== id) {
-            closeDownloadPrompt();
+            closePrompt();
             selected = id;
             formSignature = '';
             runIntent = null;
@@ -291,7 +291,7 @@ export function start() {
     try {
       devices = (await api('/api/devices')).devices;
       if (selected && !devices.some((d) => d.id === selected)) {
-        closeDownloadPrompt();
+        closePrompt();
         closeClipPicker?.();
         selected = '';
         formSignature = '';
@@ -303,9 +303,9 @@ export function start() {
       renderDetail();
       deviceId = selected;
       if (deviceId) {
-        const { commands } = await api(`/api/commands?device=${encodeURIComponent(deviceId)}`);
+        const { commands, prompts } = await api(`/api/commands?device=${encodeURIComponent(deviceId)}`);
         if (selected === deviceId) {
-          showDownloadConfirmation(commands, deviceId);
+          showPendingConfirmation(commands, deviceId, prompts);
           updateHistory(commands, deviceId);
         }
       }

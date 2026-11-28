@@ -1,3 +1,4 @@
+const { reconcilePrompts } = require('./confirmations');
 const c = require('../shared/remote-protocol');
 const { linkRun } = require('./video-library');
 const assignment = require('./assignment');
@@ -133,6 +134,19 @@ function createCommandApi(store) {
       });
     }
     if (route === '/api/schedule-decision' && method === 'POST') return scheduleDecision(owned(user, data.deviceId), data);
+    if (['/api/confirmation', '/api/download-confirmation'].includes(route) && method === 'POST') {
+      const d = owned(user, data.deviceId);
+      const prompt = d.prompts?.find(p => p.id === data.id && p.runId === data.runId);
+      if (typeof data.proceed !== 'boolean') c.fail('Invalid decision');
+      if (prompt) {
+        if (d.revoked || d.leaseUntil <= Date.now() || prompt.expiresAt <= Date.now()) c.fail('Confirmation expired', 409);
+        if (prompt.proceed !== undefined && prompt.proceed !== data.proceed) c.fail('Already answered', 409);
+        prompt.proceed = data.proceed;
+        store.put('device', d, user.id);
+        return { ok: true };
+      }
+      if (route === '/api/confirmation') c.fail('Confirmation expired', 409);
+    }
     if (route === '/api/download-confirmation' && method === 'POST') {
       const d = owned(user, data.deviceId), id = c.uuid(data.id);
       const run = store.get('command', c.uuid(data.runId));
@@ -150,10 +164,11 @@ function createCommandApi(store) {
       return { ok: true };
     }
     if (route === '/api/commands' && method === 'GET') {
-      const id = url.searchParams.get('device'); owned(user, id);
+      const id = url.searchParams.get('device'); const device = owned(user, id);
       const requestId = url.searchParams.get('request');
       const commands = expire(user.id, id);
-      return { commands: commands.filter(v => requestId ? v.id === requestId : v.type !== 'browseClips')
+      const prompts = device.leaseUntil > Date.now() && !device.revoked ? device.prompts || [] : [];
+      return { prompts, commands: commands.filter(v => requestId ? v.id === requestId : v.type !== 'browseClips')
         .filter((cmd, index, list) => SCHEDULE_STATES.includes(cmd.state) || index >= list.length - 200).reverse().map(({ fingerprint, ...v }) => v) };
     }
     if (route !== '/api/commands' || method !== 'POST') c.fail('Not found', 404);
@@ -282,6 +297,9 @@ function createCommandApi(store) {
         }
         ack.push({ id: cmd.id, seq: report.seq });
       }
+      const previousPrompts = d.instanceId === data.instanceId ? d.prompts || [] : [];
+      d.prompts = reconcilePrompts(data.prompts, meta, previousPrompts);
+      const promptDecisions = d.prompts.filter(p => typeof p.proceed === 'boolean').map(({ id, runId, proceed }) => ({ id, runId, proceed }));
       recordActivity(d,data);
       Object.assign(d, { metadata: meta, localTasks, lastSeen: now, instanceId: data.instanceId, leaseUntil: now + 35000 }); store.put('device', d, d.owner);
       const commands = expire(d.owner, d.id);
@@ -310,7 +328,7 @@ function createCommandApi(store) {
         .sort((a, b) => Number(a.type === 'run' || a.type === 'browseClips') - Number(b.type === 'run' || b.type === 'browseClips') || a.created - b.created)[0];
       if (!next && enabled) next = assignment.allocate(store, d.owner, now, d.id);
       if (next) { next.state = 'dispatched'; next.deliveryUntil = now + 10000; store.put('command', next, d.owner); }
-      return { ack, schedulePrompts, command: next ? { id: next.id, type: next.type, payload: next.payload, ...(next.automatic && { assignmentTopic: next.topic }), ...(next.scenarioId && {assignmentScenarioId:next.scenarioId}), expires: next.expires } : null, serverTime: now, downloadDecisions };
+      return { ack, promptDecisions, schedulePrompts, command: next ? { id: next.id, type: next.type, payload: next.payload, ...(next.automatic && { assignmentTopic: next.topic }), ...(next.scenarioId && {assignmentScenarioId:next.scenarioId}), expires: next.expires } : null, serverTime: now, downloadDecisions };
     });
   }
   return { account, device };
